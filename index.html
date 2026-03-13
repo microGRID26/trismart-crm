@@ -1077,18 +1077,21 @@ function clearPipeFilters(){
   renderPipeline();
 }
 function getPipeFiltered(){
-  const financier=document.getElementById('pf-financier').value;
-  const utility=document.getElementById('pf-utility').value;
-  const ahj=document.getElementById('pf-ahj').value;
-  const disposition=document.getElementById('pf-disposition').value;
-  const city=(document.getElementById('pf-city').value||'').toLowerCase().trim();
-  const sort=document.getElementById('pf-sort').value;
-  const dir=document.getElementById('pf-dir').value;
+  const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  const financier=g('pf-financier');
+  const utility=g('pf-utility');
+  const ahj=g('pf-ahj');
+  const disposition=g('pf-disposition');
+  const city=(g('pf-city')||'').toLowerCase().trim();
+  const sort=g('pf-sort')||'sla';
+  const dir=g('pf-dir')||'desc';
 
   ['pf-financier','pf-utility','pf-ahj','pf-disposition'].forEach(id=>{
-    document.getElementById(id).classList.toggle('pf-active',!!document.getElementById(id).value);
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('pf-active',!!el.value);
   });
-  document.getElementById('pf-city').classList.toggle('pf-active',!!city);
+  const cityEl=document.getElementById('pf-city');
+  if(cityEl) cityEl.classList.toggle('pf-active',!!city);
 
   let vis=visProjects();
   if(financier)   vis=vis.filter(p=>p.financier===financier);
@@ -1931,11 +1934,9 @@ function renderFilesSection(pid){
       <div class="files-folder-bar">
         <span class="files-folder-name">📁 Drive folder linked</span>
         <a href="${folder.folderUrl}" target="_blank" class="files-btn">Open Folder ↗</a>
-        <button class="files-btn" onclick="loadProjectFiles('${pid}')">↻ Refresh</button>
+        <button class="files-btn" onclick="loadProjectFiles('${pid}')">Load Files</button>
       </div>
-      <div id="files-list-${pid}"><div class="files-loading"><div class="spinner" style="width:14px;height:14px;border-width:1.5px;"></div> Loading files...</div></div>`;
-    // Auto-load files
-    loadProjectFiles(pid);
+      <div id="files-list-${pid}"><div class="files-empty" style="padding:4px 0;">Click Load Files to view contents.</div></div>`;
   }
   right.appendChild(container);
 }
