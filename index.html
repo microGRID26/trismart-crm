@@ -106,8 +106,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .queue-stat.qs-overdue{background:#fff0f0;border-color:#f5c6c6;color:#A32D2D;}
 .queue-stat.qs-today{background:#fffbeb;border-color:#fde68a;color:#92400e;}
 .queue-stat.qs-ok{background:#f0faf5;border-color:#a7f3d0;color:#065f46;}
-.queue-section-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:12px 0 6px;border-top:0.5px solid var(--border);margin-top:4px;}
+.queue-section-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:12px 0 6px;border-top:0.5px solid var(--border);margin-top:4px;user-select:none;}
 .queue-section-title:first-of-type{border-top:none;margin-top:0;}
+.queue-section-title:hover{color:var(--text2);}
 .qcard{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;margin-bottom:5px;}
 .qcard:hover{border-color:var(--border2);}
 .qcard.is-blocked{border-left:3px solid var(--purple);border-radius:0 var(--radius) var(--radius) 0;}
@@ -1263,22 +1264,32 @@ function renderQueue(){
   html+=`<span style="font-size:11px;color:var(--text3);margin-left:auto;">${vis.length} total projects</span></div>`;
 
   if(overduePrj.length){
-    html+=`<div class="queue-section-title">Overdue tasks — act now</div>`;
-    html+=overduePrj.map(qcard).join('');
+    html+=`<div class="queue-section-title" onclick="toggleQueueSection(this)" style="cursor:pointer;">▾ Overdue tasks — act now <span style="font-size:9px;color:var(--text3);font-weight:400;">${overduePrj.length}</span></div>`;
+    html+=`<div class="queue-section-body">${overduePrj.map(qcard).join('')}</div>`;
   }
   if(todayPrj.length){
-    html+=`<div class="queue-section-title">Due today</div>`;
-    html+=todayPrj.map(qcard).join('');
+    html+=`<div class="queue-section-title" onclick="toggleQueueSection(this)" style="cursor:pointer;">▾ Due today <span style="font-size:9px;color:var(--text3);font-weight:400;">${todayPrj.length}</span></div>`;
+    html+=`<div class="queue-section-body">${todayPrj.map(qcard).join('')}</div>`;
   }
   if(blockedPrj.length){
-    html+=`<div class="queue-section-title">Blocked</div>`;
-    html+=blockedPrj.map(qcard).join('');
+    html+=`<div class="queue-section-title" onclick="toggleQueueSection(this)" style="cursor:pointer;">▾ Blocked <span style="font-size:9px;color:var(--text3);font-weight:400;">${blockedPrj.length}</span></div>`;
+    html+=`<div class="queue-section-body">${blockedPrj.map(qcard).join('')}</div>`;
   }
   if(ontrackPrj.length){
-    html+=`<div class="queue-section-title">On track</div>`;
-    html+=ontrackPrj.map(qcard).join('');
+    html+=`<div class="queue-section-title collapsed" onclick="toggleQueueSection(this)" style="cursor:pointer;">▸ On track <span style="font-size:9px;color:var(--text3);font-weight:400;">${ontrackPrj.length}</span></div>`;
+    html+=`<div class="queue-section-body" style="display:none;">${ontrackPrj.map(qcard).join('')}</div>`;
   }
   grid.innerHTML=html;
+}
+
+function toggleQueueSection(el){
+  const body=el.nextElementSibling;
+  if(!body) return;
+  const collapsed=body.style.display==='none';
+  body.style.display=collapsed?'':'none';
+  // Swap arrow
+  el.innerHTML=el.innerHTML.replace(collapsed?'▸':'▾',collapsed?'▾':'▸');
+  el.classList.toggle('collapsed',!collapsed);
 }
 
 // ── PIPELINE ─────────────────────────────────────────────
