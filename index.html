@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TriSMART Solar CRM</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -278,10 +279,49 @@ select.np-input{cursor:pointer;}
 .mention-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;flex-shrink:0;}
 .chat-who-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .chat-who-sel{font-size:11px;padding:3px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;}
+
+/* LOGIN SCREEN */
+.login-screen{position:fixed;inset:0;background:var(--bg3);z-index:500;display:flex;align-items:center;justify-content:center;}
+.login-card{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:40px 48px;text-align:center;max-width:360px;width:100%;}
+.login-logo{font-size:22px;font-weight:600;margin-bottom:6px;}
+.login-logo span{color:var(--green);}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:28px;}
+.login-hint{font-size:11px;color:var(--text3);margin-top:16px;}
+/* user chip in topbar */
+.user-chip{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:20px;background:var(--bg2);border:0.5px solid var(--border);}
+.user-chip-avatar{width:24px;height:24px;border-radius:50%;object-fit:cover;}
+.user-chip-avatar-fallback{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;}
+.user-chip-name{font-size:11px;font-weight:500;color:var(--text);}
+.user-chip-out{font-size:10px;color:var(--text3);cursor:pointer;margin-left:2px;}
+.user-chip-out:hover{color:var(--red);}
 </style>
 </head>
 <body>
 <div class="loading-bar" id="loading-bar"></div>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Tri<span>SMART</span> Solar</div>
+    <div class="login-sub">Project Management</div>
+    <div id="g_id_onload"
+      data-client_id="628637774830-q3097k1680on1nk51jjjfv8jlsn7b4p2.apps.googleusercontent.com"
+      data-callback="onGoogleSignIn"
+      data-auto_select="true"
+      data-itp_support="true">
+    </div>
+    <div class="g_id_signin"
+      data-type="standard"
+      data-shape="rectangular"
+      data-theme="outline"
+      data-text="sign_in_with"
+      data-size="large"
+      data-logo_alignment="left"
+      data-width="260">
+    </div>
+    <div class="login-hint">Sign in with your TriSMART Google Workspace account</div>
+  </div>
+</div>
 <div class="app">
 <div class="topbar">
   <span class="logo">Tri<span>SMART</span> Solar</span>
@@ -300,6 +340,12 @@ select.np-input{cursor:pointer;}
   </select>
   <span class="saving-badge" id="saving-badge">Saving...</span>
   <button class="nav-btn" style="background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:500;" onclick="openNewProject()">+ New Project</button>
+  <div class="user-chip" id="user-chip" style="display:none;">
+    <div class="user-chip-avatar-fallback" id="user-avatar-fb" style="background:#1D9E75;"></div>
+    <img class="user-chip-avatar" id="user-avatar-img" style="display:none;" alt="">
+    <span class="user-chip-name" id="user-chip-name"></span>
+    <span class="user-chip-out" onclick="signOut()" title="Sign out">✕</span>
+  </div>
 </div>
 
 <!-- NEW PROJECT MODAL -->
@@ -1020,18 +1066,7 @@ function renderPanel(pid){
         <div class="chat-messages" id="chat-messages-${pid}">${renderChatMessages(pNotes)}</div>
         <div class="chat-input-wrap">
           <div class="mention-dropdown" id="mention-dd-${pid}"></div>
-          <div class="chat-who-wrap">
-            <span style="font-size:11px;color:var(--text2);">Posting as</span>
-            <select class="chat-who-sel" id="chat-who-${pid}">
-              <option value="Greg">Greg</option>
-              <option value="Heidi">Heidi</option>
-              <option value="Ari"${p.pm==='Ari'?' selected':''}>Ari</option>
-              <option value="Jen"${p.pm==='Jen'?' selected':''}>Jen</option>
-              <option value="Aaron">Aaron</option>
-              <option value="Zach">Zach</option>
-              <option value="Mark">Mark</option>
-            </select>
-          </div>
+          <div class="chat-who-wrap" id="chat-who-wrap-${pid}" style="display:none;"></div>
           <textarea class="chat-input" id="chat-input-${pid}" placeholder="Leave a note or @mention someone..." onkeydown="chatKeydown(event,'${pid}')" oninput="chatInput(this,'${pid}')"></textarea>
           <div class="chat-footer">
             <span class="chat-hint">@ to mention &nbsp;·&nbsp; Shift+Enter for new line &nbsp;·&nbsp; Enter to send</span>
@@ -1111,6 +1146,63 @@ function render(){
   else if(currentView==='pipeline') renderPipeline();
   else if(currentView==='analytics') renderAnalytics();
 }
+// ── GOOGLE AUTH ──────────────────────────────────────────
+let currentUser={name:'',email:'',picture:''};
+
+function parseJwt(token){
+  try{return JSON.parse(atob(token.split('.')[1]));}catch(e){return {};}
+}
+
+function onGoogleSignIn(response){
+  const payload=parseJwt(response.credential);
+  const firstName=(payload.given_name||payload.name||payload.email||'').split(' ')[0];
+  currentUser={
+    name:firstName,
+    fullName:payload.name||firstName,
+    email:payload.email||'',
+    picture:payload.picture||'',
+  };
+  // Store in sessionStorage so refresh keeps you logged in
+  sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
+  showUserChip();
+  document.getElementById('login-screen').style.display='none';
+  loadData();
+}
+
+function showUserChip(){
+  const chip=document.getElementById('user-chip');
+  const name=document.getElementById('user-chip-name');
+  const img=document.getElementById('user-avatar-img');
+  const fb=document.getElementById('user-avatar-fb');
+  name.textContent=currentUser.name;
+  if(currentUser.picture){
+    img.src=currentUser.picture;img.style.display='block';fb.style.display='none';
+  } else {
+    fb.textContent=(currentUser.name||'?').slice(0,2).toUpperCase();fb.style.display='flex';img.style.display='none';
+  }
+  chip.style.display='flex';
+}
+
+function signOut(){
+  sessionStorage.removeItem('crm_user');
+  currentUser={name:'',email:'',picture:''};
+  document.getElementById('user-chip').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+
+// Check session on load
+(function(){
+  const saved=sessionStorage.getItem('crm_user');
+  if(saved){
+    try{
+      currentUser=JSON.parse(saved);
+      showUserChip();
+      document.getElementById('login-screen').style.display='none';
+      // loadData() called below after DOM ready
+    }catch(e){}
+  }
+})();
+
 // ── CHAT ─────────────────────────────────────────────────
 const TEAM=[
   {name:'Greg',    color:'#1D9E75'},
@@ -1201,9 +1293,16 @@ function sendChat(pid){
   const whoEl=document.getElementById('chat-who-'+pid);
   if(!el||!el.value.trim()) return;
   const text=el.value.trim();
-  const who=whoEl?whoEl.value:'Team';
+  const who=currentUser.name||'Unknown';
+  if(!who||who==='Unknown'){showToast('Sign in to post messages');return;}
   const now=new Date();
-  const timeStr=now.toLocaleDateString()+' '+now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const mo=String(now.getMonth()+1).padStart(2,'0');
+  const dy=String(now.getDate()).padStart(2,'0');
+  const yr=now.getFullYear();
+  const hr=now.getHours()%12||12;
+  const mn=String(now.getMinutes()).padStart(2,'0');
+  const ap=now.getHours()>=12?'PM':'AM';
+  const timeStr=`${mo}/${dy}/${yr} ${hr}:${mn} ${ap}`;
   const note={text,time:timeStr,pm:who};
   if(!notes[pid]) notes[pid]=[];
   notes[pid].push(note);
@@ -1318,7 +1417,8 @@ document.getElementById('np-overlay').addEventListener('click',function(e){
   if(e.target===this) closeNewProject();
 });
 
-loadData();
+// Only load data if already logged in from session
+if(currentUser.name) loadData();
 </script>
 </body>
 </html>
