@@ -9,21 +9,18 @@
 :root{
   --bg:#ffffff;--bg2:#f5f5f3;--bg3:#efefec;
   --text:#1a1a1a;--text2:#666;--text3:#999;
-  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.2);
-  --info-bg:#e6f1fb;--info-text:#0c447c;
-  --success-bg:#eaf3de;--success-text:#27500a;
-  --warn-bg:#faeeda;--warn-text:#633806;
-  --danger-bg:#fcebeb;--danger-text:#a32d2d;
-  --purple-bg:#eeedfe;--purple-text:#3c3489;
+  --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.18);
   --radius:8px;--radius-lg:12px;
+  --green:#1D9E75;--green-bg:#eaf3de;--green-text:#27500a;
+  --amber:#BA7517;--amber-bg:#faeeda;--amber-text:#633806;
+  --red:#E24B4A;--purple:#534AB7;--purple-bg:#eeedfe;--purple-text:#3c3489;
+  --blue:#0C447C;--blue-bg:#e6f1fb;
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:var(--bg3);color:var(--text);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
-
-/* TOPBAR */
-.topbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg);border-bottom:0.5px solid var(--border);flex-wrap:wrap;position:sticky;top:0;z-index:10;}
+.topbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg);border-bottom:0.5px solid var(--border2);flex-wrap:wrap;position:sticky;top:0;z-index:10;}
 .logo{font-size:14px;font-weight:600;color:var(--text);margin-right:4px;}
-.logo span{color:#1D9E75;}
+.logo span{color:var(--green);}
 .nav-btn{font-size:12px;padding:5px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
 .nav-btn.active{background:var(--bg2);color:var(--text);font-weight:500;}
 .nav-btn:hover{background:var(--bg2);}
@@ -36,31 +33,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .sr-name{font-weight:500;font-size:12px;}
 .sr-meta{font-size:10px;color:var(--text3);margin-top:1px;}
 .pm-sel{font-size:12px;padding:5px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;margin-left:auto;}
-.loading-bar{height:2px;background:#1D9E75;position:fixed;top:0;left:0;right:0;z-index:100;transition:width .3s;width:0%;}
-.saving-badge{font-size:11px;padding:3px 8px;border-radius:var(--radius);background:var(--warn-bg);color:var(--warn-text);display:none;}
+.loading-bar{height:2px;background:var(--green);position:fixed;top:0;left:0;z-index:100;transition:width .3s;width:0%;}
+.saving-badge{font-size:11px;padding:3px 8px;border-radius:var(--radius);background:var(--amber-bg);color:var(--amber-text);display:none;}
 .saving-badge.show{display:inline-block;}
-
-/* MAIN */
 .main{flex:1;padding:16px;}
 .view{display:none;}
 .view.active{display:block;}
-
-/* LOADER */
 .loader{text-align:center;padding:60px 20px;color:var(--text3);font-size:14px;}
-.loader .spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:#1D9E75;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+.loader .spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 /* METRICS */
 .metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:16px;}
-.metric{background:var(--bg);border-radius:var(--radius);padding:10px 12px;}
+.metric{background:var(--bg);border-radius:var(--radius);padding:10px 12px;border:0.5px solid var(--border);}
 .metric-label{font-size:11px;color:var(--text2);margin-bottom:2px;}
 .metric-value{font-size:20px;font-weight:500;}
-.mv-blocked{color:#534AB7;}
-.mv-crit{color:#A32D2D;}
-.mv-warn{color:#BA7517;}
-.mv-ok{color:#3B6D11;}
+.mv-purple{color:var(--purple);}
+.mv-red{color:#A32D2D;}
+.mv-amber{color:var(--amber);}
+.mv-green{color:var(--green);}
 
-/* SECTION TITLES */
+/* SECTION TITLE */
 .section-title{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;margin-top:16px;}
 .section-title:first-of-type{margin-top:0;}
 
@@ -68,10 +61,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .alert-list{display:flex;flex-direction:column;gap:5px;margin-bottom:4px;}
 .alert-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);cursor:pointer;flex-wrap:wrap;}
 .alert-row:hover{border-color:var(--border2);}
-.alert-row.crit{border-left:3px solid #E24B4A;border-radius:0 var(--radius) var(--radius) 0;}
+.alert-row.crit{border-left:3px solid var(--red);border-radius:0 var(--radius) var(--radius) 0;}
 .alert-row.risk{border-left:3px solid #EF9F27;border-radius:0 var(--radius) var(--radius) 0;}
-.alert-row.stall{border-left:3px solid #639922;border-radius:0 var(--radius) var(--radius) 0;}
-.alert-row.blocked{border-left:3px solid #7F77DD;border-radius:0 var(--radius) var(--radius) 0;}
+.alert-row.stall{border-left:3px solid var(--green);border-radius:0 var(--radius) var(--radius) 0;}
+.alert-row.blocked{border-left:3px solid var(--purple);border-radius:0 var(--radius) var(--radius) 0;}
 .ar-name{font-size:13px;font-weight:500;min-width:150px;}
 .ar-stage{font-size:11px;color:var(--text2);min-width:90px;}
 .ar-pm{font-size:11px;color:var(--text3);min-width:40px;}
@@ -81,31 +74,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 /* BADGES */
 .badge{font-size:9px;padding:2px 7px;border-radius:10px;white-space:nowrap;font-weight:500;}
 .b-loyalty{background:var(--purple-bg);color:var(--purple-text);}
-.b-sale{background:var(--success-bg);color:var(--success-text);}
-.b-pm{background:var(--info-bg);color:var(--info-text);}
+.b-pm{background:var(--blue-bg);color:var(--blue);}
 .b-blocked{background:var(--purple-bg);color:var(--purple-text);}
 .b-cycle{background:var(--bg2);color:var(--text2);}
 .sla-badge{font-size:9px;padding:2px 7px;border-radius:10px;white-space:nowrap;font-weight:500;}
-.sb-ok{background:var(--success-bg);color:var(--success-text);}
-.sb-warn{background:var(--warn-bg);color:var(--warn-text);}
-.sb-risk{background:var(--danger-bg);color:var(--danger-text);}
-.sb-crit{background:#E24B4A;color:#fff;}
+.sb-ok{background:var(--green-bg);color:var(--green-text);}
+.sb-warn{background:var(--amber-bg);color:var(--amber-text);}
+.sb-risk{background:#fcebeb;color:#a32d2d;}
+.sb-crit{background:var(--red);color:#fff;}
 
-/* QUEUE */
-.queue-grid{display:flex;flex-direction:column;gap:6px;}
-.qcard{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;}
-.qcard:hover{border-color:var(--border2);}
-.qcard.is-blocked{border-left:3px solid #7F77DD;border-radius:0 var(--radius) var(--radius) 0;}
-.qcard-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
-.qcard-name{font-size:13px;font-weight:500;flex:1;}
-.qcard-tasks{display:flex;flex-direction:column;gap:4px;}
-.task-action{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg2);border-radius:var(--radius);}
-.ta-name{font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.blocker-bar{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;background:var(--purple-bg);border-radius:var(--radius);}
-.blocker-label{font-size:11px;color:var(--purple-text);font-weight:500;flex-shrink:0;}
-.blocker-text{font-size:11px;color:#534AB7;flex:1;font-style:italic;}
-
-/* STATUS DROPDOWN */
+/* STATUS */
 .status-select{font-size:11px;padding:2px 5px;border-radius:10px;border:0.5px solid var(--border2);cursor:pointer;font-family:inherit;flex-shrink:0;width:106px;}
 .ss-done{background:#E1F5EE;color:#085041;}
 .ss-inprog{background:#E6F1FB;color:#0C447C;}
@@ -114,6 +92,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .ss-sched{background:#FAEEDA;color:#633806;}
 .ss-pend{background:#FCEBEB;color:#A32D2D;}
 .ss-rev{background:#FAECE7;color:#712B13;}
+
+/* QUEUE */
+.queue-grid{display:flex;flex-direction:column;gap:6px;}
+.qcard{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;}
+.qcard:hover{border-color:var(--border2);}
+.qcard.is-blocked{border-left:3px solid var(--purple);border-radius:0 var(--radius) var(--radius) 0;}
+.qcard-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+.qcard-name{font-size:13px;font-weight:500;flex:1;}
+.qcard-tasks{display:flex;flex-direction:column;gap:4px;}
+.task-action{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg2);border-radius:var(--radius);}
+.ta-name{font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.blocker-bar{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;background:var(--purple-bg);border-radius:var(--radius);}
+.blocker-label{font-size:11px;color:var(--purple-text);font-weight:500;flex-shrink:0;}
+.blocker-text{font-size:11px;color:var(--purple);flex:1;font-style:italic;}
 
 /* PIPELINE BOARD */
 .board-wrap{overflow-x:auto;padding-bottom:8px;}
@@ -125,18 +117,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .kcard{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:8px 10px;cursor:pointer;}
 .kcard:hover{border-color:var(--border2);}
 .kcard.sel{border-color:#378ADD;border-width:1.5px;}
-.kcard.is-blocked{border-left:3px solid #7F77DD;border-radius:0 var(--radius) var(--radius) 0;}
+.kcard.is-blocked{border-left:3px solid var(--purple);border-radius:0 var(--radius) var(--radius) 0;}
 .kcard-name{font-size:12px;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .kcard-id{font-size:10px;color:var(--text3);margin-bottom:1px;}
 .kcard-kw{font-size:11px;color:var(--text2);margin-bottom:5px;}
 .kcard-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:3px;margin-bottom:4px;}
-.age-bar{height:3px;border-radius:2px;overflow:hidden;background:var(--border);}
+.age-bar{height:3px;border-radius:2px;overflow:hidden;background:var(--border2);}
 .age-fill{height:100%;border-radius:2px;}
 
-/* DETAIL PANEL */
-.panel-wrap{display:none;margin-top:16px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+/* PANEL */
+.panel-wrap{display:none;margin-top:16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);overflow:hidden;}
 .panel-wrap.open{display:block;}
-.panel-head{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:0.5px solid var(--border);flex-wrap:wrap;background:var(--bg);}
+.panel-head{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:0.5px solid var(--border2);flex-wrap:wrap;}
 .ph-title{flex:1;}
 .ph-name{font-size:16px;font-weight:500;}
 .ph-meta{font-size:11px;color:var(--text3);margin-top:2px;}
@@ -153,12 +145,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .task-item:last-child{border-bottom:none;}
 .ti-left{flex:1;min-width:0;}
 .ti-name{font-size:12px;}
-.ti-pre{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.locked{opacity:.38;}
-.prog-bar{height:4px;border-radius:2px;background:var(--border);overflow:hidden;}
-.prog-fill{height:100%;border-radius:2px;background:#1D9E75;transition:width .3s;}
+.ti-pre{font-size:10px;color:var(--text3);}
+.locked{opacity:.35;}
+.prog-bar{height:4px;border-radius:2px;background:var(--border2);overflow:hidden;}
+.prog-fill{height:100%;border-radius:2px;background:var(--green);}
 .stage-move{display:flex;gap:6px;align-items:center;margin-top:8px;}
-.enforce-msg{font-size:11px;color:var(--danger-text);margin-top:6px;padding:6px 8px;background:var(--danger-bg);border-radius:var(--radius);}
+.enforce-msg{font-size:11px;color:#a32d2d;margin-top:6px;padding:6px 8px;background:#fcebeb;border-radius:var(--radius);}
 .notes-area{width:100%;margin-top:8px;font-size:12px;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);resize:vertical;min-height:70px;font-family:inherit;}
 .note-entry{font-size:11px;color:var(--text2);padding:5px 0;border-bottom:0.5px solid var(--border);}
 .note-time{font-size:10px;color:var(--text3);}
@@ -168,23 +160,107 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .action-btn{font-size:11px;padding:4px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;margin-top:6px;}
 .action-btn:hover{background:var(--bg2);}
 
-/* TOAST */
+/* ── ANALYTICS (LEADERSHIP) ──────────────────────────── */
+.an-page{display:flex;flex-direction:column;gap:14px;}
+.an-row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.an-row-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.an-row-1{display:grid;grid-template-columns:1fr;gap:12px;}
+.an-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;}
+.an-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;}
+.an-sub{font-size:11px;color:var(--text3);margin-bottom:14px;}
+
+/* KPI big numbers */
+.kpi-val{font-size:30px;font-weight:500;line-height:1;margin-bottom:3px;}
+.kpi-label{font-size:12px;color:var(--text2);}
+.kpi-note{font-size:11px;color:var(--text3);margin-top:5px;}
+.kpi-trend{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:500;margin-top:6px;padding:2px 7px;border-radius:10px;}
+.kpi-trend.bad{background:#fcebeb;color:#a32d2d;}
+.kpi-trend.ok{background:var(--green-bg);color:var(--green-text);}
+.kpi-trend.warn{background:var(--amber-bg);color:var(--amber-text);}
+
+/* forecast funnel */
+.funnel{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.funnel-row{display:flex;align-items:center;gap:10px;}
+.funnel-label{font-size:11px;color:var(--text2);width:110px;flex-shrink:0;text-align:right;}
+.funnel-bar-wrap{flex:1;background:var(--bg2);border-radius:4px;height:28px;overflow:hidden;position:relative;}
+.funnel-bar{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 10px;transition:width .4s;}
+.funnel-bar-label{font-size:11px;font-weight:500;color:#fff;white-space:nowrap;}
+.funnel-val{font-size:11px;color:var(--text2);width:80px;text-align:right;flex-shrink:0;}
+
+/* stage dwell time */
+.dwell-chart{display:flex;flex-direction:column;gap:7px;}
+.dwell-row{display:flex;align-items:center;gap:10px;}
+.dwell-label{font-size:11px;color:var(--text2);width:100px;flex-shrink:0;text-align:right;}
+.dwell-bars{flex:1;position:relative;}
+.dwell-target{position:absolute;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,0.15);z-index:2;}
+.dwell-bar{height:20px;border-radius:4px;display:flex;align-items:center;padding:0 7px;min-width:4px;}
+.dwell-bar-label{font-size:10px;font-weight:500;color:#fff;}
+.dwell-note{font-size:10px;color:var(--text3);width:70px;flex-shrink:0;text-align:right;}
+
+/* SLA stack */
+.sla-stack{display:flex;height:26px;border-radius:6px;overflow:hidden;gap:1px;margin-bottom:10px;}
+.sla-seg{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;min-width:0;}
+.sla-ok{background:var(--green);}
+.sla-warn{background:#BA7517;}
+.sla-risk{background:#CF5A1A;}
+.sla-crit{background:var(--red);}
+.sla-blocked{background:var(--purple);}
+.sla-legend{display:flex;gap:12px;flex-wrap:wrap;}
+.sla-leg{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);}
+.sla-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* PM scorecard */
+.pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.pm-head{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;}
+.pm-name-lg{font-size:15px;font-weight:500;}
+.pm-sub{font-size:11px;color:var(--text3);}
+.pm-stat{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--border);}
+.pm-stat:last-child{border-bottom:none;}
+.pm-stat-label{font-size:11px;color:var(--text2);}
+.pm-stat-val{font-size:12px;font-weight:500;}
+.pm-health{display:flex;height:7px;border-radius:4px;overflow:hidden;gap:1px;margin-top:10px;}
+.pm-seg{border-radius:2px;}
+
+/* bottleneck table */
+.btl-table{width:100%;border-collapse:collapse;}
+.btl-table th{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:0.5px solid var(--border2);text-align:left;}
+.btl-table td{font-size:11px;padding:8px;border-bottom:0.5px solid var(--border);vertical-align:middle;}
+.btl-table tr:last-child td{border-bottom:none;}
+.btl-bar-cell{width:200px;}
+.btl-bar-wrap{background:var(--bg2);border-radius:4px;height:12px;overflow:hidden;position:relative;}
+.btl-bar-fill{height:100%;border-radius:4px;}
+.btl-target-line{position:absolute;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,0.2);}
+
+/* intervention table */
+.int-table{width:100%;border-collapse:collapse;}
+.int-table th{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:0.5px solid var(--border2);text-align:left;}
+.int-table td{font-size:12px;padding:8px;border-bottom:0.5px solid var(--border);vertical-align:middle;}
+.int-table tr:last-child td{border-bottom:none;}
+.int-table tr{cursor:pointer;}
+.int-table tr:hover td{background:var(--bg2);}
+.severity-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;}
+
+/* forecast pipeline bar */
+.forecast-bar-wrap{display:flex;height:32px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:12px;}
+.fc-seg{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;min-width:2px;transition:flex .4s;cursor:default;}
+.fc-seg:hover{opacity:.85;}
+.forecast-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;}
+.fc-leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);}
+.fc-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;font-size:12px;padding:8px 18px;border-radius:var(--radius);z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;}
 .toast.show{opacity:1;}
-
-/* ERROR */
-.error-banner{background:#fcebeb;border:0.5px solid #f09595;border-radius:var(--radius);padding:10px 14px;color:#791F1F;font-size:12px;margin-bottom:12px;}
 </style>
 </head>
 <body>
 <div class="loading-bar" id="loading-bar"></div>
-
 <div class="app">
 <div class="topbar">
   <span class="logo">Tri<span>SMART</span> Solar</span>
-  <button class="nav-btn active" id="btn-command" onclick="setView('command',this)">Command center</button>
-  <button class="nav-btn" id="btn-queue" onclick="setView('queue',this)">My queue</button>
-  <button class="nav-btn" id="btn-pipeline" onclick="setView('pipeline',this)">Pipeline</button>
+  <button class="nav-btn active" id="btn-command"  onclick="setView('command',this)">Command center</button>
+  <button class="nav-btn" id="btn-queue"            onclick="setView('queue',this)">My queue</button>
+  <button class="nav-btn" id="btn-pipeline"         onclick="setView('pipeline',this)">Pipeline</button>
+  <button class="nav-btn" id="btn-analytics"        onclick="setView('analytics',this)">Analytics</button>
   <div class="search-wrap">
     <input class="search-input" type="text" placeholder="Search projects..." oninput="searchProjects(this.value)" onblur="setTimeout(closeSearch,200)">
     <div class="search-results" id="search-results" style="display:none;"></div>
@@ -202,7 +278,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <div class="loader" id="cmd-loader"><div class="spinner"></div>Loading projects...</div>
     <div id="cmd-content" style="display:none;">
       <div class="metrics" id="cmd-metrics"></div>
-      <div id="error-area"></div>
       <div class="section-title">Blocked</div><div class="alert-list" id="list-blocked"></div>
       <div class="section-title">Critical — past SLA</div><div class="alert-list" id="list-crit"></div>
       <div class="section-title">At risk</div><div class="alert-list" id="list-risk"></div>
@@ -212,6 +287,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   </div>
   <div class="view" id="view-queue"><div class="queue-grid" id="queue-grid"></div></div>
   <div class="view" id="view-pipeline"><div class="board-wrap"><div class="board" id="board"></div></div></div>
+  <div class="view" id="view-analytics"><div class="an-page" id="an-page"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
     <div class="panel-head">
@@ -228,11 +304,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   </div>
 </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'https://script.google.com/macros/s/AKfycbyNA5rmaznOKFXMVPlFK4okvTxwmoNXNkznKqR_M69nP5corAuOTtZdXAnXkBjG77zbzw/exec';
+const API='https://script.google.com/macros/s/AKfycbyNA5rmaznOKFXMVPlFK4okvTxwmoNXNkznKqR_M69nP5corAuOTtZdXAnXkBjG77zbzw/exec';
 
 const STAGES=[
   {id:'evaluation', label:'Evaluation',   sla:3,  risk:4,  crit:6},
@@ -244,67 +319,69 @@ const STAGES=[
   {id:'complete',   label:'Completion',   sla:3,  risk:5,  crit:7},
 ];
 const STAGE_ORDER=STAGES.map(s=>s.id);
-
+// Estimated days remaining per stage (median to PTO from each stage)
+const STAGE_DAYS_REMAINING={evaluation:56,survey:50,design:44,permit:31,install:10,inspection:17,complete:3};
 const STATUSES=['Not Ready','Ready To Start','Scheduled','In Progress','Pending Resolution','Revision Required','Complete'];
 const SHORT={'Not Ready':'Not Ready','Ready To Start':'Ready','Scheduled':'Scheduled','In Progress':'In Progress','Pending Resolution':'Pending','Revision Required':'Revision','Complete':'Complete'};
 const SS={'Complete':'ss-done','In Progress':'ss-inprog','Not Ready':'ss-notready','Ready To Start':'ss-ready','Scheduled':'ss-sched','Pending Resolution':'ss-pend','Revision Required':'ss-rev'};
+window._SS=SS;
 
 const TASKS={
   evaluation:[
-    {id:'welcome',      name:'Welcome Call',               pre:[],                                                 req:true},
-    {id:'ia',           name:'IA Confirmation',            pre:[],                                                 req:true},
-    {id:'ub',           name:'UB Confirmation',            pre:[],                                                 req:true},
-    {id:'sched_survey', name:'Schedule Site Survey',       pre:[],                                                 req:true},
-    {id:'ntp',          name:'NTP Procedure',              pre:[],                                                 req:true},
+    {id:'welcome',      name:'Welcome Call',               pre:[],req:true},
+    {id:'ia',           name:'IA Confirmation',            pre:[],req:true},
+    {id:'ub',           name:'UB Confirmation',            pre:[],req:true},
+    {id:'sched_survey', name:'Schedule Site Survey',       pre:[],req:true},
+    {id:'ntp',          name:'NTP Procedure',              pre:[],req:true},
   ],
   survey:[
-    {id:'site_survey',  name:'Site Survey',                pre:['sched_survey'],                                   req:true},
-    {id:'survey_review',name:'Survey Review',              pre:['site_survey'],                                    req:true},
+    {id:'site_survey',  name:'Site Survey',                pre:['sched_survey'],req:true},
+    {id:'survey_review',name:'Survey Review',              pre:['site_survey'],req:true},
   ],
   design:[
-    {id:'build_design', name:'Build Design',               pre:['survey_review'],                                  req:true},
-    {id:'scope',        name:'Scope of Work',              pre:['build_design'],                                   req:true},
-    {id:'monitoring',   name:'Monitoring',                 pre:['scope'],                                          req:true},
-    {id:'build_eng',    name:'Build Engineering',          pre:['scope'],                                          req:true},
-    {id:'eng_approval', name:'Engineering Approval',       pre:['build_eng'],                                      req:true},
-    {id:'stamps',       name:'Stamps Required',            pre:['eng_approval'],                                   req:true},
-    {id:'wp1',          name:'WP1',                        pre:['scope'],                                          req:false},
-    {id:'prod_add',     name:'Production Addendum',        pre:['scope'],                                          req:false},
-    {id:'new_ia',       name:'Create New IA',              pre:['scope'],                                          req:false},
-    {id:'reroof',       name:'Reroof Procedure',           pre:['scope'],                                          req:false},
+    {id:'build_design', name:'Build Design',               pre:['survey_review'],req:true},
+    {id:'scope',        name:'Scope of Work',              pre:['build_design'],req:true},
+    {id:'monitoring',   name:'Monitoring',                 pre:['scope'],req:true},
+    {id:'build_eng',    name:'Build Engineering',          pre:['scope'],req:true},
+    {id:'eng_approval', name:'Engineering Approval',       pre:['build_eng'],req:true},
+    {id:'stamps',       name:'Stamps Required',            pre:['eng_approval'],req:true},
+    {id:'wp1',          name:'WP1',                        pre:['scope'],req:false},
+    {id:'prod_add',     name:'Production Addendum',        pre:['scope'],req:false},
+    {id:'new_ia',       name:'Create New IA',              pre:['scope'],req:false},
+    {id:'reroof',       name:'Reroof Procedure',           pre:['scope'],req:false},
   ],
   permit:[
-    {id:'hoa',          name:'HOA Approval',               pre:['eng_approval'],                                   req:true},
-    {id:'om_review',    name:'OM Project Review',          pre:['eng_approval'],                                   req:true},
-    {id:'city_permit',  name:'City Permit Approval',       pre:['eng_approval'],                                   req:true},
-    {id:'util_permit',  name:'Utility Permit Approval',    pre:['eng_approval'],                                   req:true},
-    {id:'checkpoint1',  name:'Check Point 1',              pre:['city_permit','eng_approval','util_permit','ntp'], req:false},
-    {id:'revise_ia',    name:'Revise IA',                  pre:[],                                                 req:false},
+    {id:'hoa',          name:'HOA Approval',               pre:['eng_approval'],req:true},
+    {id:'om_review',    name:'OM Project Review',          pre:['eng_approval'],req:true},
+    {id:'city_permit',  name:'City Permit Approval',       pre:['eng_approval'],req:true},
+    {id:'util_permit',  name:'Utility Permit Approval',    pre:['eng_approval'],req:true},
+    {id:'checkpoint1',  name:'Check Point 1',              pre:['city_permit','eng_approval','util_permit','ntp'],req:false},
+    {id:'revise_ia',    name:'Revise IA',                  pre:[],req:false},
   ],
   install:[
-    {id:'sched_install',name:'Schedule Installation',      pre:['om_review'],                                      req:true},
-    {id:'inventory',    name:'Inventory Allocation',       pre:['sched_install'],                                  req:true},
-    {id:'install_done', name:'Installation Complete',      pre:['sched_install'],                                  req:true},
-    {id:'elec_redesign',name:'Electrical Onsite Redesign', pre:[],                                                 req:false},
+    {id:'sched_install',name:'Schedule Installation',      pre:['om_review'],req:true},
+    {id:'inventory',    name:'Inventory Allocation',       pre:['sched_install'],req:true},
+    {id:'install_done', name:'Installation Complete',      pre:['sched_install'],req:true},
+    {id:'elec_redesign',name:'Electrical Onsite Redesign', pre:[],req:false},
   ],
   inspection:[
-    {id:'insp_review',  name:'Inspection Review',          pre:['install_done'],                                   req:true},
-    {id:'sched_city',   name:'Schedule City Inspection',   pre:['insp_review'],                                    req:true},
-    {id:'sched_util',   name:'Schedule Utility Inspection',pre:['insp_review'],                                    req:true},
-    {id:'city_insp',    name:'City Inspection',            pre:['sched_city'],                                     req:true},
-    {id:'util_insp',    name:'Utility Inspection',         pre:['sched_util'],                                     req:true},
-    {id:'city_upd',     name:'City Permit Update',         pre:['insp_review'],                                    req:false},
-    {id:'util_upd',     name:'Utility Permit Update',      pre:['insp_review'],                                    req:false},
-    {id:'wpi28',        name:'WPI 2 & 8',                  pre:['install_done'],                                   req:false},
+    {id:'insp_review',  name:'Inspection Review',          pre:['install_done'],req:true},
+    {id:'sched_city',   name:'Schedule City Inspection',   pre:['insp_review'],req:true},
+    {id:'sched_util',   name:'Schedule Utility Inspection',pre:['insp_review'],req:true},
+    {id:'city_insp',    name:'City Inspection',            pre:['sched_city'],req:true},
+    {id:'util_insp',    name:'Utility Inspection',         pre:['sched_util'],req:true},
+    {id:'city_upd',     name:'City Permit Update',         pre:['insp_review'],req:false},
+    {id:'util_upd',     name:'Utility Permit Update',      pre:['insp_review'],req:false},
+    {id:'wpi28',        name:'WPI 2 & 8',                  pre:['install_done'],req:false},
   ],
   complete:[
-    {id:'pto',          name:'Permission to Operate',      pre:['util_insp'],                                      req:true},
-    {id:'in_service',   name:'In Service',                 pre:['pto'],                                            req:true},
+    {id:'pto',          name:'Permission to Operate',      pre:['util_insp'],req:true},
+    {id:'in_service',   name:'In Service',                 pre:['pto'],req:true},
   ],
 };
 
-let projects=[], taskState={}, notes={}, stageHistory={};
-let selectedId=null, currentPM='all', currentView='command';
+let projects=[],taskState={},notes={},stageHistory={};
+let selectedId=null,currentPM='all',currentView='command';
 const today=new Date();
 
 function daysAgo(d){return Math.max(0,Math.floor((today-new Date(d))/(1000*60*60*24)));}
@@ -322,11 +399,11 @@ function getSLA(p){
 function isStalled(p){return !p.blocker&&daysAgo(p.stageDate)>=5&&getSLA(p).status==='ok';}
 function getProgress(pid){
   const req=Object.values(TASKS).flat().filter(t=>t.req);
-  const done=req.filter(t=>taskState[pid]&&taskState[pid][t.id]==='Complete').length;
+  const done=req.filter(t=>(taskState[pid]||{})[t.id]==='Complete').length;
   return {done,total:req.length,pct:Math.round(done/req.length*100)};
 }
 function getReadyTasks(pid,stageId){
-  return (TASKS[stageId]||[]).filter(t=>{const s=taskState[pid]&&taskState[pid][t.id];return s&&s!=='Not Ready'&&s!=='Complete';});
+  return (TASKS[stageId]||[]).filter(t=>{const s=(taskState[pid]||{})[t.id];return s&&s!=='Not Ready'&&s!=='Complete';});
 }
 function recalcUnlocks(pid){
   Object.values(TASKS).flat().forEach(t=>{
@@ -338,22 +415,27 @@ function canAdvanceStage(pid,stg){
   const inc=(TASKS[stg]||[]).filter(t=>t.req&&(taskState[pid]||{})[t.id]!=='Complete');
   return {ok:inc.length===0,missing:inc.map(t=>t.name)};
 }
+function visProjects(){return currentPM==='all'?projects:projects.filter(p=>p.pm===currentPM);}
+function slaBadge(status,days){
+  const cls=status==='crit'?'sb-crit':status==='risk'?'sb-risk':status==='warn'?'sb-warn':'sb-ok';
+  return `<span class="sla-badge ${cls}">${days}d</span>`;
+}
+function ageColor(s){return s==='crit'?'#E24B4A':s==='risk'?'#EF9F27':s==='warn'?'#639922':'#1D9E75';}
+function fmt$(n){return '$'+Number(n||0).toLocaleString();}
+function fmtK(n){return '$'+Math.round(n/1000)+'k';}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
-// ── API ──────────────────────────────────────────────────────────────
-function setLoadingBar(pct){document.getElementById('loading-bar').style.width=pct+'%';}
+// ── API ──────────────────────────────────────────────────
+function setLoadingBar(p){document.getElementById('loading-bar').style.width=p+'%';}
 function setSaving(on){const b=document.getElementById('saving-badge');b.className='saving-badge'+(on?' show':'');}
-
 async function loadData(){
   setLoadingBar(20);
   try{
-    const res=await fetch(API);
-    setLoadingBar(70);
+    const res=await fetch(API);setLoadingBar(70);
     const data=await res.json();
     if(data.error) throw new Error(data.error);
-    projects=data.projects||[];
-    taskState=data.taskState||{};
-    notes=data.notes||{};
-    stageHistory=data.stageHistory||{};
+    projects=data.projects||[];taskState=data.taskState||{};
+    notes=data.notes||{};stageHistory=data.stageHistory||{};
     setLoadingBar(100);
     document.getElementById('cmd-loader').style.display='none';
     document.getElementById('cmd-content').style.display='block';
@@ -361,30 +443,26 @@ async function loadData(){
     render();
   }catch(err){
     setLoadingBar(0);
-    document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;">Failed to load data. Check your network and Apps Script deployment.<br><small>'+err.message+'</small></div>';
+    document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;padding:20px;">Failed to load. Check Apps Script deployment.<br><small>'+err.message+'</small></div>';
   }
 }
-
 async function post(body){
   setSaving(true);
-  try{
-    await fetch(API,{method:'POST',body:JSON.stringify(body)});
-  }catch(e){showToast('Save failed — check connection');}
+  try{await fetch(API,{method:'POST',body:JSON.stringify(body)});}
+  catch(e){showToast('Save failed');}
   setSaving(false);
 }
 
-// ── STATUS ───────────────────────────────────────────────────────────
+// ── STATUS ───────────────────────────────────────────────
 function setStatus(pid,tid,val,e){
   if(e) e.stopPropagation();
   if(val==='Not Ready') return;
   if(!taskState[pid]) taskState[pid]={};
   taskState[pid][tid]=val;
-  recalcUnlocks(pid);
-  render();
+  recalcUnlocks(pid);render();
   if(selectedId===pid) renderPanel(pid);
   post({action:'updateTask',projectId:pid,taskId:tid,status:val});
 }
-
 function statusDropdown(pid,tid){
   const cur=(taskState[pid]||{})[tid]||'Not Ready';
   const locked=cur==='Not Ready';
@@ -394,16 +472,8 @@ function statusDropdown(pid,tid){
     ?`<select class="status-select ss-notready" disabled onclick="event.stopPropagation()"><option>Not Ready</option></select>`
     :`<select class="status-select ${cls}" onclick="event.stopPropagation()" onchange="setStatus('${pid}','${tid}',this.value,event);this.className='status-select '+(window._SS[this.value]||'ss-notready')">${opts}</select>`;
 }
-window._SS=SS;
 
-// ── HELPERS ──────────────────────────────────────────────────────────
-function visProjects(){return currentPM==='all'?projects:projects.filter(p=>p.pm===currentPM);}
-function slaBadge(status,days){
-  const cls=status==='crit'?'sb-crit':status==='risk'?'sb-risk':status==='warn'?'sb-warn':'sb-ok';
-  return `<span class="sla-badge ${cls}">${days}d</span>`;
-}
-function ageColor(s){return s==='crit'?'#E24B4A':s==='risk'?'#EF9F27':s==='warn'?'#639922':'#1D9E75';}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+// ── SEARCH ───────────────────────────────────────────────
 function searchProjects(val){
   const box=document.getElementById('search-results');
   if(!val.trim()){box.style.display='none';return;}
@@ -421,7 +491,7 @@ function searchProjects(val){
 }
 function closeSearch(){document.getElementById('search-results').style.display='none';}
 
-// ── VIEWS ────────────────────────────────────────────────────────────
+// ── COMMAND CENTER ───────────────────────────────────────
 function renderCommand(){
   const vis=visProjects();
   const blocked=vis.filter(p=>p.blocker);
@@ -433,9 +503,9 @@ function renderCommand(){
   const avgCycle=vis.length?Math.round(vis.reduce((a,p)=>a+cycleDays(p),0)/vis.length):0;
   document.getElementById('cmd-metrics').innerHTML=`
     <div class="metric"><div class="metric-label">Total projects</div><div class="metric-value">${vis.length}</div></div>
-    <div class="metric"><div class="metric-label">Blocked</div><div class="metric-value mv-blocked">${blocked.length}</div></div>
-    <div class="metric"><div class="metric-label">Critical</div><div class="metric-value mv-crit">${crit.length}</div></div>
-    <div class="metric"><div class="metric-label">At risk</div><div class="metric-value mv-warn">${risk.length}</div></div>
+    <div class="metric"><div class="metric-label">Blocked</div><div class="metric-value mv-purple">${blocked.length}</div></div>
+    <div class="metric"><div class="metric-label">Critical</div><div class="metric-value mv-red">${crit.length}</div></div>
+    <div class="metric"><div class="metric-label">At risk</div><div class="metric-value mv-amber">${risk.length}</div></div>
     <div class="metric"><div class="metric-label">Avg cycle time</div><div class="metric-value">${avgCycle}d</div></div>
     <div class="metric"><div class="metric-label">Portfolio value</div><div class="metric-value">$${Math.round(totalVal/1000)}k</div></div>`;
   function rows(list,cls){
@@ -460,18 +530,16 @@ function renderCommand(){
   document.getElementById('list-ok').innerHTML=rows(ok,'');
 }
 
+// ── MY QUEUE ─────────────────────────────────────────────
 function renderQueue(){
   const vis=visProjects().filter(p=>p.stage!=='complete');
   const grid=document.getElementById('queue-grid');
-  if(!vis.length){grid.innerHTML='<div class="none-msg" style="padding:20px 0;">No active projects for this PM.</div>';return;}
+  if(!vis.length){grid.innerHTML='<div class="none-msg" style="padding:20px;">No active projects.</div>';return;}
   grid.innerHTML=vis.map(p=>{
     const sla=getSLA(p);const cycle=cycleDays(p);
     const ready=getReadyTasks(p.id,p.stage);
-    const taskHTML=ready.length?ready.map(t=>`
-      <div class="task-action" onclick="event.stopPropagation()">
-        <span class="ta-name">${t.name}</span>
-        ${statusDropdown(p.id,t.id)}
-      </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:4px 8px;">No active tasks — open project for full list</div>`;
+    const taskHTML=ready.length?ready.map(t=>`<div class="task-action" onclick="event.stopPropagation()"><span class="ta-name">${t.name}</span>${statusDropdown(p.id,t.id)}</div>`).join('')
+      :`<div style="font-size:12px;color:var(--text3);padding:4px 8px;">No active tasks — open project for full list</div>`;
     const blockerHTML=p.blocker?`<div class="blocker-bar"><span class="blocker-label">Blocked:</span><span class="blocker-text">${p.blocker}</span></div>`:'';
     return `<div class="qcard${p.blocker?' is-blocked':''}" onclick="openPanel('${p.id}')">
       <div class="qcard-head">
@@ -481,16 +549,15 @@ function renderQueue(){
         <span class="badge b-cycle">${cycle}d total</span>
         <span class="badge b-pm">${p.pm}</span>
         ${p.disposition==='Loyalty'?'<span class="badge b-loyalty">Loyalty</span>':''}
-      </div>
-      ${blockerHTML}
+      </div>${blockerHTML}
       <div class="qcard-tasks">${taskHTML}</div>
     </div>`;
   }).join('');
 }
 
+// ── PIPELINE ─────────────────────────────────────────────
 function renderPipeline(){
-  const board=document.getElementById('board');
-  board.innerHTML='';
+  const board=document.getElementById('board');board.innerHTML='';
   const vis=visProjects();
   STAGES.forEach(s=>{
     const cards=vis.filter(p=>p.stage===s.id);
@@ -504,35 +571,290 @@ function renderPipeline(){
         <div class="kcard-name">${p.name}</div>
         <div class="kcard-id">${p.id}</div>
         <div class="kcard-kw">${p.systemkw} kW</div>
-        <div class="kcard-foot">
-          ${slaBadge(sla.status,sla.days)}
-          <span class="badge b-pm">${p.pm}</span>
-          ${p.blocker?'<span class="badge b-blocked">Blocked</span>':''}
-        </div>
+        <div class="kcard-foot">${slaBadge(sla.status,sla.days)}<span class="badge b-pm">${p.pm}</span>${p.blocker?'<span class="badge b-blocked">Blocked</span>':''}</div>
         <div class="age-bar"><div class="age-fill" style="width:${sla.pct}%;background:${ageColor(sla.status)};"></div></div>
       </div>`;
     });
   });
 }
 
+// ── ANALYTICS (LEADERSHIP) ───────────────────────────────
+function renderAnalytics(){
+  const vis=visProjects();
+  const pg=document.getElementById('an-page');
+  if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
+
+  const active=vis.filter(p=>p.stage!=='complete');
+  const completed=vis.filter(p=>p.stage==='complete');
+
+  // Revenue numbers
+  const totalVal=vis.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const activeVal=active.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const completedVal=completed.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const blockedVal=vis.filter(p=>p.blocker).reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const critVal=vis.filter(p=>!p.blocker&&getSLA(p).status==='crit').reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const riskVal=vis.filter(p=>!p.blocker&&getSLA(p).status==='risk').reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const atRiskRevenue=blockedVal+critVal+riskVal;
+  const atRiskPct=totalVal?Math.round(atRiskRevenue/totalVal*100):0;
+
+  // Forecast — estimate PTO date per project using remaining stage days
+  const forecasted=active.map(p=>{
+    const remaining=STAGE_DAYS_REMAINING[p.stage]||30;
+    const estPTO=new Date(today.getTime()+remaining*86400000);
+    const daysOut=remaining;
+    let bucket;
+    if(daysOut<=14) bucket='14d';
+    else if(daysOut<=30) bucket='30d';
+    else if(daysOut<=60) bucket='60d';
+    else bucket='60d+';
+    return {...p,estPTO,daysOut,bucket};
+  });
+  const fc14=forecasted.filter(p=>p.bucket==='14d');
+  const fc30=forecasted.filter(p=>p.bucket==='30d');
+  const fc60=forecasted.filter(p=>p.bucket==='60d');
+  const fc60p=forecasted.filter(p=>p.bucket==='60d+');
+  const fc14Val=fc14.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const fc30Val=fc30.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const fc60Val=fc60.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // Avg cycle time
+  const avgCycle=vis.length?Math.round(vis.reduce((a,p)=>a+cycleDays(p),0)/vis.length):0;
+
+  // SLA counts
+  const slaOk=vis.filter(p=>!p.blocker&&getSLA(p).status==='ok').length;
+  const slaWarn=vis.filter(p=>!p.blocker&&getSLA(p).status==='warn').length;
+  const slaRisk=vis.filter(p=>!p.blocker&&getSLA(p).status==='risk').length;
+  const slaCrit=vis.filter(p=>!p.blocker&&getSLA(p).status==='crit').length;
+  const slaBlocked=vis.filter(p=>p.blocker).length;
+  const total=vis.length;
+
+  // Stage dwell — avg days per stage across all projects that have been in that stage
+  const stageData=STAGES.map(s=>{
+    const sp=vis.filter(p=>p.stage===s.id);
+    const avgDays=sp.length?Math.round(sp.reduce((a,p)=>a+daysAgo(p.stageDate),0)/sp.length):0;
+    const val=sp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+    return {...s,count:sp.length,avgDays,val};
+  });
+  const maxDays=Math.max(...stageData.map(s=>s.avgDays),1);
+
+  // PM stats
+  function pmStat(pm){
+    const pp=vis.filter(p=>p.pm===pm);
+    const val=pp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+    const blocked=pp.filter(p=>p.blocker).length;
+    const crit=pp.filter(p=>!p.blocker&&getSLA(p).status==='crit').length;
+    const risk=pp.filter(p=>!p.blocker&&getSLA(p).status==='risk').length;
+    const warn=pp.filter(p=>!p.blocker&&getSLA(p).status==='warn').length;
+    const ok=pp.filter(p=>!p.blocker&&getSLA(p).status==='ok').length;
+    const avgC=pp.length?Math.round(pp.reduce((a,p)=>a+cycleDays(p),0)/pp.length):0;
+    const healthy=Math.round(ok/pp.length*100)||0;
+    return {count:pp.length,val,blocked,crit,risk,warn,ok,avgCycle:avgC,healthy};
+  }
+  const ari=pmStat('Ari');const jen=pmStat('Jen');
+
+  // Intervention list — blocked + crit sorted by $ value
+  const interventions=vis.filter(p=>p.blocker||getSLA(p).status==='crit'||getSLA(p).status==='risk')
+    .sort((a,b)=>{
+      const rank=p=>p.blocker?0:getSLA(p).status==='crit'?1:2;
+      return rank(a)-rank(b)||(Number(b.contract)||0)-(Number(a.contract)||0);
+    });
+
+  // ── RENDER ──
+
+  // Row 1: 3 KPIs
+  const row1=`<div class="an-row-3">
+    <div class="an-card">
+      <div class="an-title">Active pipeline</div>
+      <div class="an-sub">Revenue in progress</div>
+      <div class="kpi-val" style="color:var(--green);">${fmtK(activeVal)}</div>
+      <div class="kpi-label">${active.length} projects in flight</div>
+      <div class="kpi-note">Avg ${fmtK(active.length?activeVal/active.length:0)} per project</div>
+      ${completedVal?`<div class="kpi-trend ok">+ ${fmtK(completedVal)} completed</div>`:''}
+    </div>
+    <div class="an-card">
+      <div class="an-title">Revenue at risk</div>
+      <div class="an-sub">Blocked, critical, or approaching SLA limit</div>
+      <div class="kpi-val" style="color:${atRiskPct>30?'#A32D2D':'#BA7517'};">${fmtK(atRiskRevenue)}</div>
+      <div class="kpi-label">${atRiskPct}% of active portfolio</div>
+      <div class="kpi-note">${interventions.length} projects need attention</div>
+      <div class="kpi-trend ${atRiskPct>30?'bad':'warn'}">${atRiskPct>30?'High exposure':'Moderate exposure'}</div>
+    </div>
+    <div class="an-card">
+      <div class="an-title">Avg cycle time</div>
+      <div class="an-sub">Sale date to today across all projects</div>
+      <div class="kpi-val">${avgCycle}d</div>
+      <div class="kpi-label">Portfolio average</div>
+      <div class="kpi-note">Ari ${ari.avgCycle}d &nbsp;·&nbsp; Jen ${jen.avgCycle}d</div>
+      <div class="kpi-trend ${avgCycle>60?'bad':avgCycle>45?'warn':'ok'}">${avgCycle>60?'Above benchmark':avgCycle>45?'Approaching benchmark':'Healthy pace'}</div>
+    </div>
+  </div>`;
+
+  // Row 2: Revenue forecast
+  const fcTotal=fc14Val+fc30Val+fc60Val;
+  const fcMax=Math.max(fc14Val,fc30Val,fc60Val,1);
+  const row2=`<div class="an-row-1"><div class="an-card">
+    <div class="an-title">Revenue forecast — estimated PTO by window</div>
+    <div class="an-sub">Based on current stage and median days remaining to Permission to Operate. Click any project to open.</div>
+    <div class="forecast-bar-wrap">
+      ${fc14.length?`<div class="fc-seg" style="flex:${fc14.length};background:#1D9E75;" title="Next 14 days">${fc14.length}</div>`:''}
+      ${fc30.length?`<div class="fc-seg" style="flex:${fc30.length};background:#4A8ED6;" title="15–30 days">${fc30.length}</div>`:''}
+      ${fc60.length?`<div class="fc-seg" style="flex:${fc60.length};background:#9B8EC4;" title="31–60 days">${fc60.length}</div>`:''}
+      ${fc60p.length?`<div class="fc-seg" style="flex:${fc60p.length};background:#C8C4B8;" title="60+ days">${fc60p.length}</div>`:''}
+    </div>
+    <div class="forecast-legend">
+      <div class="fc-leg"><div class="fc-dot" style="background:#1D9E75;"></div>Next 14d — ${fc14.length} projects · ${fmtK(fc14Val)}</div>
+      <div class="fc-leg"><div class="fc-dot" style="background:#4A8ED6;"></div>15–30d — ${fc30.length} projects · ${fmtK(fc30Val)}</div>
+      <div class="fc-leg"><div class="fc-dot" style="background:#9B8EC4;"></div>31–60d — ${fc60.length} projects · ${fmtK(fc60Val)}</div>
+      <div class="fc-leg"><div class="fc-dot" style="background:#C8C4B8;"></div>60d+ — ${fc60p.length} projects</div>
+    </div>
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:3px;">
+      ${[{label:'Next 14 days',list:fc14,color:'#1D9E75'},{label:'15–30 days',list:fc30,color:'#4A8ED6'},{label:'31–60 days',list:fc60,color:'#9B8EC4'}].map(({label,list,color})=>
+        list.length?`<div style="margin-top:8px;font-size:11px;font-weight:500;color:var(--text2);margin-bottom:4px;">${label}</div>`+
+          list.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg2);border-radius:var(--radius);cursor:pointer;margin-bottom:3px;" onclick="openPanel('${p.id}')">
+            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+            <span style="flex:1;font-size:12px;">${p.name}</span>
+            <span style="font-size:11px;color:var(--text3);">${STAGES.find(s=>s.id===p.stage)?.label}</span>
+            <span style="font-size:11px;font-weight:500;">${fmt$(p.contract)}</span>
+            <span class="badge b-pm">${p.pm}</span>
+            ${slaBadge(getSLA(p).status,getSLA(p).days)}
+          </div>`).join('')
+        :''
+      ).join('')}
+    </div>
+  </div></div>`;
+
+  // Row 3: SLA health + Stage dwell time
+  function pct(n){return total?Math.round(n/total*100):0;}
+  const row3=`<div class="an-row-2">
+    <div class="an-card">
+      <div class="an-title">Portfolio health</div>
+      <div class="an-sub">SLA status across all active projects</div>
+      <div class="sla-stack">
+        ${slaOk?`<div class="sla-seg sla-ok" style="flex:${slaOk};">${pct(slaOk)}%</div>`:''}
+        ${slaWarn?`<div class="sla-seg sla-warn" style="flex:${slaWarn};">${pct(slaWarn)}%</div>`:''}
+        ${slaRisk?`<div class="sla-seg sla-risk" style="flex:${slaRisk};">${pct(slaRisk)}%</div>`:''}
+        ${slaCrit?`<div class="sla-seg sla-crit" style="flex:${slaCrit};">${pct(slaCrit)}%</div>`:''}
+        ${slaBlocked?`<div class="sla-seg sla-blocked" style="flex:${slaBlocked};">${pct(slaBlocked)}%</div>`:''}
+      </div>
+      <div class="sla-legend">
+        <div class="sla-leg"><div class="sla-dot" style="background:#1D9E75;"></div>On track (${slaOk})</div>
+        <div class="sla-leg"><div class="sla-dot" style="background:#BA7517;"></div>Past target (${slaWarn})</div>
+        <div class="sla-leg"><div class="sla-dot" style="background:#CF5A1A;"></div>At risk (${slaRisk})</div>
+        <div class="sla-leg"><div class="sla-dot" style="background:#E24B4A;"></div>Critical (${slaCrit})</div>
+        <div class="sla-leg"><div class="sla-dot" style="background:#534AB7;"></div>Blocked (${slaBlocked})</div>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:10px;">By stage — count and value</div>
+        ${stageData.filter(s=>s.count>0).map(s=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <div style="font-size:11px;color:var(--text2);width:90px;text-align:right;flex-shrink:0;">${s.label}</div>
+            <div style="flex:1;background:var(--bg2);border-radius:4px;height:18px;overflow:hidden;">
+              <div style="height:100%;width:${Math.round(s.count/total*100)}%;background:var(--green);border-radius:4px;display:flex;align-items:center;padding:0 6px;min-width:20px;">
+                <span style="font-size:10px;font-weight:600;color:#fff;">${s.count}</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text3);width:70px;text-align:right;">${s.val?fmtK(s.val):'—'}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="an-card">
+      <div class="an-title">Stage bottlenecks</div>
+      <div class="an-sub">Avg days spent in each stage vs SLA target. Vertical line = target.</div>
+      <div class="dwell-chart">
+        ${stageData.filter(s=>s.count>0).map(s=>{
+          const barW=Math.max(2,Math.round(s.avgDays/maxDays*100));
+          const targetW=Math.round(s.sla/maxDays*100);
+          const over=s.avgDays>s.sla;
+          const color=s.avgDays>=s.crit?'#E24B4A':s.avgDays>=s.risk?'#EF9F27':s.avgDays>=s.sla?'#BA7517':'#1D9E75';
+          return `<div class="dwell-row">
+            <div class="dwell-label">${s.label}</div>
+            <div class="dwell-bars">
+              <div class="dwell-target" style="left:${targetW}%;"></div>
+              <div class="dwell-bar" style="width:${barW}%;background:${color};">
+                <span class="dwell-bar-label">${s.avgDays}d avg</span>
+              </div>
+            </div>
+            <div class="dwell-note">target ${s.sla}d${over?' ⚠':''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:12px;font-size:10px;color:var(--text3);">Vertical line = SLA target. Amber = past target. Orange = at risk. Red = critical.</div>
+    </div>
+  </div>`;
+
+  // Row 4: PM scorecard
+  function pmCard(name,stats){
+    const healthPct=stats.count?Math.round(stats.ok/stats.count*100):0;
+    return `<div>
+      <div class="pm-head">
+        <span class="pm-name-lg">${name}</span>
+        <span class="pm-sub">${stats.count} projects &nbsp;·&nbsp; ${fmtK(stats.val)}</span>
+      </div>
+      <div class="pm-stat"><span class="pm-stat-label">Avg cycle time</span><span class="pm-stat-val">${stats.avgCycle}d</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Portfolio value</span><span class="pm-stat-val">${fmtK(stats.val)}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">On track</span><span class="pm-stat-val" style="color:var(--green);">${stats.ok} &nbsp;<span style="font-size:10px;font-weight:400;color:var(--text3);">(${healthPct}%)</span></span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Past SLA target</span><span class="pm-stat-val">${stats.warn}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">At risk</span><span class="pm-stat-val" style="color:var(--amber);">${stats.risk}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Critical</span><span class="pm-stat-val" style="color:#A32D2D;">${stats.crit}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Blocked</span><span class="pm-stat-val" style="color:var(--purple);">${stats.blocked}</span></div>
+      <div class="pm-health" style="margin-top:12px;">
+        ${stats.ok?`<div class="pm-seg" style="flex:${stats.ok};background:#1D9E75;"></div>`:''}
+        ${stats.warn?`<div class="pm-seg" style="flex:${stats.warn};background:#BA7517;"></div>`:''}
+        ${stats.risk?`<div class="pm-seg" style="flex:${stats.risk};background:#CF5A1A;"></div>`:''}
+        ${stats.crit?`<div class="pm-seg" style="flex:${stats.crit};background:#E24B4A;"></div>`:''}
+        ${stats.blocked?`<div class="pm-seg" style="flex:${stats.blocked};background:#534AB7;"></div>`:''}
+      </div>
+    </div>`;
+  }
+  const row4=`<div class="an-row-1"><div class="an-card">
+    <div class="an-title">PM performance</div>
+    <div class="an-sub">Workload and SLA health by project manager</div>
+    <div class="pm-grid">${pmCard('Ari',ari)}${pmCard('Jen',jen)}</div>
+  </div></div>`;
+
+  // Row 5: Intervention table
+  const row5=`<div class="an-row-1"><div class="an-card">
+    <div class="an-title">Required interventions</div>
+    <div class="an-sub">All projects needing leadership attention — sorted by severity then contract value. Click to open.</div>
+    ${interventions.length?`
+    <table class="int-table">
+      <thead><tr><th>Severity</th><th>Customer</th><th>Stage</th><th>PM</th><th>Contract</th><th>Days in stage</th><th>Issue</th></tr></thead>
+      <tbody>${interventions.map(p=>{
+        const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);
+        const sev=p.blocker?{color:'#534AB7',label:'Blocked'}:sla.status==='crit'?{color:'#E24B4A',label:'Critical'}:{color:'#EF9F27',label:'At risk'};
+        const issue=p.blocker?p.blocker.slice(0,50)+(p.blocker.length>50?'...':''):sla.status==='crit'?`${sla.days}d — critical threshold ${sla.crit}d`:`${sla.days}d — risk threshold ${sla.risk}d`;
+        return `<tr onclick="openPanel('${p.id}')">
+          <td><span class="severity-dot" style="background:${sev.color};"></span>${sev.label}</td>
+          <td><strong>${p.name}</strong></td>
+          <td>${s?s.label:p.stage}</td>
+          <td>${p.pm}</td>
+          <td style="font-weight:500;">${fmt$(p.contract)}</td>
+          <td>${slaBadge(p.blocker?'crit':sla.status,sla.days)}</td>
+          <td style="color:var(--text2);max-width:180px;">${issue}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`:'<div class="none-msg">No interventions required.</div>'}
+  </div></div>`;
+
+  pg.innerHTML=row1+row2+row3+row4+row5;
+}
+
+// ── PANEL ─────────────────────────────────────────────────
 function renderPanel(pid){
-  const p=projects.find(x=>x.id===pid);
-  if(!p) return;
+  const p=projects.find(x=>x.id===pid);if(!p) return;
   const sla=getSLA(p);const pr=getProgress(pid);
   const s=STAGES.find(x=>x.id===p.stage);const cycle=cycleDays(p);
-  const pNotes=notes[pid]||[];
-  const pHistory=stageHistory[pid]||[];
+  const pNotes=notes[pid]||[];const pHistory=stageHistory[pid]||[];
   const check=canAdvanceStage(pid,p.stage);
   document.getElementById('dp-name').textContent=p.name;
   document.getElementById('dp-meta').textContent=`${p.id} · ${p.city} · ${s?s.label:p.stage} · ${sla.days}d in stage · ${cycle}d total · ${p.pm}`;
-
   document.getElementById('dp-left').innerHTML=`
     <div class="sec"><div class="sec-title">Contact</div>
       <div class="frow"><span class="flabel">Phone</span><span class="fval">${p.phone}</span></div>
       <div class="frow"><span class="flabel">Email</span><span class="fval" style="font-size:10px;">${p.email}</span></div>
     </div>
     <div class="sec"><div class="sec-title">Contract</div>
-      <div class="frow"><span class="flabel">Amount</span><span class="fval">$${Number(p.contract||0).toLocaleString()}</span></div>
+      <div class="frow"><span class="flabel">Amount</span><span class="fval">${fmt$(p.contract)}</span></div>
       <div class="frow"><span class="flabel">System</span><span class="fval">${p.systemkw} kW</span></div>
       <div class="frow"><span class="flabel">Financier</span><span class="fval">${p.financier}</span></div>
       <div class="frow"><span class="flabel">Disposition</span><span class="fval">${p.disposition}</span></div>
@@ -548,7 +870,7 @@ function renderPanel(pid){
     </div>
     <div class="sec"><div class="sec-title">Timing</div>
       <div class="frow"><span class="flabel">Days in stage</span><span class="fval">${sla.days}d ${slaBadge(sla.status,sla.days)}</span></div>
-      <div class="frow"><span class="flabel">Total cycle time</span><span class="fval">${cycle}d</span></div>
+      <div class="frow"><span class="flabel">Total cycle</span><span class="fval">${cycle}d</span></div>
       <div class="frow"><span class="flabel">Target / Risk / Crit</span><span class="fval">${sla.sla}d / ${sla.risk}d / ${sla.crit}d</span></div>
     </div>
     <div class="sec"><div class="sec-title">Stage history</div>
@@ -572,9 +894,8 @@ function renderPanel(pid){
       <textarea class="notes-area" id="note-input" placeholder="Add a note..."></textarea>
       <button class="action-btn" onclick="addNote('${pid}')">Save note</button>
     </div>`;
-
-  let taskHTML=`<div class="sec-title">Progress — ${pr.done}/${pr.total} required tasks complete</div>`;
-  taskHTML+=`<div class="prog-bar" style="margin-bottom:12px;height:6px;"><div class="prog-fill" style="width:${pr.pct}%"></div></div>`;
+  let taskHTML=`<div class="sec-title">Progress — ${pr.done}/${pr.total} required tasks complete</div>
+    <div class="prog-bar" style="margin-bottom:12px;height:6px;"><div class="prog-fill" style="width:${pr.pct}%"></div></div>`;
   STAGES.forEach(st=>{
     const isCur=st.id===p.stage;
     taskHTML+=`<div class="sec-title" style="margin-top:10px;${isCur?'':'opacity:.4'}">${st.label}</div>`;
@@ -586,80 +907,64 @@ function renderPanel(pid){
         <div class="ti-left">
           <div class="ti-name">${t.name}${t.req?'':' <span style="font-size:9px;color:var(--text3);">opt</span>'}</div>
           ${t.pre.length?`<div class="ti-pre">after: ${preNames}</div>`:''}
-        </div>
-        ${statusDropdown(pid,t.id)}
-      </div>`;
+        </div>${statusDropdown(pid,t.id)}</div>`;
     });
   });
   document.getElementById('dp-right').innerHTML=taskHTML;
   document.getElementById('detail-panel').classList.add('open');
 }
 
-// ── ACTIONS ──────────────────────────────────────────────────────────
+// ── ACTIONS ──────────────────────────────────────────────
 function moveStage(pid){
-  const p=projects.find(x=>x.id===pid);
-  const sel=document.getElementById('stage-sel');
+  const p=projects.find(x=>x.id===pid);const sel=document.getElementById('stage-sel');
   if(!p||!sel) return;
   const newStage=sel.value;
-  const newIdx=STAGE_ORDER.indexOf(newStage);
-  const curIdx=STAGE_ORDER.indexOf(p.stage);
+  const newIdx=STAGE_ORDER.indexOf(newStage);const curIdx=STAGE_ORDER.indexOf(p.stage);
   if(newIdx>curIdx){
     const check=canAdvanceStage(pid,p.stage);
     if(!check.ok){showToast('Complete required tasks: '+check.missing.slice(0,2).join(', ')+(check.missing.length>2?' +more':''));renderPanel(pid);return;}
   }
-  const s=STAGES.find(x=>x.id===newStage);
-  const dateStr=today.toISOString().slice(0,10);
+  const s=STAGES.find(x=>x.id===newStage);const dateStr=today.toISOString().slice(0,10);
   if(!stageHistory[pid]) stageHistory[pid]=[];
   stageHistory[pid].push({stage:s.label,entered:dateStr});
   p.stage=newStage;p.stageDate=dateStr;
-  render();renderPanel(pid);
-  showToast('Moved to '+s.label);
+  render();renderPanel(pid);showToast('Moved to '+s.label);
   post({action:'moveStage',projectId:pid,stage:newStage,stageDate:dateStr,stageLabel:s.label});
 }
-
 function saveBlocker(pid){
-  const p=projects.find(x=>x.id===pid);
-  const inp=document.getElementById('blocker-input');
+  const p=projects.find(x=>x.id===pid);const inp=document.getElementById('blocker-input');
   if(!p||!inp) return;
-  p.blocker=inp.value.trim();
-  render();renderPanel(pid);
+  p.blocker=inp.value.trim();render();renderPanel(pid);
   showToast(p.blocker?'Blocker saved':'Blocker cleared');
   post({action:'saveBlocker',projectId:pid,blocker:p.blocker});
 }
-
 function addNote(pid){
-  const p=projects.find(x=>x.id===pid);
-  const inp=document.getElementById('note-input');
+  const p=projects.find(x=>x.id===pid);const inp=document.getElementById('note-input');
   if(!p||!inp||!inp.value.trim()) return;
   const note={text:inp.value.trim(),time:today.toLocaleDateString(),pm:currentPM==='all'?'Team':currentPM};
   if(!notes[pid]) notes[pid]=[];
-  notes[pid].push(note);
-  renderPanel(pid);
-  showToast('Note saved');
+  notes[pid].push(note);renderPanel(pid);showToast('Note saved');
   post({action:'addNote',projectId:pid,...note});
 }
-
 function openPanel(pid){
   selectedId=pid;renderPanel(pid);render();
   setTimeout(()=>document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
-
 function setView(v,btn){
   currentView=v;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  closePanel();render();
+  btn.classList.add('active');closePanel();render();
 }
 function setPM(v){currentPM=v;render();}
 function render(){
   if(currentView==='command') renderCommand();
   else if(currentView==='queue') renderQueue();
   else if(currentView==='pipeline') renderPipeline();
+  else if(currentView==='analytics') renderAnalytics();
 }
-
 loadData();
 </script>
 </body>
