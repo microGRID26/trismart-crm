@@ -1055,16 +1055,20 @@ function renderQueue(){
 
 // ── PIPELINE ─────────────────────────────────────────────
 function populatePipeFilters(){
+  const fin=document.getElementById('pf-financier');
+  const util=document.getElementById('pf-utility');
+  const ahjEl=document.getElementById('pf-ahj');
+  if(!fin||!util||!ahjEl) return;
   const vis=visProjects();
-  function opts(sel,vals){
-    const cur=document.getElementById(sel).value;
+  function opts(el,vals){
+    const cur=el.value;
     const uniq=[...new Set(vals.filter(Boolean).sort())];
-    const first=document.getElementById(sel).options[0].text;
-    document.getElementById(sel).innerHTML=`<option value="">${first}</option>`+uniq.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
+    const first=el.options[0].text;
+    el.innerHTML=`<option value="">${first}</option>`+uniq.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
   }
-  opts('pf-financier',vis.map(p=>p.financier));
-  opts('pf-utility',vis.map(p=>p.utility));
-  opts('pf-ahj',vis.map(p=>p.ahj));
+  opts(fin,vis.map(p=>p.financier));
+  opts(util,vis.map(p=>p.utility));
+  opts(ahjEl,vis.map(p=>p.ahj));
 }
 function clearPipeFilters(){
   document.getElementById('pf-financier').value='';
