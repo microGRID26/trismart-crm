@@ -189,6 +189,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .stl-stage.current{color:var(--green);}
 .stl-meta{font-size:10px;color:var(--text3);margin-top:1px;}
 .stl-dur{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--bg2);color:var(--text2);margin-left:4px;}
+/* AGE WARNING */
+.age-warn-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:2px 6px;border-radius:8px;background:#FFF3CD;border:0.5px solid #FFCA28;color:#7A4F00;font-weight:500;}
+.age-warn-badge.critical{background:#FEE2E2;border-color:#F87171;color:#991B1B;}
+
 /* STALE DATA */
 .data-freshness{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);cursor:pointer;padding:3px 8px;border-radius:8px;border:0.5px solid transparent;transition:all .15s;white-space:nowrap;}
 .data-freshness:hover{background:var(--bg2);border-color:var(--border);}
@@ -718,6 +722,7 @@ select.np-input{cursor:pointer;}
       <div class="section-title" id="st-crit" onclick="toggleSection(this)">Critical — past SLA</div><div class="alert-list" id="list-crit"></div>
       <div class="section-title" id="st-risk" onclick="toggleSection(this)">At risk</div><div class="alert-list" id="list-risk"></div>
       <div class="section-title" id="st-stall" onclick="toggleSection(this)">Stalled — no movement 5+ days</div><div class="alert-list" id="list-stall"></div>
+      <div class="section-title collapsed" id="st-aging" onclick="toggleSection(this)">Aging projects — 90+ days total cycle</div><div class="alert-list" id="list-aging" style="display:none;"></div>
       <div class="section-title" id="st-ok" onclick="toggleSection(this)">On track</div><div class="alert-list" id="list-ok"></div>
     </div>
   </div>
@@ -798,9 +803,9 @@ select.np-input{cursor:pointer;}
       <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Analytics
     </button>
-    <button class="mn-btn" onclick="openNewProject()">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-      New
+    <button class="mn-btn" id="mn-audit" onclick="setView('audit',document.getElementById('btn-audit'));syncMobileNav('audit')">
+      <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Audit
     </button>
   </div>
 </div>
@@ -889,6 +894,12 @@ const today=new Date();
 
 function daysAgo(d){if(!d) return 0;const n=new Date(d);if(isNaN(n)) return 0;return Math.max(0,Math.floor((today-n)/(1000*60*60*24)));}
 function cycleDays(p){return daysAgo(p.saleDate)||0;}
+function getAgeWarning(p){
+  const days=cycleDays(p);
+  if(days>=120) return {level:'critical',days,label:`${days}d total — customer churn risk`};
+  if(days>=90)  return {level:'warn',days,label:`${days}d total — review recommended`};
+  return null;
+}
 function getSLA(p){
   const s=STAGES.find(x=>x.id===p.stage);
   if(!s) return {days:0,status:'ok',pct:0,sla:3,risk:5,crit:7};
@@ -1091,6 +1102,7 @@ function renderCommand(){
   const risk=vis.filter(p=>!p.blocker&&getSLA(p).status==='risk');
   const stall=vis.filter(p=>isStalled(p));
   const ok=vis.filter(p=>!p.blocker&&getSLA(p).status==='ok'&&!isStalled(p));
+  const aging=vis.filter(p=>p.stage!=='complete'&&cycleDays(p)>=90).sort((a,b)=>cycleDays(b)-cycleDays(a));
   const totalVal=vis.reduce((a,p)=>a+(Number(p.contract)||0),0);
   const avgCycle=vis.length?Math.round(vis.reduce((a,p)=>a+cycleDays(p),0)/vis.length):0;
   document.getElementById('cmd-metrics').innerHTML=`
@@ -1098,7 +1110,7 @@ function renderCommand(){
     <div class="metric" onclick="cmdDrilldown('blocked')"><div class="metric-label">Blocked</div><div class="metric-value mv-purple">${blocked.length}</div></div>
     <div class="metric" onclick="cmdDrilldown('crit')"><div class="metric-label">Critical</div><div class="metric-value mv-red">${crit.length}</div></div>
     <div class="metric" onclick="cmdDrilldown('risk')"><div class="metric-label">At risk</div><div class="metric-value mv-amber">${risk.length}</div></div>
-    <div class="metric" onclick="cmdDrilldown('all')"><div class="metric-label">Avg cycle time</div><div class="metric-value">${avgCycle}d</div></div>
+    <div class="metric" onclick="cmdDrilldown('aging')"><div class="metric-label">90+ day cycle</div><div class="metric-value${aging.length?' mv-amber':''}">${aging.length}</div></div>
     <div class="metric" onclick="cmdDrilldown('all')"><div class="metric-label">Portfolio value</div><div class="metric-value">$${Math.round(totalVal/1000)}k</div></div>`;
   // Highlight active drilldown
   if(cmdFilter){
@@ -1138,11 +1150,36 @@ function renderCommand(){
   setSection('crit',    rows(crit,'crit'),       'Critical — past SLA', crit.length||'');
   setSection('risk',    rows(risk,'risk'),        'At risk', risk.length||'');
   setSection('stall',   rows(stall,'stall'),      'Stalled — no movement 5+ days', stall.length||'');
+  // Aging projects section
+  const stAging=document.getElementById('st-aging');
+  const liAging=document.getElementById('list-aging');
+  if(stAging&&liAging){
+    if(!aging.length){stAging.style.display='none';liAging.style.display='none';}
+    else{
+      stAging.style.display='';
+      const c=stAging.classList.contains('collapsed');
+      stAging.innerHTML=`Aging projects — 90+ days total cycle <span style="font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:8px;color:var(--text2);font-weight:400;">${aging.length}</span>`;
+      stAging.onclick=()=>toggleSection(stAging);
+      if(c) stAging.classList.add('collapsed');
+      liAging.innerHTML=aging.map(p=>{
+        const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);const cycle=cycleDays(p);
+        const warn=getAgeWarning(p);
+        return `<div class="alert-row${p.blocker?' blocked-row':''}" onclick="openPanel('${p.id}')">
+          <span class="ar-name">${p.name} <span style="font-size:10px;color:var(--text3);">${p.id}</span></span>
+          <span class="ar-meta">${s?s.label:p.stage}</span>
+          <span class="ar-meta">${p.pm}</span>
+          <span class="ar-meta">${fmt$(p.contract)}</span>
+          <span class="age-warn-badge ${warn?warn.level:'warn'}">${cycle}d total</span>
+          ${slaBadge(sla.status,sla.days)}
+        </div>`;
+      }).join('');
+    }
+  }
   setSection('ok',      rows(ok,''),              'On track', ok.length||'');
 
   // Collapse non-matching sections when filter active
   if(cmdFilter){
-    ['blocked','crit','risk','stall','ok'].forEach(id=>{
+    ['blocked','crit','risk','stall','aging','ok'].forEach(id=>{
       const st=document.getElementById('st-'+id);
       const li=document.getElementById('list-'+id);
       if(!st||!li) return;
@@ -1654,7 +1691,8 @@ function renderPanel(pid){
   const pNotes=notes[pid]||[];const pHistory=stageHistory[pid]||[];
   const check=canAdvanceStage(pid,p.stage);
   document.getElementById('dp-name').textContent=p.name;
-  document.getElementById('dp-meta').textContent=`${p.id} · ${p.city} · ${s?s.label:p.stage} · ${sla.days}d in stage · ${cycle}d total · ${p.pm}`;
+  const ageWarn=getAgeWarning(p);
+  document.getElementById('dp-meta').innerHTML=`${p.id} · ${p.city} · ${s?s.label:p.stage} · ${sla.days}d in stage · ${cycle}d total · ${p.pm}${ageWarn?` <span class="age-warn-badge ${ageWarn.level}">⚠ ${ageWarn.label}</span>`:''}`;
   document.getElementById('dp-left').innerHTML=`
     <div class="sec"><div class="sec-title">Contact</div>
       <div class="frow"><span class="flabel">Phone</span><span class="fval">${p.phone}</span></div>
