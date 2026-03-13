@@ -1155,9 +1155,9 @@ function parseJwt(token){
 
 function onGoogleSignIn(response){
   const payload=parseJwt(response.credential);
-  const firstName=(payload.given_name||payload.name||payload.email||'').split(' ')[0];
+  const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
   currentUser={
-    name:firstName,
+    name:payload.name||firstName,
     fullName:payload.name||firstName,
     email:payload.email||'',
     picture:payload.picture||'',
