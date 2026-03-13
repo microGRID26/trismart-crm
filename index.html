@@ -280,6 +280,29 @@ select.np-input{cursor:pointer;}
 .chat-who-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .chat-who-sel{font-size:11px;padding:3px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;}
 
+/* FILES / DRIVE */
+.files-section{margin-top:16px;}
+.files-folder-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);margin-bottom:10px;flex-wrap:wrap;}
+.files-folder-name{font-size:11px;color:var(--text2);flex:1;}
+.files-btn{font-size:11px;padding:4px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;}
+.files-btn:hover{background:var(--bg2);}
+.files-btn.primary{background:var(--green);color:#fff;border-color:var(--green);}
+.files-category{margin-bottom:14px;}
+.files-cat-label{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;padding-bottom:4px;border-bottom:0.5px solid var(--border);}
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;}
+.file-thumb{border-radius:var(--radius);overflow:hidden;border:0.5px solid var(--border);cursor:pointer;background:var(--bg2);position:relative;}
+.file-thumb:hover{border-color:var(--border2);}
+.file-thumb img{width:100%;height:70px;object-fit:cover;display:block;}
+.file-thumb-name{font-size:9px;color:var(--text2);padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.file-doc{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border);cursor:pointer;margin-bottom:4px;}
+.file-doc:hover{border-color:var(--border2);}
+.file-doc-icon{font-size:18px;flex-shrink:0;}
+.file-doc-info{flex:1;min-width:0;}
+.file-doc-name{font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.file-doc-meta{font-size:10px;color:var(--text3);}
+.files-empty{font-size:11px;color:var(--text3);padding:6px 0;}
+.files-loading{font-size:11px;color:var(--text3);padding:8px 0;display:flex;align-items:center;gap:6px;}
+
 /* PIPELINE FILTERS */
 .pipe-filters{display:flex;align-items:center;gap:10px;padding:8px 0 10px;flex-wrap:wrap;}
 .pf-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
@@ -780,7 +803,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={},taskDueDates={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
 let selectedId=null,currentPM='all',currentView='command';
 const today=new Date();
 
@@ -876,7 +899,7 @@ async function loadData(){
     const data=await res.json();
     if(data.error) throw new Error(data.error);
     projects=data.projects||[];taskState=data.taskState||{};
-    notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};
+    notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
     setLoadingBar(100);
     document.getElementById('cmd-loader').style.display='none';
     document.getElementById('cmd-content').style.display='block';
@@ -1464,6 +1487,8 @@ function renderPanel(pid){
     });
   });
   document.getElementById('dp-right').innerHTML=taskHTML;
+  // Render files section
+  renderFilesSection(pid);
   document.getElementById('detail-panel').classList.add('open');
 }
 
@@ -1878,7 +1903,115 @@ async function submitEditProject(){
   btn.textContent='Save Changes';btn.disabled=false;
 }
 
-// ── EXPORT ───────────────────────────────────────────────
+// ── FILES / DRIVE ─────────────────────────────────────────
+function renderFilesSection(pid){
+  const right=document.getElementById('dp-right');
+  if(!right) return;
+  const folder=projectFolders[pid];
+  const container=document.createElement('div');
+  container.className='files-section';
+  container.id='files-section-'+pid;
+
+  if(!folder){
+    container.innerHTML=`
+      <div class="sec-title" style="margin-top:10px;">Files</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Create a Drive folder to store site survey photos, install photos, and contracts.</div>
+      <button class="files-btn primary" onclick="createProjectFolder('${pid}')">Create Drive Folder</button>
+      <div id="files-creating-${pid}" style="display:none;font-size:11px;color:var(--text3);margin-top:6px;">Creating folder...</div>`;
+  } else {
+    container.innerHTML=`
+      <div class="sec-title" style="margin-top:10px;">Files</div>
+      <div class="files-folder-bar">
+        <span class="files-folder-name">📁 Drive folder linked</span>
+        <a href="${folder.folderUrl}" target="_blank" class="files-btn">Open Folder ↗</a>
+        <button class="files-btn" onclick="loadProjectFiles('${pid}')">↻ Refresh</button>
+      </div>
+      <div id="files-list-${pid}"><div class="files-loading"><div class="spinner" style="width:14px;height:14px;border-width:1.5px;"></div> Loading files...</div></div>`;
+    // Auto-load files
+    loadProjectFiles(pid);
+  }
+  right.appendChild(container);
+}
+
+async function createProjectFolder(pid){
+  const p=projects.find(x=>x.id===pid);if(!p) return;
+  const btn=document.querySelector(`#files-section-${pid} .files-btn.primary`);
+  const msg=document.getElementById('files-creating-'+pid);
+  if(btn){btn.disabled=true;btn.textContent='Creating...';}
+  if(msg) msg.style.display='block';
+  try{
+    const res=await fetch(API,{method:'POST',body:JSON.stringify({action:'createFolder',projectId:pid,projectName:p.name})});
+    const data=await res.json();
+    if(data.ok&&data.folderId){
+      projectFolders[pid]={folderId:data.folderId,folderUrl:data.folderUrl};
+      // re-render files section
+      const old=document.getElementById('files-section-'+pid);
+      if(old) old.remove();
+      renderFilesSection(pid);
+      showToast('Drive folder created');
+    } else {
+      showToast('Failed to create folder');
+      if(btn){btn.disabled=false;btn.textContent='Create Drive Folder';}
+      if(msg) msg.style.display='none';
+    }
+  }catch(e){
+    showToast('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Create Drive Folder';}
+    if(msg) msg.style.display='none';
+  }
+}
+
+async function loadProjectFiles(pid){
+  const container=document.getElementById('files-list-'+pid);
+  if(!container) return;
+  container.innerHTML='<div class="files-loading"><div class="spinner" style="width:14px;height:14px;border-width:1.5px;"></div> Loading files...</div>';
+  try{
+    const res=await fetch(API,{method:'POST',body:JSON.stringify({action:'getFiles',projectId:pid})});
+    const data=await res.json();
+    if(!data.ok){container.innerHTML='<div class="files-empty">Could not load files.</div>';return;}
+    const files=data.files||[];
+    if(!files.length){
+      container.innerHTML=`<div class="files-empty">No files yet. <a href="${(projectFolders[pid]||{}).folderUrl||'#'}" target="_blank" style="color:var(--green);">Open folder ↗</a> to upload.</div>`;
+      return;
+    }
+    // Group by category
+    const cats=['Site Survey Photos','Install Photos','Contracts','Other'];
+    let html='';
+    cats.forEach(cat=>{
+      const catFiles=files.filter(f=>f.category===cat);
+      if(!catFiles.length) return;
+      html+=`<div class="files-category"><div class="files-cat-label">${cat} (${catFiles.length})</div>`;
+      const images=catFiles.filter(f=>f.isImage);
+      const docs=catFiles.filter(f=>!f.isImage);
+      if(images.length){
+        html+=`<div class="files-grid">`;
+        images.forEach(f=>{
+          html+=`<div class="file-thumb" onclick="window.open('${f.url}','_blank')" title="${escapeHtml(f.name)}">
+            <img src="${f.thumbUrl}" alt="${escapeHtml(f.name)}" onerror="this.style.display='none'">
+            <div class="file-thumb-name">${escapeHtml(f.name)}</div>
+          </div>`;
+        });
+        html+=`</div>`;
+      }
+      docs.forEach(f=>{
+        const icon=f.isPdf?'📄':f.mimeType.includes('sheet')?'📊':f.mimeType.includes('doc')?'📝':'📎';
+        const size=f.size>1048576?Math.round(f.size/1048576)+'MB':Math.round(f.size/1024)+'KB';
+        html+=`<div class="file-doc" onclick="window.open('${f.url}','_blank')">
+          <span class="file-doc-icon">${icon}</span>
+          <div class="file-doc-info">
+            <div class="file-doc-name">${escapeHtml(f.name)}</div>
+            <div class="file-doc-meta">${size} · ${f.date}</div>
+          </div>
+          <span style="font-size:10px;color:var(--text3);">↗</span>
+        </div>`;
+      });
+      html+=`</div>`;
+    });
+    container.innerHTML=html;
+  }catch(e){
+    container.innerHTML='<div class="files-empty">Error loading files: '+escapeHtml(e.message)+'</div>';
+  }
+}
 function openExport(){
   document.getElementById('export-pm-label').textContent=currentPM==='all'?'All PMs':currentPM;
   document.querySelector('[name=export-scope][value=all]').checked=true;
