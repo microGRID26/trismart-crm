@@ -55,8 +55,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .mv-green{color:var(--green);}
 
 /* SECTION TITLE */
-.section-title{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;margin-top:16px;}
+.section-title{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;margin-top:16px;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;}
 .section-title:first-of-type{margin-top:0;}
+.section-title::before{content:'▾';font-size:10px;transition:transform .15s;display:inline-block;}
+.section-title.collapsed::before{transform:rotate(-90deg);}
+.section-title.collapsed+.alert-list{display:none;}
 
 /* ALERT ROWS */
 .alert-list{display:flex;flex-direction:column;gap:5px;margin-bottom:4px;}
@@ -648,13 +651,13 @@ select.np-input{cursor:pointer;}
     <div class="loader" id="cmd-loader"><div class="spinner"></div>Loading projects...</div>
     <div id="cmd-content" style="display:none;">
       <div class="metrics" id="cmd-metrics"></div>
-      <div class="section-title" id="st-overdue">Overdue tasks</div><div class="alert-list" id="list-overdue"></div>
-      <div class="section-title" id="st-duetoday">Due today</div><div class="alert-list" id="list-duetoday"></div>
-      <div class="section-title">Blocked</div><div class="alert-list" id="list-blocked"></div>
-      <div class="section-title">Critical — past SLA</div><div class="alert-list" id="list-crit"></div>
-      <div class="section-title">At risk</div><div class="alert-list" id="list-risk"></div>
-      <div class="section-title">Stalled — no movement 5+ days</div><div class="alert-list" id="list-stall"></div>
-      <div class="section-title">On track</div><div class="alert-list" id="list-ok"></div>
+      <div class="section-title" id="st-overdue" onclick="toggleSection(this)">Overdue tasks</div><div class="alert-list" id="list-overdue"></div>
+      <div class="section-title" id="st-duetoday" onclick="toggleSection(this)">Due today</div><div class="alert-list" id="list-duetoday"></div>
+      <div class="section-title" id="st-blocked" onclick="toggleSection(this)">Blocked</div><div class="alert-list" id="list-blocked"></div>
+      <div class="section-title" id="st-crit" onclick="toggleSection(this)">Critical — past SLA</div><div class="alert-list" id="list-crit"></div>
+      <div class="section-title" id="st-risk" onclick="toggleSection(this)">At risk</div><div class="alert-list" id="list-risk"></div>
+      <div class="section-title" id="st-stall" onclick="toggleSection(this)">Stalled — no movement 5+ days</div><div class="alert-list" id="list-stall"></div>
+      <div class="section-title" id="st-ok" onclick="toggleSection(this)">On track</div><div class="alert-list" id="list-ok"></div>
     </div>
   </div>
   <div class="view" id="view-queue" style="display:none;"><div class="queue-grid" id="queue-grid"></div></div>
@@ -995,18 +998,43 @@ function renderCommand(){
       </div>`;
     }).join('');
   }
-  document.getElementById('list-blocked').innerHTML=rows(blocked,'blocked');
-  document.getElementById('list-crit').innerHTML=rows(crit,'crit');
-  document.getElementById('list-risk').innerHTML=rows(risk,'risk');
-  document.getElementById('list-stall').innerHTML=rows(stall,'stall');
-  document.getElementById('list-ok').innerHTML=rows(ok,'');
+  function setSection(id, list, label, count) {
+    const st = document.getElementById('st-'+id);
+    const el = document.getElementById('list-'+id);
+    if (!st || !el) return;
+    const collapsed = st.classList.contains('collapsed');
+    st.innerHTML = label + (count ? ` <span style="font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:8px;color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;">${count}</span>` : '');
+    st.onclick = () => toggleSection(st);
+    el.innerHTML = list;
+    if (collapsed) st.classList.add('collapsed');
+  }
+  setSection('blocked', rows(blocked,'blocked'), 'Blocked', blocked.length||'');
+  setSection('crit',    rows(crit,'crit'),       'Critical — past SLA', crit.length||'');
+  setSection('risk',    rows(risk,'risk'),        'At risk', risk.length||'');
+  setSection('stall',   rows(stall,'stall'),      'Stalled — no movement 5+ days', stall.length||'');
+  setSection('ok',      rows(ok,''),              'On track', ok.length||'');
+
   // due dates
   const overdue=getOverdueTasks();
   const dueToday=getDueTodayTasks();
-  document.getElementById('st-overdue').style.display=overdue.length?'':'none';
-  document.getElementById('list-overdue').style.display=overdue.length?'':'none';
-  document.getElementById('st-duetoday').style.display=dueToday.length?'':'none';
-  document.getElementById('list-duetoday').style.display=dueToday.length?'':'none';
+  const stOverdue=document.getElementById('st-overdue');
+  const stDuetoday=document.getElementById('st-duetoday');
+  if(stOverdue){
+    stOverdue.style.display=overdue.length?'':'none';
+    document.getElementById('list-overdue').style.display=overdue.length?'':'none';
+    const c=stOverdue.classList.contains('collapsed');
+    stOverdue.innerHTML='Overdue tasks'+(overdue.length?` <span style="font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:8px;color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;">${overdue.length}</span>`:'');
+    stOverdue.onclick=()=>toggleSection(stOverdue);
+    if(c) stOverdue.classList.add('collapsed');
+  }
+  if(stDuetoday){
+    stDuetoday.style.display=dueToday.length?'':'none';
+    document.getElementById('list-duetoday').style.display=dueToday.length?'':'none';
+    const c=stDuetoday.classList.contains('collapsed');
+    stDuetoday.innerHTML='Due today'+(dueToday.length?` <span style="font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:8px;color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;">${dueToday.length}</span>`:'');
+    stDuetoday.onclick=()=>toggleSection(stDuetoday);
+    if(c) stDuetoday.classList.add('collapsed');
+  }
   document.getElementById('list-overdue').innerHTML=overdue.map(({p,taskName,daysOver})=>
     `<div class="due-task-row overdue" onclick="openPanel('${p.id}')">
       <span class="dtr-project">${p.name}</span>
@@ -1552,6 +1580,13 @@ function openPanel(pid){
   selectedId=pid;renderPanel(pid);render();
   setTimeout(()=>document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
+function toggleSection(el){
+  el.classList.toggle('collapsed');
+  const list=el.nextElementSibling;
+  if(list&&list.classList.contains('alert-list')){
+    list.style.display=el.classList.contains('collapsed')?'none':'';
+  }
+}
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
 function setView(v,btn){
   currentView=v;
@@ -1967,7 +2002,8 @@ async function createProjectFolder(pid){
       renderFilesSection(pid);
       showToast('Drive folder created');
     } else {
-      showToast('Failed to create folder');
+      const errMsg=data.error||'Failed to create folder';
+      showToast(errMsg);
       if(btn){btn.disabled=false;btn.textContent='Create Drive Folder';}
       if(msg) msg.style.display='none';
     }
