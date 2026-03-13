@@ -449,6 +449,7 @@ select.np-input{cursor:pointer;}
   </select>
   <span class="saving-badge" id="saving-badge">Saving...</span>
   <button class="nav-btn" style="background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:500;" onclick="openNewProject()">+ New Project</button>
+  <button class="nav-btn" onclick="openExport()" style="font-size:11px;">↓ Export</button>
   <div class="user-chip" id="user-chip" style="display:none;">
     <div class="user-chip-avatar-fallback" id="user-avatar-fb" style="background:#1D9E75;"></div>
     <img class="user-chip-avatar" id="user-avatar-img" style="display:none;" alt="">
@@ -554,8 +555,72 @@ select.np-input{cursor:pointer;}
   </div>
 </div>
 
+<!-- EXPORT MODAL -->
+<div id="export-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;overflow-y:auto;">
+  <div style="background:#fff;border-radius:12px;max-width:480px;margin:60px auto;padding:24px 28px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div>
+        <div style="font-size:16px;font-weight:500;">Export Projects</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;" id="export-count"></div>
+      </div>
+      <button onclick="closeExport()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&#x2715;</button>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div class="np-label" style="margin-bottom:8px;">Scope</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;"><input type="radio" name="export-scope" value="all" checked onchange="updateExportCount()"> All projects</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;"><input type="radio" name="export-scope" value="pm" onchange="updateExportCount()"> Current PM filter (<span id="export-pm-label">All PMs</span>)</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;"><input type="radio" name="export-scope" value="stage" onchange="updateExportCount()"> By stage:
+          <select class="np-input" id="export-stage" onchange="document.querySelector('[name=export-scope][value=stage]').checked=true;updateExportCount()" style="font-size:11px;padding:3px 6px;width:auto;">
+            <option value="">All stages</option>
+            <option value="evaluation">Evaluation</option>
+            <option value="survey">Site Survey</option>
+            <option value="design">Design</option>
+            <option value="permit">Permitting</option>
+            <option value="install">Installation</option>
+            <option value="inspection">Inspection</option>
+            <option value="complete">Completion</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;"><input type="radio" name="export-scope" value="flagged" onchange="updateExportCount()"> Blocked + Critical only</label>
+      </div>
+    </div>
+    <div style="margin-bottom:20px;">
+      <div class="np-label" style="margin-bottom:8px;">Columns</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;" id="export-cols">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="id" checked> Project ID</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="name" checked> Customer Name</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="city" checked> City</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="phone"> Phone</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="email"> Email</label>
+        <label style="display:flex;align-items:center;gap=6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="stage" checked> Stage</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="pm" checked> PM</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="saleDate" checked> Sale Date</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="stageDate"> Stage Date</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="daysInStage" checked> Days in Stage</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="slaStatus" checked> SLA Status</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="contract" checked> Contract Value</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="systemkw" checked> System kW</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="financier" checked> Financier</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="ahj"> AHJ</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="utility"> Utility</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="advisor"> Energy Advisor</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="consultant"> Energy Consultant</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="disposition"> Disposition</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="blocker"> Blocker</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="cycleDays"> Total Cycle Days</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="tasksComplete"> Tasks Complete</label>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+      <button onclick="closeExport()" style="font-size:12px;padding:7px 16px;border-radius:8px;border:0.5px solid rgba(0,0,0,0.18);background:#fff;cursor:pointer;">Cancel</button>
+      <button onclick="runExport('csv')" style="font-size:12px;padding:7px 16px;border-radius:8px;border:none;background:#0C447C;color:#fff;font-weight:500;cursor:pointer;">↓ Download CSV</button>
+      <button onclick="runExport('sheets')" style="font-size:12px;padding:7px 16px;border-radius:8px;border:none;background:#1D9E75;color:#fff;font-weight:500;cursor:pointer;">Open in Sheets ↗</button>
+    </div>
+  </div>
+</div>
+
 <div class="main">
-  <div class="view active" id="view-command">
     <div class="loader" id="cmd-loader"><div class="spinner"></div>Loading projects...</div>
     <div id="cmd-content" style="display:none;">
       <div class="metrics" id="cmd-metrics"></div>
@@ -1813,10 +1878,103 @@ async function submitEditProject(){
   btn.textContent='Save Changes';btn.disabled=false;
 }
 
-// close modal on overlay click
-document.getElementById('np-overlay').addEventListener('click',function(e){
-  if(e.target===this) closeNewProject();
-});
+// ── EXPORT ───────────────────────────────────────────────
+function openExport(){
+  document.getElementById('export-pm-label').textContent=currentPM==='all'?'All PMs':currentPM;
+  document.querySelector('[name=export-scope][value=all]').checked=true;
+  updateExportCount();
+  document.getElementById('export-overlay').style.display='block';
+}
+function closeExport(){
+  document.getElementById('export-overlay').style.display='none';
+}
+function getExportProjects(){
+  const scope=document.querySelector('[name=export-scope]:checked').value;
+  const stage=document.getElementById('export-stage').value;
+  let list=projects.slice();
+  if(scope==='pm') list=list.filter(p=>currentPM==='all'||p.pm===currentPM);
+  else if(scope==='stage'&&stage) list=list.filter(p=>p.stage===stage);
+  else if(scope==='stage'&&!stage) list=list; // all stages
+  else if(scope==='flagged') list=list.filter(p=>p.blocker||getSLA(p).status==='crit');
+  return list;
+}
+function updateExportCount(){
+  const n=getExportProjects().length;
+  document.getElementById('export-count').textContent=n+' project'+(n===1?'':'s')+ ' will be exported';
+}
+function getExportCols(){
+  return [...document.querySelectorAll('#export-cols input[type=checkbox]:checked')].map(c=>c.value);
+}
+const EXPORT_HEADERS={
+  id:'Project ID',name:'Customer Name',city:'City',phone:'Phone',email:'Email',
+  stage:'Stage',pm:'PM',saleDate:'Sale Date',stageDate:'Stage Date',
+  daysInStage:'Days in Stage',slaStatus:'SLA Status',contract:'Contract Value',
+  systemkw:'System kW',financier:'Financier',ahj:'AHJ',utility:'Utility',
+  advisor:'Energy Advisor',consultant:'Energy Consultant',disposition:'Disposition',
+  blocker:'Blocker',cycleDays:'Total Cycle Days',tasksComplete:'Tasks Complete',
+};
+function getRowValue(p,col){
+  const sla=getSLA(p);
+  const pr=getProgress(p.id);
+  const s=STAGES.find(x=>x.id===p.stage);
+  switch(col){
+    case 'stage': return s?s.label:p.stage;
+    case 'daysInStage': return sla.days;
+    case 'slaStatus': return p.blocker?'Blocked':sla.status==='crit'?'Critical':sla.status==='risk'?'At Risk':sla.status==='warn'?'Past Target':'On Track';
+    case 'cycleDays': return cycleDays(p);
+    case 'tasksComplete': return pr.done+'/'+pr.total;
+    case 'contract': return Number(p.contract)||0;
+    case 'systemkw': return Number(p.systemkw)||0;
+    default: return p[col]||'';
+  }
+}
+function buildCSV(list,cols){
+  const header=cols.map(c=>EXPORT_HEADERS[c]||c).join(',');
+  const rows=list.map(p=>cols.map(c=>{
+    const v=getRowValue(p,c);
+    const s=String(v).replace(/"/g,'""');
+    return s.includes(',')||s.includes('"')||s.includes('\n')?`"${s}"`:s;
+  }).join(','));
+  return [header,...rows].join('\n');
+}
+function runExport(type){
+  const list=getExportProjects();
+  const cols=getExportCols();
+  if(!cols.length){showToast('Select at least one column');return;}
+  const csv=buildCSV(list,cols);
+  if(type==='csv'){
+    const blob=new Blob([csv],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const date=new Date().toISOString().slice(0,10);
+    a.href=url;a.download=`trismart-projects-${date}.csv`;
+    a.click();URL.revokeObjectURL(url);
+    showToast(`Downloaded ${list.length} projects`);
+    closeExport();
+  } else {
+    // Open in Google Sheets via data URI encoded into a Sheets import URL
+    const encoded=encodeURIComponent(csv);
+    // Use a data URI approach — paste into sheets
+    // Build a tab-separated version for Sheets paste
+    const tsv=buildTSV(list,cols);
+    const blob=new Blob([tsv],{type:'text/tab-separated-values'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const date=new Date().toISOString().slice(0,10);
+    a.href=url;a.download=`trismart-projects-${date}.tsv`;
+    a.click();URL.revokeObjectURL(url);
+    // Also open a new blank Sheet
+    setTimeout(()=>window.open('https://sheets.new','_blank'),300);
+    showToast('TSV downloaded — paste into the new Sheet with Ctrl+Shift+V');
+    closeExport();
+  }
+}
+function buildTSV(list,cols){
+  const header=cols.map(c=>EXPORT_HEADERS[c]||c).join('\t');
+  const rows=list.map(p=>cols.map(c=>String(getRowValue(p,c)).replace(/\t/g,' ')).join('\t'));
+  return [header,...rows].join('\n');
+}
+document.getElementById('export-overlay').addEventListener('click',function(e){if(e.target===this)closeExport();});
 
 // Only load data if already logged in from session
 if(currentUser.name) loadData();
