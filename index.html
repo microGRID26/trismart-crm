@@ -280,6 +280,25 @@ select.np-input{cursor:pointer;}
 .chat-who-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .chat-who-sel{font-size:11px;padding:3px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;}
 
+/* DUE DATES */
+.due-row{display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;}
+.due-input{font-size:10px;padding:2px 5px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:inherit;}
+.due-input:focus{outline:none;border-color:var(--green);}
+.due-clear{font-size:11px;padding:0 3px;border:none;background:none;cursor:pointer;color:var(--text3);line-height:1.5;}
+.due-clear:hover{color:var(--red);}
+.due-flag{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;white-space:nowrap;}
+.due-flag.overdue{background:#fcebeb;color:#a32d2d;}
+.due-flag.today{background:var(--amber-bg);color:var(--amber-text);}
+.ti-overdue{background:#fff8f8;}
+.task-item.ti-overdue .ti-name{color:#a32d2d;}
+.due-task-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);cursor:pointer;flex-wrap:wrap;}
+.due-task-row:hover{border-color:var(--border2);}
+.due-task-row.overdue{border-left:3px solid var(--red);border-radius:0 var(--radius) var(--radius) 0;}
+.due-task-row.today{border-left:3px solid var(--amber);border-radius:0 var(--radius) var(--radius) 0;}
+.dtr-project{font-size:12px;font-weight:500;min-width:120px;}
+.dtr-task{font-size:11px;color:var(--text2);flex:1;}
+.dtr-pm{font-size:11px;color:var(--text3);}
+
 /* LOGIN SCREEN */
 .login-screen{position:fixed;inset:0;background:var(--bg3);z-index:500;display:flex;align-items:center;justify-content:center;}
 .login-card{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:40px 48px;text-align:center;max-width:360px;width:100%;}
@@ -518,6 +537,8 @@ select.np-input{cursor:pointer;}
     <div class="loader" id="cmd-loader"><div class="spinner"></div>Loading projects...</div>
     <div id="cmd-content" style="display:none;">
       <div class="metrics" id="cmd-metrics"></div>
+      <div class="section-title" id="st-overdue">Overdue tasks</div><div class="alert-list" id="list-overdue"></div>
+      <div class="section-title" id="st-duetoday">Due today</div><div class="alert-list" id="list-duetoday"></div>
       <div class="section-title">Blocked</div><div class="alert-list" id="list-blocked"></div>
       <div class="section-title">Critical — past SLA</div><div class="alert-list" id="list-crit"></div>
       <div class="section-title">At risk</div><div class="alert-list" id="list-risk"></div>
@@ -644,7 +665,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={};
 let selectedId=null,currentPM='all',currentView='command';
 const today=new Date();
 
@@ -661,6 +682,47 @@ function getSLA(p){
   return {days,status,pct:Math.min(100,Math.round(days/s.crit*100)),sla:s.sla,risk:s.risk,crit:s.crit};
 }
 function isStalled(p){return !p.blocker&&daysAgo(p.stageDate)>=5&&getSLA(p).status==='ok';}
+function todayStr(){return today.toISOString().slice(0,10);}
+function getDueStatus(pid,taskId,status){
+  if(status==='Complete') return 'ok';
+  const due=(taskDueDates[pid]||{})[taskId];
+  if(!due) return 'ok';
+  const dueD=new Date(due+'T00:00:00');
+  const tod=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+  if(dueD<tod) return 'overdue';
+  if(dueD.getTime()===tod.getTime()) return 'today';
+  return 'ok';
+}
+function getOverdueTasks(){
+  const out=[];
+  visProjects().forEach(p=>{
+    const pdues=taskDueDates[p.id]||{};
+    Object.entries(pdues).forEach(([taskId,dueDate])=>{
+      if(!dueDate) return;
+      const status=(taskState[p.id]||{})[taskId]||'Not Ready';
+      if(getDueStatus(p.id,taskId,status)!=='overdue') return;
+      const task=Object.values(TASKS).flat().find(t=>t.id===taskId);
+      const tod=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+      const dueD=new Date(dueDate+'T00:00:00');
+      out.push({p,taskId,taskName:task?task.name:taskId,daysOver:Math.round((tod-dueD)/(864e5))});
+    });
+  });
+  return out.sort((a,b)=>b.daysOver-a.daysOver);
+}
+function getDueTodayTasks(){
+  const out=[];
+  visProjects().forEach(p=>{
+    const pdues=taskDueDates[p.id]||{};
+    Object.entries(pdues).forEach(([taskId,dueDate])=>{
+      if(!dueDate) return;
+      const status=(taskState[p.id]||{})[taskId]||'Not Ready';
+      if(getDueStatus(p.id,taskId,status)!=='today') return;
+      const task=Object.values(TASKS).flat().find(t=>t.id===taskId);
+      out.push({p,taskId,taskName:task?task.name:taskId});
+    });
+  });
+  return out;
+}
 function getProgress(pid){
   const req=Object.values(TASKS).flat().filter(t=>t.req);
   const done=req.filter(t=>(taskState[pid]||{})[t.id]==='Complete').length;
@@ -699,7 +761,7 @@ async function loadData(){
     const data=await res.json();
     if(data.error) throw new Error(data.error);
     projects=data.projects||[];taskState=data.taskState||{};
-    notes=data.notes||{};stageHistory=data.stageHistory||{};
+    notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};
     setLoadingBar(100);
     document.getElementById('cmd-loader').style.display='none';
     document.getElementById('cmd-content').style.display='block';
@@ -794,6 +856,27 @@ function renderCommand(){
   document.getElementById('list-risk').innerHTML=rows(risk,'risk');
   document.getElementById('list-stall').innerHTML=rows(stall,'stall');
   document.getElementById('list-ok').innerHTML=rows(ok,'');
+  // due dates
+  const overdue=getOverdueTasks();
+  const dueToday=getDueTodayTasks();
+  document.getElementById('st-overdue').style.display=overdue.length?'':'none';
+  document.getElementById('list-overdue').style.display=overdue.length?'':'none';
+  document.getElementById('st-duetoday').style.display=dueToday.length?'':'none';
+  document.getElementById('list-duetoday').style.display=dueToday.length?'':'none';
+  document.getElementById('list-overdue').innerHTML=overdue.map(({p,taskName,daysOver})=>
+    `<div class="due-task-row overdue" onclick="openPanel('${p.id}')">
+      <span class="dtr-project">${p.name}</span>
+      <span class="dtr-task">${taskName}</span>
+      <span class="sla-badge sb-crit">${daysOver}d late</span>
+      <span class="dtr-pm">${p.pm}</span>
+    </div>`).join('');
+  document.getElementById('list-duetoday').innerHTML=dueToday.map(({p,taskName})=>
+    `<div class="due-task-row today" onclick="openPanel('${p.id}')">
+      <span class="dtr-project">${p.name}</span>
+      <span class="dtr-task">${taskName}</span>
+      <span class="sla-badge sb-warn">Due today</span>
+      <span class="dtr-pm">${p.pm}</span>
+    </div>`).join('');
 }
 
 // ── MY QUEUE ─────────────────────────────────────────────
@@ -804,7 +887,13 @@ function renderQueue(){
   grid.innerHTML=vis.map(p=>{
     const sla=getSLA(p);const cycle=cycleDays(p);
     const ready=getReadyTasks(p.id,p.stage);
-    const taskHTML=ready.length?ready.map(t=>`<div class="task-action" onclick="event.stopPropagation()"><span class="ta-name">${t.name}</span>${statusDropdown(p.id,t.id)}</div>`).join('')
+    const taskHTML=ready.length?ready.map(t=>{
+      const tStatus=(taskState[p.id]||{})[t.id]||'Not Ready';
+      const ds=getDueStatus(p.id,t.id,tStatus);
+      const dueStr=(taskDueDates[p.id]||{})[t.id]||'';
+      const dueBadge=ds==='overdue'?'<span class="due-flag overdue">Overdue</span>':ds==='today'?'<span class="due-flag today">Due today</span>':dueStr?`<span style="font-size:9px;color:var(--text3);margin-left:4px;">due ${dueStr}</span>`:'';
+      return `<div class="task-action${ds==='overdue'?' ti-overdue':''}" onclick="event.stopPropagation()"><span class="ta-name">${t.name} ${dueBadge}</span>${statusDropdown(p.id,t.id)}</div>`;
+    }).join('')
       :`<div style="font-size:12px;color:var(--text3);padding:4px 8px;">No active tasks — open project for full list</div>`;
     const blockerHTML=p.blocker?`<div class="blocker-bar"><span class="blocker-label">Blocked:</span><span class="blocker-text">${p.blocker}</span></div>`:'';
     return `<div class="qcard${p.blocker?' is-blocked':''}" onclick="openPanel('${p.id}')">
@@ -1185,10 +1274,18 @@ function renderPanel(pid){
       const status=(taskState[pid]||{})[t.id]||'Not Ready';
       const locked=status==='Not Ready';
       const preNames=t.pre.map(p2=>{const tf=Object.values(TASKS).flat().find(x=>x.id===p2);return tf?tf.name:p2;}).join(', ');
-      taskHTML+=`<div class="task-item${locked?' locked':''}">
+      const dueDate=(taskDueDates[pid]||{})[t.id]||'';
+      const dueStatus=getDueStatus(pid,t.id,status);
+      taskHTML+=`<div class="task-item${locked?' locked':''}${dueStatus==='overdue'?' ti-overdue':''}">
         <div class="ti-left">
           <div class="ti-name">${t.name}${t.req?'':' <span style="font-size:9px;color:var(--text3);">opt</span>'}</div>
           ${t.pre.length?`<div class="ti-pre">after: ${preNames}</div>`:''}
+          <div class="due-row">
+            <input type="date" class="due-input" value="${dueDate}" onchange="setTaskDue('${pid}','${t.id}',this.value)" onclick="event.stopPropagation()" title="Set due date">
+            ${dueDate?`<button class="due-clear" onclick="event.stopPropagation();setTaskDue('${pid}','${t.id}','')">×</button>`:''}
+            ${dueStatus==='overdue'?'<span class="due-flag overdue">Overdue</span>':''}
+            ${dueStatus==='today'?'<span class="due-flag today">Due today</span>':''}
+          </div>
         </div>${statusDropdown(pid,t.id)}</div>`;
     });
   });
@@ -1197,6 +1294,15 @@ function renderPanel(pid){
 }
 
 // ── ACTIONS ──────────────────────────────────────────────
+function setTaskDue(pid,taskId,date){
+  if(!taskDueDates[pid]) taskDueDates[pid]={};
+  if(date) taskDueDates[pid][taskId]=date;
+  else delete taskDueDates[pid][taskId];
+  render();
+  if(selectedId===pid) renderPanel(pid);
+  showToast(date?'Due date set':'Due date cleared');
+  post({action:'setTaskDue',projectId:pid,taskId,dueDate:date||''});
+}
 function moveStage(pid){
   const p=projects.find(x=>x.id===pid);const sel=document.getElementById('stage-sel');
   if(!p||!sel) return;
