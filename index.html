@@ -250,6 +250,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;font-size:12px;padding:8px 18px;border-radius:var(--radius);z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;}
 .toast.show{opacity:1;}
+.np-label{font-size:11px;font-weight:500;color:#666;margin-bottom:4px;}
+.np-input{width:100%;font-size:12px;padding:7px 10px;border-radius:8px;border:0.5px solid rgba(0,0,0,0.18);background:#f5f5f3;color:#1a1a1a;font-family:inherit;}
+.np-input:focus{outline:none;border-color:#1D9E75;background:#fff;}
+select.np-input{cursor:pointer;}
 </style>
 </head>
 <body>
@@ -271,6 +275,104 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <option value="Jen">Jen</option>
   </select>
   <span class="saving-badge" id="saving-badge">Saving...</span>
+  <button class="nav-btn" style="background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:500;" onclick="openNewProject()">+ New Project</button>
+</div>
+
+<!-- NEW PROJECT MODAL -->
+<div id="np-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;overflow-y:auto;">
+  <div style="background:#fff;border-radius:12px;max-width:620px;margin:40px auto;padding:24px 28px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div>
+        <div style="font-size:16px;font-weight:500;">New Project</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;">All fields required unless marked optional</div>
+      </div>
+      <button onclick="closeNewProject()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&#x2715;</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="grid-column:1/-1;">
+        <div class="np-label">Customer Name</div>
+        <input class="np-input" id="np-name" type="text" placeholder="First Last">
+      </div>
+      <div>
+        <div class="np-label">City, State</div>
+        <input class="np-input" id="np-city" type="text" placeholder="Austin, TX">
+      </div>
+      <div>
+        <div class="np-label">Phone</div>
+        <input class="np-input" id="np-phone" type="text" placeholder="(555) 555-5555">
+      </div>
+      <div style="grid-column:1/-1;">
+        <div class="np-label">Email</div>
+        <input class="np-input" id="np-email" type="email" placeholder="customer@email.com">
+      </div>
+      <div>
+        <div class="np-label">Sale Date</div>
+        <input class="np-input" id="np-saledate" type="date">
+      </div>
+      <div>
+        <div class="np-label">Current Stage</div>
+        <select class="np-input" id="np-stage">
+          <option value="evaluation">Evaluation</option>
+          <option value="survey">Site Survey</option>
+          <option value="design">Design</option>
+          <option value="permit">Permitting</option>
+          <option value="install">Installation</option>
+          <option value="inspection">Inspection</option>
+          <option value="complete">Completion</option>
+        </select>
+      </div>
+      <div>
+        <div class="np-label">Project Manager</div>
+        <select class="np-input" id="np-pm">
+          <option value="Ari">Ari</option>
+          <option value="Jen">Jen</option>
+        </select>
+      </div>
+      <div>
+        <div class="np-label">Disposition</div>
+        <select class="np-input" id="np-disposition">
+          <option value="Sale">Sale</option>
+          <option value="Loyalty">Loyalty</option>
+        </select>
+      </div>
+      <div>
+        <div class="np-label">Contract Value ($)</div>
+        <input class="np-input" id="np-contract" type="number" placeholder="75000">
+      </div>
+      <div>
+        <div class="np-label">System Size (kW)</div>
+        <input class="np-input" id="np-systemkw" type="number" step="0.001" placeholder="18.00">
+      </div>
+      <div>
+        <div class="np-label">Financier</div>
+        <input class="np-input" id="np-financier" type="text" placeholder="Edge">
+      </div>
+      <div>
+        <div class="np-label">AHJ</div>
+        <input class="np-input" id="np-ahj" type="text" placeholder="City name or County">
+      </div>
+      <div>
+        <div class="np-label">Utility</div>
+        <input class="np-input" id="np-utility" type="text" placeholder="Oncor">
+      </div>
+      <div>
+        <div class="np-label">Energy Advisor</div>
+        <input class="np-input" id="np-advisor" type="text" placeholder="Full name">
+      </div>
+      <div>
+        <div class="np-label">Energy Consultant</div>
+        <input class="np-input" id="np-consultant" type="text" placeholder="Full name">
+      </div>
+    </div>
+
+    <div id="np-error" style="display:none;margin-top:12px;padding:8px 12px;background:#fcebeb;color:#a32d2d;border-radius:8px;font-size:12px;"></div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+      <button onclick="closeNewProject()" style="font-size:12px;padding:7px 16px;border-radius:8px;border:0.5px solid rgba(0,0,0,0.18);background:#fff;cursor:pointer;">Cancel</button>
+      <button onclick="submitNewProject()" id="np-submit" style="font-size:12px;padding:7px 18px;border-radius:8px;border:none;background:#1D9E75;color:#fff;font-weight:500;cursor:pointer;">Create Project</button>
+    </div>
+  </div>
 </div>
 
 <div class="main">
@@ -965,6 +1067,109 @@ function render(){
   else if(currentView==='pipeline') renderPipeline();
   else if(currentView==='analytics') renderAnalytics();
 }
+// ── NEW PROJECT ──────────────────────────────────────────
+function openNewProject(){
+  document.getElementById('np-overlay').style.display='block';
+  // default sale date to today
+  document.getElementById('np-saledate').value=today.toISOString().slice(0,10);
+  document.getElementById('np-error').style.display='none';
+}
+function closeNewProject(){
+  document.getElementById('np-overlay').style.display='none';
+  // clear fields
+  ['np-name','np-city','np-phone','np-email','np-contract','np-systemkw','np-financier','np-ahj','np-utility','np-advisor','np-consultant'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+}
+function generateProjectId(){
+  const existing=projects.map(p=>parseInt((p.id||'').replace('PROJ-',''))||0);
+  const max=existing.length?Math.max(...existing):28000;
+  return 'PROJ-'+(max+Math.floor(Math.random()*10)+1);
+}
+async function submitNewProject(){
+  const get=id=>document.getElementById(id).value.trim();
+  const errEl=document.getElementById('np-error');
+  errEl.style.display='none';
+
+  // validate required fields
+  const required=[
+    {id:'np-name',label:'Customer Name'},
+    {id:'np-city',label:'City'},
+    {id:'np-phone',label:'Phone'},
+    {id:'np-email',label:'Email'},
+    {id:'np-saledate',label:'Sale Date'},
+    {id:'np-contract',label:'Contract Value'},
+    {id:'np-systemkw',label:'System Size'},
+    {id:'np-financier',label:'Financier'},
+    {id:'np-ahj',label:'AHJ'},
+    {id:'np-utility',label:'Utility'},
+    {id:'np-advisor',label:'Energy Advisor'},
+    {id:'np-consultant',label:'Energy Consultant'},
+  ];
+  const missing=required.filter(f=>!get(f.id)).map(f=>f.label);
+  if(missing.length){
+    errEl.textContent='Required: '+missing.join(', ');
+    errEl.style.display='block';
+    return;
+  }
+
+  const btn=document.getElementById('np-submit');
+  btn.textContent='Creating...';btn.disabled=true;
+
+  const stage=get('np-stage');
+  const stageLabel=STAGES.find(s=>s.id===stage)?.label||stage;
+  const dateStr=today.toISOString().slice(0,10);
+  const newProject={
+    id:generateProjectId(),
+    name:get('np-name'),
+    city:get('np-city'),
+    phone:get('np-phone'),
+    email:get('np-email'),
+    stage,
+    pm:get('np-pm'),
+    stageDate:dateStr,
+    saleDate:get('np-saledate'),
+    disposition:get('np-disposition'),
+    contract:Number(get('np-contract')),
+    systemkw:Number(get('np-systemkw')),
+    ahj:get('np-ahj'),
+    utility:get('np-utility'),
+    advisor:get('np-advisor'),
+    consultant:get('np-consultant'),
+    financier:get('np-financier'),
+    blocker:'',
+    priority:'med',
+  };
+
+  // optimistic UI — add immediately
+  projects.unshift(newProject);
+  taskState[newProject.id]={};
+  Object.values(TASKS).flat().forEach(t=>{
+    taskState[newProject.id][t.id]=t.pre.length===0?'Ready To Start':'Not Ready';
+  });
+  stageHistory[newProject.id]=[{stage:stageLabel,entered:dateStr}];
+  notes[newProject.id]=[];
+
+  closeNewProject();
+  render();
+  showToast('Project created — '+newProject.name);
+  openPanel(newProject.id);
+
+  // persist to Sheets
+  try{
+    await fetch(API,{method:'POST',body:JSON.stringify({action:'addProject',project:newProject})});
+  }catch(e){
+    showToast('Saved locally — sync to Sheets failed, retry later');
+  }
+
+  btn.textContent='Create Project';btn.disabled=false;
+}
+
+// close modal on overlay click
+document.getElementById('np-overlay').addEventListener('click',function(e){
+  if(e.target===this) closeNewProject();
+});
+
 loadData();
 </script>
 </body>
