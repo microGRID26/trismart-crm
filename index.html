@@ -813,6 +813,10 @@ const TASKS={
 };
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
+// Helper — taskState values are now {status, completedDate} objects
+function ts(pid,tid){const v=(taskState[pid]||{})[tid];return v?(typeof v==='object'?v.status:v):'Not Ready';}
+function tcd(pid,tid){const v=(taskState[pid]||{})[tid];return v&&typeof v==='object'?v.completedDate:'';}
+
 let selectedId=null,currentPM='all',currentView='command';
 const today=new Date();
 
@@ -846,7 +850,7 @@ function getOverdueTasks(){
     const pdues=taskDueDates[p.id]||{};
     Object.entries(pdues).forEach(([taskId,dueDate])=>{
       if(!dueDate) return;
-      const status=(taskState[p.id]||{})[taskId]||'Not Ready';
+      const status=ts(p.id,taskId);
       if(getDueStatus(p.id,taskId,status)!=='overdue') return;
       const task=Object.values(TASKS).flat().find(t=>t.id===taskId);
       const tod=new Date(today.getFullYear(),today.getMonth(),today.getDate());
@@ -862,7 +866,7 @@ function getDueTodayTasks(){
     const pdues=taskDueDates[p.id]||{};
     Object.entries(pdues).forEach(([taskId,dueDate])=>{
       if(!dueDate) return;
-      const status=(taskState[p.id]||{})[taskId]||'Not Ready';
+      const status=ts(p.id,taskId);
       if(getDueStatus(p.id,taskId,status)!=='today') return;
       const task=Object.values(TASKS).flat().find(t=>t.id===taskId);
       out.push({p,taskId,taskName:task?task.name:taskId});
@@ -872,20 +876,20 @@ function getDueTodayTasks(){
 }
 function getProgress(pid){
   const req=Object.values(TASKS).flat().filter(t=>t.req);
-  const done=req.filter(t=>(taskState[pid]||{})[t.id]==='Complete').length;
+  const done=req.filter(t=>ts(pid,t.id)==='Complete').length;
   return {done,total:req.length,pct:Math.round(done/req.length*100)};
 }
 function getReadyTasks(pid,stageId){
-  return (TASKS[stageId]||[]).filter(t=>{const s=(taskState[pid]||{})[t.id];return s&&s!=='Not Ready'&&s!=='Complete';});
+  return (TASKS[stageId]||[]).filter(t=>{const s=ts(pid,t.id);return s&&s!=='Not Ready'&&s!=='Complete';});
 }
 function recalcUnlocks(pid){
   Object.values(TASKS).flat().forEach(t=>{
-    if((taskState[pid]||{})[t.id]==='Not Ready'&&t.pre.every(p2=>(taskState[pid]||{})[p2]==='Complete'))
-      taskState[pid][t.id]='Ready To Start';
+    if(ts(pid,t.id)==='Not Ready'&&t.pre.every(p2=>ts(pid,p2)==='Complete'))
+      taskState[pid][t.id]={status:'Ready To Start',completedDate:''};
   });
 }
 function canAdvanceStage(pid,stg){
-  const inc=(TASKS[stg]||[]).filter(t=>t.req&&(taskState[pid]||{})[t.id]!=='Complete');
+  const inc=(TASKS[stg]||[]).filter(t=>t.req&&ts(pid,t.id)!=='Complete');
   return {ok:inc.length===0,missing:inc.map(t=>t.name)};
 }
 function visProjects(){return currentPM==='all'?projects:projects.filter(p=>p.pm===currentPM);}
@@ -938,13 +942,14 @@ function setStatus(pid,tid,val,e){
   if(e) e.stopPropagation();
   if(val==='Not Ready') return;
   if(!taskState[pid]) taskState[pid]={};
-  taskState[pid][tid]=val;
+  const completedDate=val==='Complete'?new Date().toLocaleDateString():'';
+  taskState[pid][tid]={status:val,completedDate};
   recalcUnlocks(pid);render();
   if(selectedId===pid) renderPanel(pid);
   post({action:'updateTask',projectId:pid,taskId:tid,status:val});
 }
 function statusDropdown(pid,tid){
-  const cur=(taskState[pid]||{})[tid]||'Not Ready';
+  const cur=ts(pid,tid);
   const locked=cur==='Not Ready';
   const cls=SS[cur]||'ss-notready';
   const opts=STATUSES.map(s=>`<option value="${s}"${s===cur?' selected':''}>${SHORT[s]||s}</option>`).join('');
@@ -1067,7 +1072,7 @@ function renderQueue(){
     const sla=getSLA(p);const cycle=cycleDays(p);
     const ready=getReadyTasks(p.id,p.stage);
     const taskHTML=ready.length?ready.map(t=>{
-      const tStatus=(taskState[p.id]||{})[t.id]||'Not Ready';
+      const tStatus=ts(p.id,t.id);
       const ds=getDueStatus(p.id,t.id,tStatus);
       const dueStr=(taskDueDates[p.id]||{})[t.id]||'';
       const dueBadge=ds==='overdue'?'<span class="due-flag overdue">Overdue</span>':ds==='today'?'<span class="due-flag today">Due today</span>':dueStr?`<span style="font-size:9px;color:var(--text3);margin-left:4px;">due ${dueStr}</span>`:'';
@@ -1518,14 +1523,16 @@ function renderPanel(pid){
     const isCur=st.id===p.stage;
     taskHTML+=`<div class="sec-title" style="margin-top:10px;${isCur?'':'opacity:.4'}">${st.label}</div>`;
     (TASKS[st.id]||[]).forEach(t=>{
-      const status=(taskState[pid]||{})[t.id]||'Not Ready';
+      const status=ts(pid,t.id);
+      const completedDate=tcd(pid,t.id);
+      const cdBadge=completedDate&&status==='Complete'?`<span style="font-size:9px;color:var(--text3);margin-left:4px;">${completedDate}</span>`:``;
       const locked=status==='Not Ready';
       const preNames=t.pre.map(p2=>{const tf=Object.values(TASKS).flat().find(x=>x.id===p2);return tf?tf.name:p2;}).join(', ');
       const dueDate=(taskDueDates[pid]||{})[t.id]||'';
       const dueStatus=getDueStatus(pid,t.id,status);
       taskHTML+=`<div class="task-item${locked?' locked':''}${dueStatus==='overdue'?' ti-overdue':''}">
         <div class="ti-left">
-          <div class="ti-name">${t.name}${t.req?'':' <span style="font-size:9px;color:var(--text3);">opt</span>'}</div>
+          <div class="ti-name">${t.name}${t.req?'':' <span style="font-size:9px;color:var(--text3);">opt</span>'}${cdBadge}</div>
           ${t.pre.length?`<div class="ti-pre">after: ${preNames}</div>`:''}
           <div class="due-row">
             <input type="date" class="due-input" value="${dueDate}" onchange="setTaskDue('${pid}','${t.id}',this.value)" onclick="event.stopPropagation()" title="Set due date">
@@ -1917,7 +1924,7 @@ async function submitNewProject(){
   };
   projects.unshift(newProject);
   taskState[newProject.id]={};
-  Object.values(TASKS).flat().forEach(t=>{taskState[newProject.id][t.id]=t.pre.length===0?'Ready To Start':'Not Ready';});
+  Object.values(TASKS).flat().forEach(t=>{taskState[newProject.id][t.id]={status:t.pre.length===0?'Ready To Start':'Not Ready',completedDate:''};});
   stageHistory[newProject.id]=[{stage:stageLabel,entered:dateStr}];
   notes[newProject.id]=[];
   closeNewProject();render();showToast('Project created — '+newProject.name);openPanel(newProject.id);
