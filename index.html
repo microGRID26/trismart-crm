@@ -254,6 +254,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .np-input{width:100%;font-size:12px;padding:7px 10px;border-radius:8px;border:0.5px solid rgba(0,0,0,0.18);background:#f5f5f3;color:#1a1a1a;font-family:inherit;}
 .np-input:focus{outline:none;border-color:#1D9E75;background:#fff;}
 select.np-input{cursor:pointer;}
+
+/* CHAT */
+.chat-wrap{display:flex;flex-direction:column;gap:0;}
+.chat-messages{overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0 12px;max-height:320px;}
+.chat-msg{display:flex;flex-direction:column;gap:2px;}
+.chat-meta{display:flex;align-items:center;gap:6px;}
+.chat-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex-shrink:0;}
+.chat-sender{font-size:11px;font-weight:500;color:var(--text);}
+.chat-time{font-size:10px;color:var(--text3);}
+.chat-bubble{font-size:12px;line-height:1.5;color:var(--text);padding:7px 10px;background:var(--bg2);border-radius:0 8px 8px 8px;margin-left:28px;white-space:pre-wrap;word-break:break-word;}
+.chat-mention{color:var(--purple);font-weight:500;}
+.chat-input-wrap{position:relative;margin-top:10px;border-top:0.5px solid var(--border);padding-top:10px;}
+.chat-input{width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);resize:none;min-height:60px;font-family:inherit;line-height:1.5;}
+.chat-input:focus{outline:none;border-color:var(--green);background:#fff;}
+.chat-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.chat-hint{font-size:10px;color:var(--text3);}
+.chat-send{font-size:11px;padding:5px 14px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;}
+.chat-send:hover{opacity:.88;}
+.mention-dropdown{position:absolute;bottom:calc(100% + 4px);left:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;min-width:180px;overflow:hidden;display:none;}
+.mention-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:12px;}
+.mention-item:hover,.mention-item.active{background:var(--bg2);}
+.mention-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;flex-shrink:0;}
+.chat-who-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.chat-who-sel{font-size:11px;padding:3px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;}
 </style>
 </head>
 <body>
@@ -991,10 +1015,30 @@ function renderPanel(pid){
       <input class="blocker-input" type="text" id="blocker-input" value="${p.blocker||''}" placeholder="Describe blocker or leave blank to clear...">
       <button class="action-btn" onclick="saveBlocker('${pid}')">Save blocker</button>
     </div>
-    <div class="sec"><div class="sec-title">Notes</div>
-      ${pNotes.map(n=>`<div class="note-entry"><div class="note-time">${n.time} · ${n.pm}</div>${n.text}</div>`).join('')}
-      <textarea class="notes-area" id="note-input" placeholder="Add a note..."></textarea>
-      <button class="action-btn" onclick="addNote('${pid}')">Save note</button>
+    <div class="sec"><div class="sec-title">Notes &amp; Chat</div>
+      <div class="chat-wrap">
+        <div class="chat-messages" id="chat-messages-${pid}">${renderChatMessages(pNotes)}</div>
+        <div class="chat-input-wrap">
+          <div class="mention-dropdown" id="mention-dd-${pid}"></div>
+          <div class="chat-who-wrap">
+            <span style="font-size:11px;color:var(--text2);">Posting as</span>
+            <select class="chat-who-sel" id="chat-who-${pid}">
+              <option value="Greg">Greg</option>
+              <option value="Heidi">Heidi</option>
+              <option value="Ari"${p.pm==='Ari'?' selected':''}>Ari</option>
+              <option value="Jen"${p.pm==='Jen'?' selected':''}>Jen</option>
+              <option value="Aaron">Aaron</option>
+              <option value="Zach">Zach</option>
+              <option value="Mark">Mark</option>
+            </select>
+          </div>
+          <textarea class="chat-input" id="chat-input-${pid}" placeholder="Leave a note or @mention someone..." onkeydown="chatKeydown(event,'${pid}')" oninput="chatInput(this,'${pid}')"></textarea>
+          <div class="chat-footer">
+            <span class="chat-hint">@ to mention &nbsp;·&nbsp; Shift+Enter for new line &nbsp;·&nbsp; Enter to send</span>
+            <button class="chat-send" onclick="sendChat('${pid}')">Send</button>
+          </div>
+        </div>
+      </div>
     </div>`;
   let taskHTML=`<div class="sec-title">Progress — ${pr.done}/${pr.total} required tasks complete</div>
     <div class="prog-bar" style="margin-bottom:12px;height:6px;"><div class="prog-fill" style="width:${pr.pct}%"></div></div>`;
@@ -1067,6 +1111,110 @@ function render(){
   else if(currentView==='pipeline') renderPipeline();
   else if(currentView==='analytics') renderAnalytics();
 }
+// ── CHAT ─────────────────────────────────────────────────
+const TEAM=[
+  {name:'Greg',    color:'#1D9E75'},
+  {name:'Heidi',   color:'#534AB7'},
+  {name:'Ari',     color:'#0C447C'},
+  {name:'Jen',     color:'#BA7517'},
+  {name:'Aaron',   color:'#CF5A1A'},
+  {name:'Zach',    color:'#E24B4A'},
+  {name:'Mark',    color:'#2C7A4B'},
+];
+function teamColor(name){return (TEAM.find(t=>t.name===name)||{color:'#999'}).color;}
+function teamInitials(name){return name.slice(0,2).toUpperCase();}
+
+function renderChatMessages(msgs){
+  if(!msgs||!msgs.length) return '<div style="font-size:12px;color:var(--text3);padding:8px 0;">No messages yet. Be the first to leave a note.</div>';
+  return msgs.map(n=>{
+    const color=teamColor(n.pm);
+    const text=highlightMentions(escapeHtml(n.text||''));
+    return `<div class="chat-msg">
+      <div class="chat-meta">
+        <div class="chat-avatar" style="background:${color};">${teamInitials(n.pm||'?')}</div>
+        <span class="chat-sender">${escapeHtml(n.pm||'Team')}</span>
+        <span class="chat-time">${n.time||''}</span>
+      </div>
+      <div class="chat-bubble">${text}</div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function highlightMentions(s){return s.replace(/@(\w+)/g,'<span class="chat-mention">@$1</span>');}
+
+// @mention autocomplete
+let mentionActive=false,mentionStart=-1,mentionPid=null,mentionSelectedIdx=0;
+
+function chatInput(el,pid){
+  const val=el.value;
+  const pos=el.selectionStart;
+  const dd=document.getElementById('mention-dd-'+pid);
+
+  // find @ trigger
+  const before=val.slice(0,pos);
+  const atMatch=before.match(/@(\w*)$/);
+  if(atMatch){
+    mentionActive=true;mentionStart=before.lastIndexOf('@');mentionPid=pid;
+    const query=atMatch[1].toLowerCase();
+    const matches=TEAM.filter(t=>t.name.toLowerCase().startsWith(query));
+    if(matches.length){
+      mentionSelectedIdx=0;
+      dd.style.display='block';
+      dd.innerHTML=matches.map((t,i)=>`
+        <div class="mention-item${i===0?' active':''}" onmousedown="insertMention('${pid}','${t.name}')">
+          <div class="mention-avatar" style="background:${t.color};">${teamInitials(t.name)}</div>
+          ${t.name}
+        </div>`).join('');
+      return;
+    }
+  }
+  dd.style.display='none';mentionActive=false;
+}
+
+function insertMention(pid,name){
+  const el=document.getElementById('chat-input-'+pid);
+  const val=el.value;
+  const before=val.slice(0,mentionStart);
+  const after=val.slice(el.selectionStart);
+  el.value=before+'@'+name+' '+after;
+  el.focus();
+  document.getElementById('mention-dd-'+pid).style.display='none';
+  mentionActive=false;
+}
+
+function chatKeydown(e,pid){
+  const dd=document.getElementById('mention-dd-'+pid);
+  if(mentionActive&&dd.style.display!=='none'){
+    const items=dd.querySelectorAll('.mention-item');
+    if(e.key==='ArrowDown'){e.preventDefault();mentionSelectedIdx=Math.min(mentionSelectedIdx+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('active',i===mentionSelectedIdx));return;}
+    if(e.key==='ArrowUp'){e.preventDefault();mentionSelectedIdx=Math.max(mentionSelectedIdx-1,0);items.forEach((el,i)=>el.classList.toggle('active',i===mentionSelectedIdx));return;}
+    if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();const active=dd.querySelector('.mention-item.active');if(active) active.dispatchEvent(new MouseEvent('mousedown'));return;}
+    if(e.key==='Escape'){dd.style.display='none';mentionActive=false;return;}
+  }
+  // Enter sends, Shift+Enter = newline
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat(pid);}
+}
+
+function sendChat(pid){
+  const el=document.getElementById('chat-input-'+pid);
+  const whoEl=document.getElementById('chat-who-'+pid);
+  if(!el||!el.value.trim()) return;
+  const text=el.value.trim();
+  const who=whoEl?whoEl.value:'Team';
+  const now=new Date();
+  const timeStr=now.toLocaleDateString()+' '+now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const note={text,time:timeStr,pm:who};
+  if(!notes[pid]) notes[pid]=[];
+  notes[pid].push(note);
+  el.value='';
+  document.getElementById('mention-dd-'+pid).style.display='none';
+  // Re-render chat messages
+  const msgEl=document.getElementById('chat-messages-'+pid);
+  if(msgEl){msgEl.innerHTML=renderChatMessages(notes[pid]);msgEl.scrollTop=msgEl.scrollHeight;}
+  post({action:'addNote',projectId:pid,text:note.text,time:note.time,pm:note.pm});
+}
+
 // ── NEW PROJECT ──────────────────────────────────────────
 function openNewProject(){
   document.getElementById('np-overlay').style.display='block';
