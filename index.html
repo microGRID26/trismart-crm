@@ -943,6 +943,8 @@ const TASKS={
 };
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
+let blockerDates={};  // pid -> ISO date string, persisted in localStorage
+try{ blockerDates=JSON.parse(localStorage.getItem('ts_blockerDates')||'{}'); }catch(e){}
 // Helper — taskState values are now {status, completedDate} objects
 function ts(pid,tid){const v=(taskState[pid]||{})[tid];return v?(typeof v==='object'?v.status:v):'Not Ready';}
 function tcd(pid,tid){const v=(taskState[pid]||{})[tid];return v&&typeof v==='object'?v.completedDate:'';}
@@ -1177,18 +1179,37 @@ function renderCommand(){
       el.classList.toggle('active-filter',match.includes(`'${cmdFilter}'`)&&cmdFilter!=='all');
     });
   }
+  function blockerAge(pid){
+    const d=blockerDates[pid];if(!d) return null;
+    return Math.max(0,Math.floor((today-new Date(d))/(1000*60*60*24)));
+  }
+  function notesCount(pid){return (notes[pid]||[]).length;}
   function rows(list,cls){
     if(!list.length) return '<div class="none-msg">None</div>';
     return list.map(p=>{
       const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);
       const issue=p.blocker?p.blocker:sla.status==='crit'?`Past critical (${sla.crit}d)`:sla.status==='risk'?`Approaching critical at ${sla.crit}d`:sla.status==='warn'?`Past target of ${sla.sla}d`:`Stalled ${sla.days}d`;
       const mentionBadge=hasMention(p.id)?'<span class="mention-badge">@you</span>':'';
+      const nc=notesCount(p.id);
+      const notesBadge=nc?`<span style="font-size:10px;background:var(--bg2);color:var(--text3);padding:1px 6px;border-radius:8px;flex-shrink:0;">💬 ${nc}</span>`:'';
+      // Blocker age badge
+      let blockerBadge='';
+      if(p.blocker){
+        const age=blockerAge(p.id);
+        if(age===null) blockerBadge='';
+        else if(age===0) blockerBadge=`<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#F3E8FF;color:#7C3AED;flex-shrink:0;">new</span>`;
+        else if(age<3)  blockerBadge=`<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#F3E8FF;color:#7C3AED;flex-shrink:0;">${age}d</span>`;
+        else if(age<7)  blockerBadge=`<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#EDE9FE;color:#6D28D9;font-weight:600;flex-shrink:0;">⚠ ${age}d</span>`;
+        else            blockerBadge=`<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-weight:700;flex-shrink:0;">🔴 ${age}d blocked</span>`;
+      }
       return `<div class="alert-row ${cls}" onclick="openPanel('${p.id}')">
         <span class="ar-name">${p.name} <span style="font-size:10px;color:var(--text3);font-weight:400;">${p.id}</span></span>
         <span class="ar-stage">${s?s.label:p.stage}</span>
         ${slaBadge(sla.status,sla.days)}
         <span class="ar-pm">${p.pm}</span>
         <span class="ar-issue">${issue}</span>
+        ${blockerBadge}
+        ${notesBadge}
         ${mentionBadge}
         ${p.disposition==='Loyalty'?'<span class="badge b-loyalty">Loyalty</span>':''}
       </div>`;
@@ -2002,7 +2023,11 @@ function confirmCompletion(){
 function saveBlocker(pid){
   const p=projects.find(x=>x.id===pid);const inp=document.getElementById('blocker-input');
   if(!p||!inp) return;
-  p.blocker=inp.value.trim();render();renderPanel(pid);
+  p.blocker=inp.value.trim();
+  if(p.blocker){ blockerDates[pid]=today.toISOString().slice(0,10); }
+  else { delete blockerDates[pid]; }
+  try{ localStorage.setItem('ts_blockerDates',JSON.stringify(blockerDates)); }catch(e){}
+  render();renderPanel(pid);
   showToast(p.blocker?'Blocker saved':'Blocker cleared');
   post({action:'saveBlocker',projectId:pid,blocker:p.blocker});
 }
@@ -2643,6 +2668,38 @@ function buildTSV(list,cols){
   return [header,...rows].join('\n');
 }
 document.getElementById('export-overlay').addEventListener('click',function(e){if(e.target===this)closeExport();});
+document.getElementById('completion-overlay').addEventListener('click',function(e){if(e.target===this)closeCompletionModal();});
+
+// ── KEYBOARD SHORTCUTS ───────────────────────────────────
+document.addEventListener('keydown',function(e){
+  // Skip if typing in an input/textarea
+  const tag=(e.target.tagName||'').toLowerCase();
+  const inField=tag==='input'||tag==='textarea'||tag==='select'||e.target.isContentEditable;
+
+  // Escape — close panel or modal
+  if(e.key==='Escape'){
+    if(document.getElementById('completion-overlay').style.display!=='none'){closeCompletionModal();return;}
+    if(document.getElementById('export-overlay').style.display!=='none'){closeExport();return;}
+    if(selectedId){selectedId=null;render();return;}
+  }
+
+  if(inField) return; // remaining shortcuts skip when in a field
+
+  // / — focus search
+  if(e.key==='/'){ e.preventDefault();const s=document.getElementById('search-input');if(s){s.focus();s.select();} return; }
+
+  // N — new project
+  if(e.key==='n'||e.key==='N'){ openNewProject(); return; }
+
+  // 1-5 — switch views
+  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit'};
+  if(viewMap[e.key]){
+    const v=viewMap[e.key];
+    setView(v,document.getElementById('btn-'+v));
+    syncMobileNav(v);
+    return;
+  }
+});
 
 // Only load data if already logged in from session
 if(currentUser.name) loadData();
