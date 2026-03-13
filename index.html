@@ -1563,7 +1563,7 @@ function renderPanel(pid){
     <div class="sec"><div class="sec-title">Blocker</div>
       <input class="blocker-input" type="text" id="blocker-input" value="${p.blocker||''}" placeholder="Describe blocker or leave blank to clear...">
       <button class="action-btn" onclick="saveBlocker('${pid}')">Save blocker</button>
-    </div>
+    </div>`;
 
   // Build task HTML
   let taskHTML=`<div class="sec-title">Progress — ${pr.done}/${pr.total} required tasks complete</div>
@@ -2205,7 +2205,7 @@ function renderAudit(){
 }
 
 // ── EXPORT ───────────────────────────────────────────────
-  document.getElementById('export-pm-label').textContent=currentPM==='all'?'All PMs':currentPM;
+function openExport(){
   document.querySelector('[name=export-scope][value=all]').checked=true;
   updateExportCount();
   document.getElementById('export-overlay').style.display='block';
