@@ -486,8 +486,8 @@ let projects=[],taskState={},notes={},stageHistory={};
 let selectedId=null,currentPM='all',currentView='command';
 const today=new Date();
 
-function daysAgo(d){return Math.max(0,Math.floor((today-new Date(d))/(1000*60*60*24)));}
-function cycleDays(p){return daysAgo(p.saleDate);}
+function daysAgo(d){if(!d) return 0;const n=new Date(d);if(isNaN(n)) return 0;return Math.max(0,Math.floor((today-n)/(1000*60*60*24)));}
+function cycleDays(p){return daysAgo(p.saleDate)||0;}
 function getSLA(p){
   const s=STAGES.find(x=>x.id===p.stage);
   if(!s) return {days:0,status:'ok',pct:0,sla:3,risk:5,crit:7};
