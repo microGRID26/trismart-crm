@@ -299,7 +299,12 @@ select.np-input{cursor:pointer;}
 .dtr-task{font-size:11px;color:var(--text2);flex:1;}
 .dtr-pm{font-size:11px;color:var(--text3);}
 
-/* LOGIN SCREEN */
+/* MOBILE LOGIN FALLBACK */
+.login-fallback{margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border);}
+.login-fallback-label{font-size:11px;color:var(--text3);margin-bottom:8px;}
+.login-name-input{width:100%;font-size:13px;padding:8px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit;margin-bottom:8px;}
+.login-name-input:focus{outline:none;border-color:var(--green);}
+.login-name-btn{width:100%;font-size:13px;padding:9px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;}
 .login-screen{position:fixed;inset:0;background:var(--bg3);z-index:500;display:flex;align-items:center;justify-content:center;}
 .login-card{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:40px 48px;text-align:center;max-width:360px;width:100%;}
 .login-logo{font-size:22px;font-weight:600;margin-bottom:6px;}
@@ -407,6 +412,11 @@ select.np-input{cursor:pointer;}
       data-width="260">
     </div>
     <div class="login-hint">Sign in with your TriSMART Google Workspace account</div>
+    <div class="login-fallback">
+      <div class="login-fallback-label">Or enter your name to continue</div>
+      <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last" onkeydown="if(event.key==='Enter') manualSignIn()">
+      <button class="login-name-btn" onclick="manualSignIn()">Continue</button>
+    </div>
   </div>
 </div>
 <div class="app">
@@ -1400,6 +1410,16 @@ function parseJwt(token){
   try{return JSON.parse(atob(token.split('.')[1]));}catch(e){return {};}
 }
 
+function manualSignIn(){
+  const inp=document.getElementById('login-name-input');
+  const name=(inp?inp.value.trim():'');
+  if(!name){inp&&inp.focus();return;}
+  currentUser={name,fullName:name,email:'',picture:''};
+  sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
+  showUserChip();
+  document.getElementById('login-screen').style.display='none';
+  loadData();
+}
 function onGoogleSignIn(response){
   const payload=parseJwt(response.credential);
   const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
