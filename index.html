@@ -657,8 +657,8 @@ select.np-input{cursor:pointer;}
       <div class="section-title">On track</div><div class="alert-list" id="list-ok"></div>
     </div>
   </div>
-  <div class="view" id="view-queue"><div class="queue-grid" id="queue-grid"></div></div>
-  <div class="view" id="view-pipeline">
+  <div class="view" id="view-queue" style="display:none;"><div class="queue-grid" id="queue-grid"></div></div>
+  <div class="view" id="view-pipeline" style="display:none;">
     <div class="pipe-filters" id="pipe-filters">
       <div class="pf-group">
         <span class="pf-label">Filter</span>
@@ -691,7 +691,7 @@ select.np-input{cursor:pointer;}
     </div>
     <div class="board-wrap"><div class="board" id="board"></div></div>
   </div>
-  <div class="view" id="view-analytics"><div class="an-page" id="an-page"></div></div>
+  <div class="view" id="view-analytics" style="display:none;"><div class="an-page" id="an-page"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
     <div class="panel-head">
@@ -1555,12 +1555,16 @@ function openPanel(pid){
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
 function setView(v,btn){
   currentView=v;
-  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
-  document.getElementById('view-'+v).classList.add('active');
+  ['command','queue','pipeline','analytics'].forEach(id=>{
+    const el=document.getElementById('view-'+id);
+    if(el) el.style.display=(id===v)?'block':'none';
+  });
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   syncMobileNav(v);
-  closePanel();render();
+  selectedId=null;
+  document.getElementById('detail-panel').classList.remove('open');
+  render();
 }
 function setPM(v){currentPM=v;render();}
 function syncMobileNav(v){
