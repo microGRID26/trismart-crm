@@ -280,6 +280,18 @@ select.np-input{cursor:pointer;}
 .chat-who-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .chat-who-sel{font-size:11px;padding:3px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;}
 
+/* PIPELINE FILTERS */
+.pipe-filters{display:flex;align-items:center;gap:10px;padding:8px 0 10px;flex-wrap:wrap;}
+.pf-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.pf-label{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;}
+.pf-sel{font-size:11px;padding:4px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;max-width:150px;}
+.pf-input{font-size:11px;padding:4px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);width:90px;}
+.pf-input:focus{outline:none;border-color:var(--green);}
+.pf-clear{font-size:10px;padding:3px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;}
+.pf-clear:hover{background:var(--bg2);}
+.pf-results{font-size:11px;color:var(--text3);margin-left:4px;}
+.pf-active{border-color:var(--green)!important;background:#f0faf5!important;}
+
 /* DUE DATES */
 .due-row{display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;}
 .due-input{font-size:10px;padding:2px 5px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:inherit;}
@@ -557,7 +569,34 @@ select.np-input{cursor:pointer;}
     </div>
   </div>
   <div class="view" id="view-queue"><div class="queue-grid" id="queue-grid"></div></div>
-  <div class="view" id="view-pipeline"><div class="board-wrap"><div class="board" id="board"></div></div></div>
+  <div class="view" id="view-pipeline">
+    <div class="pipe-filters" id="pipe-filters">
+      <div class="pf-group">
+        <span class="pf-label">Filter</span>
+        <select class="pf-sel" id="pf-financier" onchange="renderPipeline()"><option value="">All financiers</option></select>
+        <select class="pf-sel" id="pf-utility" onchange="renderPipeline()"><option value="">All utilities</option></select>
+        <select class="pf-sel" id="pf-ahj" onchange="renderPipeline()"><option value="">All AHJs</option></select>
+        <input class="pf-input" id="pf-city" type="text" placeholder="City..." oninput="renderPipeline()">
+      </div>
+      <div class="pf-group">
+        <span class="pf-label">Sort</span>
+        <select class="pf-sel" id="pf-sort" onchange="renderPipeline()">
+          <option value="sla">Days in stage</option>
+          <option value="contract">Contract value</option>
+          <option value="cycle">Total cycle</option>
+          <option value="name">Name A–Z</option>
+          <option value="kw">System size</option>
+        </select>
+        <select class="pf-sel" id="pf-dir" onchange="renderPipeline()">
+          <option value="desc">High → Low</option>
+          <option value="asc">Low → High</option>
+        </select>
+        <button class="pf-clear" onclick="clearPipeFilters()">✕ Clear</button>
+      </div>
+      <div class="pf-results" id="pf-results"></div>
+    </div>
+    <div class="board-wrap"><div class="board" id="board"></div></div>
+  </div>
   <div class="view" id="view-analytics"><div class="an-page" id="an-page"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
@@ -922,9 +961,68 @@ function renderQueue(){
 }
 
 // ── PIPELINE ─────────────────────────────────────────────
-function renderPipeline(){
-  const board=document.getElementById('board');board.innerHTML='';
+function populatePipeFilters(){
   const vis=visProjects();
+  function opts(sel,vals){
+    const cur=document.getElementById(sel).value;
+    const uniq=[...new Set(vals.filter(Boolean).sort())];
+    const first=document.getElementById(sel).options[0].text;
+    document.getElementById(sel).innerHTML=`<option value="">${first}</option>`+uniq.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
+  }
+  opts('pf-financier',vis.map(p=>p.financier));
+  opts('pf-utility',vis.map(p=>p.utility));
+  opts('pf-ahj',vis.map(p=>p.ahj));
+}
+function clearPipeFilters(){
+  document.getElementById('pf-financier').value='';
+  document.getElementById('pf-utility').value='';
+  document.getElementById('pf-ahj').value='';
+  document.getElementById('pf-city').value='';
+  document.getElementById('pf-sort').value='sla';
+  document.getElementById('pf-dir').value='desc';
+  renderPipeline();
+}
+function getPipeFiltered(){
+  const financier=document.getElementById('pf-financier').value;
+  const utility=document.getElementById('pf-utility').value;
+  const ahj=document.getElementById('pf-ahj').value;
+  const city=(document.getElementById('pf-city').value||'').toLowerCase().trim();
+  const sort=document.getElementById('pf-sort').value;
+  const dir=document.getElementById('pf-dir').value;
+
+  // highlight active filters
+  ['pf-financier','pf-utility','pf-ahj'].forEach(id=>{
+    document.getElementById(id).classList.toggle('pf-active',!!document.getElementById(id).value);
+  });
+  document.getElementById('pf-city').classList.toggle('pf-active',!!city);
+
+  let vis=visProjects();
+  if(financier) vis=vis.filter(p=>p.financier===financier);
+  if(utility)   vis=vis.filter(p=>p.utility===utility);
+  if(ahj)       vis=vis.filter(p=>p.ahj===ahj);
+  if(city)      vis=vis.filter(p=>(p.city||'').toLowerCase().includes(city));
+
+  // sort
+  vis.sort((a,b)=>{
+    let av,bv;
+    if(sort==='sla'){av=getSLA(a).days;bv=getSLA(b).days;}
+    else if(sort==='contract'){av=Number(a.contract)||0;bv=Number(b.contract)||0;}
+    else if(sort==='cycle'){av=cycleDays(a);bv=cycleDays(b);}
+    else if(sort==='name'){av=a.name||'';bv=b.name||'';return dir==='asc'?av.localeCompare(bv):bv.localeCompare(av);}
+    else if(sort==='kw'){av=Number(a.systemkw)||0;bv=Number(b.systemkw)||0;}
+    else{av=0;bv=0;}
+    return dir==='asc'?av-bv:bv-av;
+  });
+  return vis;
+}
+function renderPipeline(){
+  populatePipeFilters();
+  const board=document.getElementById('board');board.innerHTML='';
+  const vis=getPipeFiltered();
+  const total=visProjects().length;
+  const resEl=document.getElementById('pf-results');
+  resEl.textContent=vis.length<total?`${vis.length} of ${total} projects`:`${total} projects`;
+
   STAGES.forEach(s=>{
     const cards=vis.filter(p=>p.stage===s.id);
     const col=document.createElement('div');
@@ -937,7 +1035,7 @@ function renderPipeline(){
       body.innerHTML+=`<div class="kcard${selectedId===p.id?' sel':''}${p.blocker?' is-blocked':''}" onclick="openPanel('${p.id}')">
         <div class="kcard-name">${p.name}</div>
         <div class="kcard-id">${p.id}</div>
-        <div class="kcard-kw">${p.systemkw} kW</div>
+        <div class="kcard-kw">${p.systemkw} kW &nbsp;·&nbsp; ${fmt$(p.contract)}</div>
         <div class="kcard-foot">${slaBadge(sla.status,sla.days)}<span class="badge b-pm">${p.pm}</span>${p.blocker?'<span class="badge b-blocked">Blocked</span>':''}${mentionBadge}</div>
         <div class="age-bar"><div class="age-fill" style="width:${sla.pct}%;background:${ageColor(sla.status)};"></div></div>
       </div>`;
