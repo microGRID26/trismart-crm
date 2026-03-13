@@ -189,6 +189,55 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .stl-stage.current{color:var(--green);}
 .stl-meta{font-size:10px;color:var(--text3);margin-top:1px;}
 .stl-dur{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--bg2);color:var(--text2);margin-left:4px;}
+/* ── SCHEDULE ─────────────────────────────────────────── */
+.sch-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.sch-week-nav{display:flex;align-items:center;gap:8px;}
+.sch-week-btn{background:var(--bg2);border:0.5px solid var(--border2);color:var(--text);border-radius:var(--radius);padding:5px 12px;font-size:12px;cursor:pointer;}
+.sch-week-btn:hover{background:var(--border2);}
+.sch-week-label{font-size:13px;font-weight:600;color:var(--text);min-width:180px;text-align:center;}
+.sch-filter-btn{padding:4px 12px;border-radius:20px;font-size:11px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;transition:all .15s;}
+.sch-filter-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
+.sch-grid{width:100%;border-collapse:collapse;font-size:12px;}
+.sch-grid th{padding:7px 8px;background:var(--bg2);border:0.5px solid var(--border);font-size:11px;font-weight:600;text-align:center;color:var(--text2);position:sticky;top:0;z-index:2;}
+.sch-grid th.today-col{background:rgba(29,158,117,0.12);color:var(--green);}
+.sch-grid td{padding:4px;border:0.5px solid var(--border);vertical-align:top;min-width:110px;min-height:60px;cursor:pointer;background:var(--bg);}
+.sch-grid td:hover{background:var(--bg2);}
+.sch-grid td.today-col{background:rgba(29,158,117,0.04);}
+.sch-crew-label{padding:8px 10px;background:var(--bg2);border:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;position:sticky;left:0;z-index:1;}
+.sch-job{border-radius:4px;padding:3px 6px;margin-bottom:3px;font-size:10px;line-height:1.3;cursor:pointer;display:flex;flex-direction:column;gap:1px;}
+.sch-job:hover{opacity:.85;}
+.sch-job-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+.sch-job-type{font-size:9px;opacity:.8;text-transform:uppercase;letter-spacing:.04em;}
+.sch-job.survey{background:#DBEAFE;color:#1E40AF;}
+.sch-job.install{background:#D1FAE5;color:#065F46;}
+.sch-job.inspection{background:#FEF3C7;color:#92400E;}
+.sch-job.service{background:#FCE7F3;color:#9D174D;}
+.sch-job.cancelled{background:var(--bg2);color:var(--text3);text-decoration:line-through;}
+.sch-add-btn{display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--border);color:var(--text3);font-size:14px;margin:2px auto;cursor:pointer;opacity:.5;}
+.sch-add-btn:hover{opacity:1;background:var(--green);color:#fff;}
+.sch-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+.sch-leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);}
+.sch-leg-dot{width:10px;height:10px;border-radius:2px;}
+.sch-crew-mgmt{margin-top:16px;padding-top:16px;border-top:0.5px solid var(--border);}
+.sch-crew-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);}
+.sch-crew-name-edit{font-size:12px;padding:4px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);width:140px;}
+
+/* ASSIGN MODAL */
+.assign-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
+.assign-card{background:var(--bg);border-radius:12px;width:100%;max-width:440px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.25);}
+.assign-header{background:var(--bg2);padding:16px 20px;border-bottom:0.5px solid var(--border);}
+.assign-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.assign-sub{font-size:11px;color:var(--text3);}
+.assign-body{padding:18px 20px;display:flex;flex-direction:column;gap:12px;}
+.assign-field label{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px;}
+.assign-field select,.assign-field input{width:100%;font-size:13px;padding:7px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);box-sizing:border-box;}
+.assign-conflict{background:#FEF2F2;border:0.5px solid #FECACA;border-radius:var(--radius);padding:8px 12px;font-size:11px;color:#DC2626;margin-top:4px;}
+.assign-actions{display:flex;gap:8px;padding:0 20px 18px;}
+.assign-btn-save{flex:1;padding:10px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;}
+.assign-btn-save:disabled{background:var(--border2);color:var(--text3);cursor:not-allowed;}
+.assign-btn-cancel{padding:10px 16px;background:var(--bg2);color:var(--text2);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;cursor:pointer;}
+.assign-btn-delete{padding:10px 16px;background:#FEF2F2;color:#DC2626;border:0.5px solid #FECACA;border-radius:var(--radius);font-size:13px;cursor:pointer;}
+
 /* COMPLETION MODAL */
 .completion-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
 .completion-card{background:var(--bg);border-radius:16px;width:100%;max-width:500px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
@@ -548,6 +597,7 @@ select.np-input{cursor:pointer;}
   <button class="nav-btn" id="btn-pipeline"         onclick="setView('pipeline',this)">Pipeline</button>
   <button class="nav-btn" id="btn-analytics"        onclick="setView('analytics',this)">Analytics</button>
   <button class="nav-btn" id="btn-audit"            onclick="setView('audit',this)">Task audit</button>
+  <button class="nav-btn" id="btn-schedule"         onclick="setView('schedule',this)">Schedule</button>
   <div class="search-wrap">
     <input class="search-input" type="text" placeholder="Search projects..." oninput="searchProjects(this.value)" onblur="setTimeout(closeSearch,200)">
     <div class="search-results" id="search-results" style="display:none;"></div>
@@ -785,6 +835,7 @@ select.np-input{cursor:pointer;}
   </div>
   <div class="view" id="view-analytics" style="display:none;"><div class="an-page" id="an-page"></div></div>
   <div class="view" id="view-audit" style="display:none;"><div id="audit-page" style="padding:4px 0;"></div></div>
+  <div class="view" id="view-schedule" style="display:none;"><div id="schedule-page"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
     <div class="panel-head">
@@ -808,6 +859,49 @@ select.np-input{cursor:pointer;}
 </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- ASSIGN MODAL -->
+<div class="assign-overlay" id="assign-overlay" style="display:none;">
+  <div class="assign-card">
+    <div class="assign-header">
+      <div class="assign-title" id="am-title">Schedule Job</div>
+      <div class="assign-sub" id="am-sub"></div>
+    </div>
+    <div class="assign-body">
+      <div class="assign-field">
+        <label>Project</label>
+        <select id="am-project"></select>
+      </div>
+      <div class="assign-field">
+        <label>Job type</label>
+        <select id="am-type">
+          <option value="survey">Site Survey</option>
+          <option value="install">Installation</option>
+          <option value="inspection">Inspection</option>
+          <option value="service">Service Call</option>
+        </select>
+      </div>
+      <div class="assign-field">
+        <label>Crew</label>
+        <select id="am-crew"></select>
+      </div>
+      <div class="assign-field">
+        <label>Date</label>
+        <input type="date" id="am-date">
+      </div>
+      <div class="assign-field">
+        <label>Notes (optional)</label>
+        <input type="text" id="am-notes" placeholder="Access code, special instructions...">
+      </div>
+      <div id="am-conflict" style="display:none;" class="assign-conflict"></div>
+    </div>
+    <div class="assign-actions">
+      <button class="assign-btn-cancel" onclick="closeAssignModal()">Cancel</button>
+      <button class="assign-btn-delete" id="am-delete-btn" style="display:none;" onclick="deleteScheduleEntry()">Remove</button>
+      <button class="assign-btn-save" id="am-save-btn" onclick="saveAssignment()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- COMPLETION MODAL -->
 <div class="completion-overlay" id="completion-overlay" style="display:none;">
@@ -943,6 +1037,9 @@ const TASKS={
 };
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
+let crews=[];       // [{id,name,members,active}]
+let schedule=[];    // [{id,projectId,crewId,jobType,date,status,notes,pm}]
+let schedWeekOffset=0;  // weeks from today
 let blockerDates={};  // pid -> ISO date string, persisted in localStorage
 try{ blockerDates=JSON.parse(localStorage.getItem('ts_blockerDates')||'{}'); }catch(e){}
 // Helper — taskState values are now {status, completedDate} objects
@@ -1075,6 +1172,7 @@ async function loadData(){
     if(data.error) throw new Error(data.error);
     projects=data.projects||[];taskState=data.taskState||{};
     notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
+    crews=data.crews||[];schedule=data.schedule||[];
     // Merge any locally stored folder URLs
     try{
       const local=JSON.parse(localStorage.getItem('trismart_folders')||'{}');
@@ -2053,7 +2151,7 @@ function toggleSection(el){
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
 function setView(v,btn){
   currentView=v;
-  ['command','queue','pipeline','analytics','audit'].forEach(id=>{
+  ['command','queue','pipeline','analytics','audit','schedule'].forEach(id=>{
     const el=document.getElementById('view-'+id);
     if(el) el.style.display=(id===v)?'block':'none';
   });
@@ -2109,6 +2207,7 @@ function render(){
   else if(currentView==='pipeline') renderPipeline();
   else if(currentView==='analytics') renderAnalytics();
   else if(currentView==='audit') renderAudit();
+  else if(currentView==='schedule') renderSchedule();
 }
 // ── GOOGLE AUTH ──────────────────────────────────────────
 let currentUser={name:'',email:'',picture:''};
@@ -2669,6 +2768,210 @@ function buildTSV(list,cols){
 }
 document.getElementById('export-overlay').addEventListener('click',function(e){if(e.target===this)closeExport();});
 document.getElementById('completion-overlay').addEventListener('click',function(e){if(e.target===this)closeCompletionModal();});
+document.getElementById('assign-overlay').addEventListener('click',function(e){if(e.target===this)closeAssignModal();});
+
+// ── SCHEDULE ─────────────────────────────────────────────
+const JOB_TYPES={survey:{label:'Site Survey',cls:'survey'},install:{label:'Installation',cls:'install'},inspection:{label:'Inspection',cls:'inspection'},service:{label:'Service Call',cls:'service'}};
+let schedJobFilter='all';
+
+function schedWeekDates(){
+  const base=new Date(today);
+  base.setDate(base.getDate()-base.getDay()+1+(schedWeekOffset*7)); // Monday
+  return Array.from({length:6},(_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d;});
+}
+
+function isoDate(d){return d.toISOString().slice(0,10);}
+
+function renderSchedule(){
+  const el=document.getElementById('schedule-page');if(!el) return;
+  const days=schedWeekDates();
+  const todayIso=isoDate(today);
+  const activeCrews=crews.length?crews:[{id:'crew1',name:'Crew 1'},{id:'crew2',name:'Crew 2'},{id:'crew3',name:'Crew 3'}];
+
+  const weekLabel=`${days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${days[5].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+
+  // build lookup: crewId+date -> [schedule entries]
+  function jobsFor(crewId,dateIso){
+    return schedule.filter(s=>s.crewId===crewId&&s.date===dateIso&&(schedJobFilter==='all'||s.jobType===schedJobFilter));
+  }
+
+  // count scheduled per crew this week for summary
+  const weekJobCount=activeCrews.map(c=>days.reduce((a,d)=>a+jobsFor(c.id,isoDate(d)).length,0));
+  const totalWeek=weekJobCount.reduce((a,b)=>a+b,0);
+
+  el.innerHTML=`
+    <div class="sch-toolbar">
+      <div class="sch-week-nav">
+        <button class="sch-week-btn" onclick="schedWeekOffset--;renderSchedule()">◀ Prev</button>
+        <span class="sch-week-label">${weekLabel}</span>
+        <button class="sch-week-btn" onclick="schedWeekOffset++;renderSchedule()">Next ▶</button>
+        ${schedWeekOffset!==0?`<button class="sch-week-btn" onclick="schedWeekOffset=0;renderSchedule()">Today</button>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="sch-filter-btn ${schedJobFilter==='all'?'active':''}" onclick="schedJobFilter='all';renderSchedule()">All</button>
+        ${Object.entries(JOB_TYPES).map(([k,v])=>`<button class="sch-filter-btn ${schedJobFilter===k?'active':''}" onclick="schedJobFilter='${k}';renderSchedule()">${v.label}</button>`).join('')}
+      </div>
+      <button style="margin-left:auto;padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;" onclick="openAssignModal(null,null,null)">+ Schedule Job</button>
+    </div>
+    <div class="sch-legend">
+      ${Object.entries(JOB_TYPES).map(([k,v])=>`<div class="sch-leg"><div class="sch-leg-dot sch-job ${v.cls}"></div>${v.label}</div>`).join('')}
+      <span style="margin-left:auto;font-size:11px;color:var(--text3);">${totalWeek} job${totalWeek!==1?'s':''} this week</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="sch-grid">
+      <thead><tr>
+        <th style="min-width:110px;">Crew</th>
+        ${days.map(d=>{
+          const iso=isoDate(d);
+          const isToday=iso===todayIso;
+          const dayLabel=d.toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
+          return `<th class="${isToday?'today-col':''}">${isToday?'<span style="color:var(--green);">'+dayLabel+'</span>':dayLabel}</th>`;
+        }).join('')}
+      </tr></thead>
+      <tbody>
+        ${activeCrews.map(crew=>`
+          <tr>
+            <td class="sch-crew-label">
+              <div>${crew.name}</div>
+              <div style="font-size:9px;color:var(--text3);margin-top:2px;">${weekJobCount[activeCrews.indexOf(crew)]} this week</div>
+            </td>
+            ${days.map(d=>{
+              const iso=isoDate(d);
+              const isToday=iso===todayIso;
+              const jobs=jobsFor(crew.id,iso);
+              return `<td class="${isToday?'today-col':''}" onclick="openAssignModal('${crew.id}','${iso}',null)">
+                ${jobs.map(j=>{
+                  const p=projects.find(x=>String(x.id)===String(j.projectId));
+                  const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
+                  return `<div class="sch-job ${jt.cls}${j.status==='cancelled'?' cancelled':''}" onclick="event.stopPropagation();openAssignModal('${crew.id}','${iso}','${j.id}')">
+                    <span class="sch-job-name">${p?p.name:j.projectId}</span>
+                    <span class="sch-job-type">${jt.label}</span>
+                    ${j.notes?`<span style="font-size:9px;opacity:.7;">${j.notes.slice(0,30)}</span>`:''}
+                  </div>`;
+                }).join('')}
+                <div class="sch-add-btn" onclick="event.stopPropagation();openAssignModal('${crew.id}','${iso}',null)">+</div>
+              </td>`;
+            }).join('')}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+    ${activeCrews.length<20?`
+    <div class="sch-crew-mgmt">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;">Manage Crews</div>
+      ${activeCrews.map(c=>`
+        <div class="sch-crew-row">
+          <input class="sch-crew-name-edit" value="${c.name}" id="crew-name-${c.id}" placeholder="Crew name">
+          <button style="font-size:11px;padding:4px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;" onclick="saveCrewName('${c.id}')">Save</button>
+        </div>`).join('')}
+      <button style="margin-top:8px;font-size:11px;padding:5px 14px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
+    </div>`:''}`;
+}
+
+function saveCrewName(id){
+  const inp=document.getElementById('crew-name-'+id);if(!inp) return;
+  const name=inp.value.trim();if(!name) return;
+  const c=crews.find(x=>x.id===id);
+  if(c) c.name=name;
+  renderSchedule();
+  post({action:'updateCrew',crewId:id,name});
+  showToast('Crew updated');
+}
+
+function addCrew(){
+  const id='crew'+Date.now();
+  const name='Crew '+(crews.length+1);
+  crews.push({id,name,members:'',active:true});
+  renderSchedule();
+  post({action:'addCrew',crewId:id,name});
+  showToast('Crew added');
+}
+
+// ── ASSIGN MODAL ─────────────────────────────────────────
+let assignEditId=null;
+
+function openAssignModal(crewId,dateIso,schedId){
+  const existing=schedId?schedule.find(s=>s.id===schedId):null;
+  assignEditId=schedId||null;
+
+  // Populate project dropdown — filter to relevant stages
+  const sel=document.getElementById('am-project');
+  const relevant=projects.filter(p=>['survey','design','permit','install','inspection','complete'].includes(p.stage)||true);
+  sel.innerHTML=relevant.map(p=>`<option value="${p.id}" ${existing&&String(existing.projectId)===String(p.id)?'selected':''}>${p.name} (${p.id})</option>`).join('');
+
+  // Populate crew dropdown
+  const crewSel=document.getElementById('am-crew');
+  const activeCrews=crews.length?crews:[{id:'crew1',name:'Crew 1'},{id:'crew2',name:'Crew 2'},{id:'crew3',name:'Crew 3'}];
+  crewSel.innerHTML=activeCrews.map(c=>`<option value="${c.id}" ${(existing?existing.crewId:crewId)===c.id?'selected':''}>${c.name}</option>`).join('');
+
+  document.getElementById('am-type').value=existing?existing.jobType:(schedJobFilter!=='all'?schedJobFilter:'install');
+  document.getElementById('am-date').value=existing?existing.date:(dateIso||isoDate(today));
+  document.getElementById('am-notes').value=existing?existing.notes||'':'';
+  document.getElementById('am-title').textContent=existing?'Edit Scheduled Job':'Schedule Job';
+  document.getElementById('am-delete-btn').style.display=existing?'':'none';
+  document.getElementById('am-conflict').style.display='none';
+
+  // Check conflicts on change
+  ['am-crew','am-date','am-type'].forEach(id=>{
+    document.getElementById(id).onchange=checkAssignConflict;
+  });
+
+  document.getElementById('assign-overlay').style.display='flex';
+  checkAssignConflict();
+}
+
+function checkAssignConflict(){
+  const crewId=document.getElementById('am-crew').value;
+  const date=document.getElementById('am-date').value;
+  const el=document.getElementById('am-conflict');
+  if(!crewId||!date){el.style.display='none';return;}
+  const conflicts=schedule.filter(s=>s.crewId===crewId&&s.date===date&&s.id!==assignEditId&&s.status!=='cancelled');
+  if(conflicts.length){
+    const names=conflicts.map(s=>{const p=projects.find(x=>String(x.id)===String(s.projectId));return p?p.name:s.projectId;}).join(', ');
+    el.textContent=`⚠ ${conflicts.length} job${conflicts.length>1?'s':''} already on this crew that day: ${names}`;
+    el.style.display='';
+  } else {
+    el.style.display='none';
+  }
+}
+
+function closeAssignModal(){
+  document.getElementById('assign-overlay').style.display='none';
+  assignEditId=null;
+}
+
+function saveAssignment(){
+  const projectId=document.getElementById('am-project').value;
+  const crewId=document.getElementById('am-crew').value;
+  const jobType=document.getElementById('am-type').value;
+  const date=document.getElementById('am-date').value;
+  const notes=document.getElementById('am-notes').value.trim();
+  if(!projectId||!crewId||!date){showToast('Fill in all required fields');return;}
+
+  if(assignEditId){
+    const entry=schedule.find(s=>s.id===assignEditId);
+    if(entry){Object.assign(entry,{projectId,crewId,jobType,date,notes});}
+    post({action:'updateSchedule',id:assignEditId,projectId,crewId,jobType,date,notes});
+    showToast('Updated');
+  } else {
+    const id='sch'+Date.now();
+    const pm=currentUser.name||currentPM||'Team';
+    schedule.push({id,projectId,crewId,jobType,date,notes,status:'scheduled',pm});
+    post({action:'addSchedule',id,projectId,crewId,jobType,date,notes,pm});
+    showToast('Scheduled');
+  }
+  closeAssignModal();
+  renderSchedule();
+}
+
+function deleteScheduleEntry(){
+  if(!assignEditId) return;
+  schedule=schedule.filter(s=>s.id!==assignEditId);
+  post({action:'deleteSchedule',id:assignEditId});
+  closeAssignModal();
+  renderSchedule();
+  showToast('Removed');
+}
 
 // ── KEYBOARD SHORTCUTS ───────────────────────────────────
 document.addEventListener('keydown',function(e){
@@ -2691,8 +2994,8 @@ document.addEventListener('keydown',function(e){
   // N — new project
   if(e.key==='n'||e.key==='N'){ openNewProject(); return; }
 
-  // 1-5 — switch views
-  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit'};
+  // 1-6 — switch views
+  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule'};
   if(viewMap[e.key]){
     const v=viewMap[e.key];
     setView(v,document.getElementById('btn-'+v));
