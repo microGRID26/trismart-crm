@@ -909,6 +909,13 @@ async function loadData(){
     if(data.error) throw new Error(data.error);
     projects=data.projects||[];taskState=data.taskState||{};
     notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
+    // Merge any locally stored folder URLs
+    try{
+      const local=JSON.parse(localStorage.getItem('trismart_folders')||'{}');
+      Object.entries(local).forEach(([pid,url])=>{
+        if(!projectFolders[pid]||!projectFolders[pid].folderUrl) projectFolders[pid]={folderUrl:url,folderId:''};
+      });
+    }catch(e){}
     setLoadingBar(100);
     document.getElementById('cmd-loader').style.display='none';
     document.getElementById('cmd-content').style.display='block';
@@ -1966,105 +1973,58 @@ function renderFilesSection(pid){
   container.className='files-section';
   container.id='files-section-'+pid;
 
-  if(!folder){
+  if(!folder || !folder.folderUrl){
     container.innerHTML=`
       <div class="sec-title" style="margin-top:10px;">Files</div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Create a Drive folder to store site survey photos, install photos, and contracts.</div>
-      <button class="files-btn primary" onclick="createProjectFolder('${pid}')">Create Drive Folder</button>
-      <div id="files-creating-${pid}" style="display:none;font-size:11px;color:var(--text3);margin-top:6px;">Creating folder...</div>`;
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Paste a Google Drive folder URL to link files for this project.</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="text" id="folder-url-input-${pid}" placeholder="https://drive.google.com/drive/folders/..." 
+          style="flex:1;font-size:11px;padding:6px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);">
+        <button class="files-btn primary" onclick="saveFolderUrl('${pid}')">Save</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px;">Create a folder in Drive, right-click → Share → Copy link, paste above.</div>`;
   } else {
     container.innerHTML=`
       <div class="sec-title" style="margin-top:10px;">Files</div>
       <div class="files-folder-bar">
         <span class="files-folder-name">📁 Drive folder linked</span>
         <a href="${folder.folderUrl}" target="_blank" class="files-btn">Open Folder ↗</a>
-        <button class="files-btn" onclick="loadProjectFiles('${pid}')">Load Files</button>
-      </div>
-      <div id="files-list-${pid}"><div class="files-empty" style="padding:4px 0;">Click Load Files to view contents.</div></div>`;
+        <button class="files-btn" onclick="clearFolderUrl('${pid}')" style="color:var(--text3);">✕</button>
+      </div>`;
   }
   right.appendChild(container);
 }
 
-async function createProjectFolder(pid){
-  const p=projects.find(x=>x.id===pid);if(!p) return;
-  const btn=document.querySelector(`#files-section-${pid} .files-btn.primary`);
-  const msg=document.getElementById('files-creating-'+pid);
-  if(btn){btn.disabled=true;btn.textContent='Creating...';}
-  if(msg) msg.style.display='block';
+async function saveFolderUrl(pid){
+  const inp=document.getElementById('folder-url-input-'+pid);
+  const url=(inp?inp.value:'').trim();
+  if(!url||!url.includes('drive.google.com')){showToast('Paste a valid Google Drive URL');return;}
+  projectFolders[pid]={folderUrl:url,folderId:''};
+  // Store in localStorage so it persists without a server change
   try{
-    const res=await fetch(API,{method:'POST',body:JSON.stringify({action:'createFolder',projectId:pid,projectName:p.name})});
-    const data=await res.json();
-    if(data.ok&&data.folderId){
-      projectFolders[pid]={folderId:data.folderId,folderUrl:data.folderUrl};
-      // re-render files section
-      const old=document.getElementById('files-section-'+pid);
-      if(old) old.remove();
-      renderFilesSection(pid);
-      showToast('Drive folder created');
-    } else {
-      const errMsg=data.error||'Failed to create folder';
-      showToast(errMsg);
-      if(btn){btn.disabled=false;btn.textContent='Create Drive Folder';}
-      if(msg) msg.style.display='none';
-    }
-  }catch(e){
-    showToast('Error: '+e.message);
-    if(btn){btn.disabled=false;btn.textContent='Create Drive Folder';}
-    if(msg) msg.style.display='none';
-  }
+    const stored=JSON.parse(localStorage.getItem('trismart_folders')||'{}');
+    stored[pid]=url;
+    localStorage.setItem('trismart_folders',JSON.stringify(stored));
+  }catch(e){}
+  const old=document.getElementById('files-section-'+pid);
+  if(old) old.remove();
+  renderFilesSection(pid);
+  showToast('Drive folder linked');
 }
 
-async function loadProjectFiles(pid){
-  const container=document.getElementById('files-list-'+pid);
-  if(!container) return;
-  container.innerHTML='<div class="files-loading"><div class="spinner" style="width:14px;height:14px;border-width:1.5px;"></div> Loading files...</div>';
+function clearFolderUrl(pid){
+  if(!confirm('Remove the Drive folder link for this project?')) return;
+  delete projectFolders[pid];
   try{
-    const res=await fetch(API,{method:'POST',body:JSON.stringify({action:'getFiles',projectId:pid})});
-    const data=await res.json();
-    if(!data.ok){container.innerHTML='<div class="files-empty">Could not load files.</div>';return;}
-    const files=data.files||[];
-    if(!files.length){
-      container.innerHTML=`<div class="files-empty">No files yet. <a href="${(projectFolders[pid]||{}).folderUrl||'#'}" target="_blank" style="color:var(--green);">Open folder ↗</a> to upload.</div>`;
-      return;
-    }
-    // Group by category
-    const cats=['Site Survey Photos','Install Photos','Contracts','Other'];
-    let html='';
-    cats.forEach(cat=>{
-      const catFiles=files.filter(f=>f.category===cat);
-      if(!catFiles.length) return;
-      html+=`<div class="files-category"><div class="files-cat-label">${cat} (${catFiles.length})</div>`;
-      const images=catFiles.filter(f=>f.isImage);
-      const docs=catFiles.filter(f=>!f.isImage);
-      if(images.length){
-        html+=`<div class="files-grid">`;
-        images.forEach(f=>{
-          html+=`<div class="file-thumb" onclick="window.open('${f.url}','_blank')" title="${escapeHtml(f.name)}">
-            <img src="${f.thumbUrl}" alt="${escapeHtml(f.name)}" onerror="this.style.display='none'">
-            <div class="file-thumb-name">${escapeHtml(f.name)}</div>
-          </div>`;
-        });
-        html+=`</div>`;
-      }
-      docs.forEach(f=>{
-        const icon=f.isPdf?'📄':f.mimeType.includes('sheet')?'📊':f.mimeType.includes('doc')?'📝':'📎';
-        const size=f.size>1048576?Math.round(f.size/1048576)+'MB':Math.round(f.size/1024)+'KB';
-        html+=`<div class="file-doc" onclick="window.open('${f.url}','_blank')">
-          <span class="file-doc-icon">${icon}</span>
-          <div class="file-doc-info">
-            <div class="file-doc-name">${escapeHtml(f.name)}</div>
-            <div class="file-doc-meta">${size} · ${f.date}</div>
-          </div>
-          <span style="font-size:10px;color:var(--text3);">↗</span>
-        </div>`;
-      });
-      html+=`</div>`;
-    });
-    container.innerHTML=html;
-  }catch(e){
-    container.innerHTML='<div class="files-empty">Error loading files: '+escapeHtml(e.message)+'</div>';
-  }
+    const stored=JSON.parse(localStorage.getItem('trismart_folders')||'{}');
+    delete stored[pid];
+    localStorage.setItem('trismart_folders',JSON.stringify(stored));
+  }catch(e){}
+  const old=document.getElementById('files-section-'+pid);
+  if(old) old.remove();
+  renderFilesSection(pid);
 }
+async function loadProjectFiles(pid){}
 function openExport(){
   document.getElementById('export-pm-label').textContent=currentPM==='all'?'All PMs':currentPM;
   document.querySelector('[name=export-scope][value=all]').checked=true;
