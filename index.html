@@ -664,6 +664,11 @@ select.np-input{cursor:pointer;}
         <select class="pf-sel" id="pf-financier" onchange="renderPipeline()"><option value="">All financiers</option></select>
         <select class="pf-sel" id="pf-utility" onchange="renderPipeline()"><option value="">All utilities</option></select>
         <select class="pf-sel" id="pf-ahj" onchange="renderPipeline()"><option value="">All AHJs</option></select>
+        <select class="pf-sel" id="pf-disposition" onchange="renderPipeline()">
+          <option value="">All dispositions</option>
+          <option value="Sale">Sale</option>
+          <option value="Loyalty">Loyalty</option>
+        </select>
         <input class="pf-input" id="pf-city" type="text" placeholder="City..." oninput="renderPipeline()">
       </div>
       <div class="pf-group">
@@ -979,7 +984,7 @@ function renderCommand(){
       const issue=p.blocker?p.blocker:sla.status==='crit'?`Past critical (${sla.crit}d)`:sla.status==='risk'?`Approaching critical at ${sla.crit}d`:sla.status==='warn'?`Past target of ${sla.sla}d`:`Stalled ${sla.days}d`;
       const mentionBadge=hasMention(p.id)?'<span class="mention-badge">@you</span>':'';
       return `<div class="alert-row ${cls}" onclick="openPanel('${p.id}')">
-        <span class="ar-name">${p.name}</span>
+        <span class="ar-name">${p.name} <span style="font-size:10px;color:var(--text3);font-weight:400;">${p.id}</span></span>
         <span class="ar-stage">${s?s.label:p.stage}</span>
         ${slaBadge(sla.status,sla.days)}
         <span class="ar-pm">${p.pm}</span>
@@ -1065,6 +1070,7 @@ function clearPipeFilters(){
   document.getElementById('pf-financier').value='';
   document.getElementById('pf-utility').value='';
   document.getElementById('pf-ahj').value='';
+  document.getElementById('pf-disposition').value='';
   document.getElementById('pf-city').value='';
   document.getElementById('pf-sort').value='sla';
   document.getElementById('pf-dir').value='desc';
@@ -1074,21 +1080,22 @@ function getPipeFiltered(){
   const financier=document.getElementById('pf-financier').value;
   const utility=document.getElementById('pf-utility').value;
   const ahj=document.getElementById('pf-ahj').value;
+  const disposition=document.getElementById('pf-disposition').value;
   const city=(document.getElementById('pf-city').value||'').toLowerCase().trim();
   const sort=document.getElementById('pf-sort').value;
   const dir=document.getElementById('pf-dir').value;
 
-  // highlight active filters
-  ['pf-financier','pf-utility','pf-ahj'].forEach(id=>{
+  ['pf-financier','pf-utility','pf-ahj','pf-disposition'].forEach(id=>{
     document.getElementById(id).classList.toggle('pf-active',!!document.getElementById(id).value);
   });
   document.getElementById('pf-city').classList.toggle('pf-active',!!city);
 
   let vis=visProjects();
-  if(financier) vis=vis.filter(p=>p.financier===financier);
-  if(utility)   vis=vis.filter(p=>p.utility===utility);
-  if(ahj)       vis=vis.filter(p=>p.ahj===ahj);
-  if(city)      vis=vis.filter(p=>(p.city||'').toLowerCase().includes(city));
+  if(financier)   vis=vis.filter(p=>p.financier===financier);
+  if(utility)     vis=vis.filter(p=>p.utility===utility);
+  if(ahj)         vis=vis.filter(p=>p.ahj===ahj);
+  if(disposition) vis=vis.filter(p=>p.disposition===disposition);
+  if(city)        vis=vis.filter(p=>(p.city||'').toLowerCase().includes(city));
 
   // sort
   vis.sort((a,b)=>{
