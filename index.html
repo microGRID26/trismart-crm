@@ -294,6 +294,74 @@ select.np-input{cursor:pointer;}
 .user-chip-name{font-size:11px;font-weight:500;color:var(--text);}
 .user-chip-out{font-size:10px;color:var(--text3);cursor:pointer;margin-left:2px;}
 .user-chip-out:hover{color:var(--red);}
+
+/* MOBILE NAV */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:0.5px solid var(--border2);z-index:20;padding:6px 0 max(6px,env(safe-area-inset-bottom));}
+.mobile-nav-inner{display:flex;justify-content:space-around;}
+.mn-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;border:none;background:none;cursor:pointer;color:var(--text3);font-size:10px;position:relative;}
+.mn-btn.active{color:var(--green);}
+.mn-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.mn-badge{position:absolute;top:2px;right:6px;background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;}
+
+/* MENTION BADGE on project cards */
+.mention-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:2px 6px;border-radius:10px;background:var(--purple-bg);color:var(--purple-text);font-weight:600;}
+
+@media(max-width:768px){
+  /* topbar */
+  .topbar{padding:8px 12px;gap:6px;}
+  .logo{font-size:13px;}
+  .nav-btn:not(.active):not([style*="background:#1D9E75"]){display:none;}
+  .nav-btn.active{font-size:11px;padding:4px 10px;}
+  .search-input{width:130px;font-size:11px;}
+  .pm-sel{font-size:11px;padding:4px 6px;margin-left:0;}
+  .saving-badge{display:none;}
+  .nav-btn[style*="background:#1D9E75"]{font-size:11px;padding:4px 10px;}
+  .user-chip-name{display:none;}
+
+  /* main */
+  .main{padding:10px 10px 80px;}
+
+  /* metrics — 2 per row on mobile */
+  .metrics{grid-template-columns:repeat(3,1fr);gap:6px;}
+  .metric{padding:8px 10px;}
+  .metric-value{font-size:16px;}
+
+  /* alert rows */
+  .ar-stage,.ar-pm{display:none;}
+  .ar-issue{font-size:10px;}
+
+  /* panel — full screen on mobile */
+  .panel-wrap{margin-top:0;border-radius:0;position:fixed;inset:0;z-index:100;overflow-y:auto;}
+  .panel-wrap.open{display:flex;flex-direction:column;}
+  .panel-head{position:sticky;top:0;background:var(--bg);z-index:5;}
+  .panel-body{display:flex;flex-direction:column;flex:1;}
+  .panel-left{border-right:none;border-bottom:0.5px solid var(--border);max-height:none;padding:12px;}
+  .panel-right{max-height:none;padding:12px;}
+
+  /* pipeline board — horizontal scroll with snap */
+  .board{grid-template-columns:repeat(7,85vw);gap:10px;}
+  .board-wrap{scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+  .board>div{scroll-snap-align:start;}
+
+  /* queue */
+  .qcard-head{gap:5px;}
+
+  /* analytics */
+  .an-row-3,.an-row-2{grid-template-columns:1fr;}
+  .pm-grid{grid-template-columns:1fr;}
+  .int-table th:nth-child(4),.int-table td:nth-child(4),
+  .int-table th:nth-child(6),.int-table td:nth-child(6){display:none;}
+
+  /* new project modal */
+  #np-overlay>div{margin:0;border-radius:0;min-height:100vh;padding:16px;}
+  #np-overlay>div>div:first-child{margin-bottom:14px;}
+
+  /* mobile nav bar */
+  .mobile-nav{display:block;}
+
+  /* chat */
+  .chat-messages{max-height:240px;}
+}
 </style>
 </head>
 <body>
@@ -477,6 +545,30 @@ select.np-input{cursor:pointer;}
 </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="mobile-nav" id="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mn-btn active" id="mn-command" onclick="setView('command',document.getElementById('btn-command'));syncMobileNav('command')">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
+    </button>
+    <button class="mn-btn" id="mn-queue" onclick="setView('queue',document.getElementById('btn-queue'));syncMobileNav('queue')">
+      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Queue
+    </button>
+    <button class="mn-btn" id="mn-pipeline" onclick="setView('pipeline',document.getElementById('btn-pipeline'));syncMobileNav('pipeline')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Pipeline
+    </button>
+    <button class="mn-btn" id="mn-analytics" onclick="setView('analytics',document.getElementById('btn-analytics'));syncMobileNav('analytics')">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Analytics
+    </button>
+    <button class="mn-btn" onclick="openNewProject()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      New
+    </button>
+  </div>
+</div>
 
 <script>
 const API='https://script.google.com/macros/s/AKfycbyNA5rmaznOKFXMVPlFK4okvTxwmoNXNkznKqR_M69nP5corAuOTtZdXAnXkBjG77zbzw/exec';
@@ -685,12 +777,14 @@ function renderCommand(){
     return list.map(p=>{
       const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);
       const issue=p.blocker?p.blocker:sla.status==='crit'?`Past critical (${sla.crit}d)`:sla.status==='risk'?`Approaching critical at ${sla.crit}d`:sla.status==='warn'?`Past target of ${sla.sla}d`:`Stalled ${sla.days}d`;
+      const mentionBadge=hasMention(p.id)?'<span class="mention-badge">@you</span>':'';
       return `<div class="alert-row ${cls}" onclick="openPanel('${p.id}')">
         <span class="ar-name">${p.name}</span>
         <span class="ar-stage">${s?s.label:p.stage}</span>
         ${slaBadge(sla.status,sla.days)}
         <span class="ar-pm">${p.pm}</span>
         <span class="ar-issue">${issue}</span>
+        ${mentionBadge}
         ${p.disposition==='Loyalty'?'<span class="badge b-loyalty">Loyalty</span>':''}
       </div>`;
     }).join('');
@@ -739,11 +833,12 @@ function renderPipeline(){
     const body=document.getElementById('kcol-'+s.id);
     cards.forEach(p=>{
       const sla=getSLA(p);
+      const mentionBadge=hasMention(p.id)?'<span class="mention-badge">@you</span>':'';
       body.innerHTML+=`<div class="kcard${selectedId===p.id?' sel':''}${p.blocker?' is-blocked':''}" onclick="openPanel('${p.id}')">
         <div class="kcard-name">${p.name}</div>
         <div class="kcard-id">${p.id}</div>
         <div class="kcard-kw">${p.systemkw} kW</div>
-        <div class="kcard-foot">${slaBadge(sla.status,sla.days)}<span class="badge b-pm">${p.pm}</span>${p.blocker?'<span class="badge b-blocked">Blocked</span>':''}</div>
+        <div class="kcard-foot">${slaBadge(sla.status,sla.days)}<span class="badge b-pm">${p.pm}</span>${p.blocker?'<span class="badge b-blocked">Blocked</span>':''}${mentionBadge}</div>
         <div class="age-bar"><div class="age-fill" style="width:${sla.pct}%;background:${ageColor(sla.status)};"></div></div>
       </div>`;
     });
@@ -1036,7 +1131,13 @@ function renderPanel(pid){
       <div class="frow"><span class="flabel">Utility</span><span class="fval">${p.utility}</span></div>
     </div>
     <div class="sec"><div class="sec-title">Team</div>
-      <div class="frow"><span class="flabel">PM</span><span class="fval">${p.pm}</span></div>
+      <div class="frow"><span class="flabel">PM</span><span class="fval" style="display:flex;align-items:center;gap:6px;">${p.pm}
+        <select onchange="reassignPM('${pid}',this.value)" style="font-size:10px;padding:2px 4px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;">
+          <option value="">Reassign...</option>
+          <option value="Ari"${p.pm==='Ari'?' disabled':''}>Ari</option>
+          <option value="Jen"${p.pm==='Jen'?' disabled':''}>Jen</option>
+        </select>
+      </span></div>
       <div class="frow"><span class="flabel">Advisor</span><span class="fval">${p.advisor}</span></div>
       <div class="frow"><span class="flabel">Consultant</span><span class="fval">${p.consultant}</span></div>
     </div>
@@ -1137,9 +1238,49 @@ function setView(v,btn){
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');closePanel();render();
+  if(btn) btn.classList.add('active');
+  syncMobileNav(v);
+  closePanel();render();
 }
 function setPM(v){currentPM=v;render();}
+function syncMobileNav(v){
+  document.querySelectorAll('.mn-btn').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('mn-'+v);
+  if(el) el.classList.add('active');
+}
+function reassignPM(pid,newPM){
+  if(!newPM) return;
+  const p=projects.find(x=>x.id===pid);if(!p) return;
+  const oldPM=p.pm;
+  p.pm=newPM;
+  render();renderPanel(pid);
+  showToast(`Moved to ${newPM}`);
+  post({action:'reassignPM',projectId:pid,pm:newPM});
+}
+function hasMention(pid){
+  const myName=currentUser.name||'';
+  if(!myName) return false;
+  return (notes[pid]||[]).some(n=>n.text&&n.text.toLowerCase().includes('@'+myName.split(' ')[0].toLowerCase()));
+}
+function fmtTimestamp(raw){
+  if(!raw) return '';
+  // if it looks like a JS Date string (contains GMT or UTC), reformat it
+  if(raw.includes('GMT')||raw.includes('UTC')||raw.includes('Central')){
+    try{
+      const d=new Date(raw);
+      if(!isNaN(d)){
+        const mo=String(d.getMonth()+1).padStart(2,'0');
+        const dy=String(d.getDate()).padStart(2,'0');
+        const yr=d.getFullYear();
+        const hr=d.getHours()%12||12;
+        const mn=String(d.getMinutes()).padStart(2,'0');
+        const ap=d.getHours()>=12?'PM':'AM';
+        return `${mo}/${dy}/${yr} ${hr}:${mn} ${ap}`;
+      }
+    }catch(e){}
+  }
+  return raw;
+}
 function render(){
   if(currentView==='command') renderCommand();
   else if(currentView==='queue') renderQueue();
@@ -1221,11 +1362,12 @@ function renderChatMessages(msgs){
   return msgs.map(n=>{
     const color=teamColor(n.pm);
     const text=highlightMentions(escapeHtml(n.text||''));
+    const time=fmtTimestamp(n.time||'');
     return `<div class="chat-msg">
       <div class="chat-meta">
         <div class="chat-avatar" style="background:${color};">${teamInitials(n.pm||'?')}</div>
         <span class="chat-sender">${escapeHtml(n.pm||'Team')}</span>
-        <span class="chat-time">${n.time||''}</span>
+        <span class="chat-time">${time}</span>
       </div>
       <div class="chat-bubble">${text}</div>
     </div>`;
