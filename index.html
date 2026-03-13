@@ -162,6 +162,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .note-time{font-size:10px;color:var(--text3);}
 .history-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:0.5px solid var(--border);font-size:11px;}
 .history-row:last-child{border-bottom:none;}
+/* Stage timeline */
+.stage-timeline{display:flex;flex-direction:column;gap:0;padding:4px 0;}
+.stl-row{display:flex;align-items:stretch;gap:0;min-height:36px;}
+.stl-spine{display:flex;flex-direction:column;align-items:center;width:20px;flex-shrink:0;}
+.stl-dot{width:8px;height:8px;border-radius:50%;background:var(--green);border:1.5px solid var(--bg);margin-top:6px;flex-shrink:0;z-index:1;}
+.stl-dot.current{background:var(--green);box-shadow:0 0 0 3px rgba(29,158,117,.2);}
+.stl-dot.done{background:var(--border2);}
+.stl-line{width:1.5px;flex:1;background:var(--border);margin-top:0;}
+.stl-body{flex:1;padding:2px 0 10px 8px;}
+.stl-stage{font-size:11px;font-weight:500;color:var(--text);}
+.stl-stage.current{color:var(--green);}
+.stl-meta{font-size:10px;color:var(--text3);margin-top:1px;}
+.stl-dur{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--bg2);color:var(--text2);margin-left:4px;}
+/* STALE DATA */
+.data-freshness{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);cursor:pointer;padding:3px 8px;border-radius:8px;border:0.5px solid transparent;transition:all .15s;white-space:nowrap;}
+.data-freshness:hover{background:var(--bg2);border-color:var(--border);}
+.fresh-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.data-freshness.stale .fresh-dot{background:var(--amber);}
+.data-freshness.very-stale .fresh-dot{background:var(--red);}
 .blocker-input{width:100%;font-size:12px;padding:6px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);margin-top:6px;font-family:inherit;}
 .action-btn{font-size:11px;padding:4px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;margin-top:6px;}
 .action-btn:hover{background:var(--bg2);}
@@ -500,6 +519,10 @@ select.np-input{cursor:pointer;}
   <span class="saving-badge" id="saving-badge">Saving...</span>
   <button class="nav-btn" style="background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:500;" onclick="openNewProject()">+ New Project</button>
   <button class="nav-btn" onclick="openExport()" style="font-size:11px;">↓ Export</button>
+  <div class="data-freshness" id="data-freshness" onclick="reloadData()" title="Click to refresh data" style="display:none;">
+    <div class="fresh-dot"></div>
+    <span id="freshness-label">Loaded just now</span>
+  </div>
   <div class="user-chip" id="user-chip" style="display:none;">
     <div class="user-chip-avatar-fallback" id="user-avatar-fb" style="background:#1D9E75;"></div>
     <img class="user-chip-avatar" id="user-avatar-img" style="display:none;" alt="">
@@ -935,6 +958,30 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 // ── API ──────────────────────────────────────────────────
 function setLoadingBar(p){document.getElementById('loading-bar').style.width=p+'%';}
 function setSaving(on){const b=document.getElementById('saving-badge');b.className='saving-badge'+(on?' show':'');}
+let dataLoadedAt=null;
+let freshnessTimer=null;
+
+function updateFreshnessUI(){
+  const el=document.getElementById('data-freshness');
+  const lbl=document.getElementById('freshness-label');
+  if(!el||!dataLoadedAt) return;
+  el.style.display='flex';
+  const mins=Math.floor((Date.now()-dataLoadedAt)/60000);
+  el.className='data-freshness';
+  let text='';
+  if(mins<1){text='Loaded just now';}
+  else if(mins<5){text=`${mins}m ago`;}
+  else if(mins<15){text=`${mins}m ago`;el.classList.add('stale');}
+  else{text=`${mins}m ago — refresh`;el.classList.add('very-stale');}
+  lbl.textContent=text;
+}
+
+async function reloadData(){
+  const lbl=document.getElementById('freshness-label');
+  if(lbl) lbl.textContent='Refreshing...';
+  await loadData();
+}
+
 async function loadData(){
   setLoadingBar(20);
   try{
@@ -950,6 +997,10 @@ async function loadData(){
         if(!projectFolders[pid]||!projectFolders[pid].folderUrl) projectFolders[pid]={folderUrl:url,folderId:''};
       });
     }catch(e){}
+    dataLoadedAt=Date.now();
+    updateFreshnessUI();
+    if(freshnessTimer) clearInterval(freshnessTimer);
+    freshnessTimer=setInterval(updateFreshnessUI,60000);
     setLoadingBar(100);
     document.getElementById('cmd-loader').style.display='none';
     document.getElementById('cmd-content').style.display='block';
@@ -1550,7 +1601,40 @@ function renderPanel(pid){
       <div class="frow"><span class="flabel">Target / Risk / Crit</span><span class="fval">${sla.sla}d / ${sla.risk}d / ${sla.crit}d</span></div>
     </div>
     <div class="sec"><div class="sec-title">Stage history</div>
-      ${pHistory.map(h=>`<div class="history-row"><span>${h.stage}</span><span style="color:var(--text3);">${h.entered}</span></div>`).join('')||'<div style="font-size:11px;color:var(--text3);">No history recorded</div>'}
+      ${(()=>{
+        if(!pHistory.length) return '<div style="font-size:11px;color:var(--text3);">No history recorded yet.</div>';
+        // Sort by entered date ascending
+        const sorted=[...pHistory].sort((a,b)=>new Date(a.entered)-new Date(b.entered));
+        const now=new Date();
+        let html='<div class="stage-timeline">';
+        sorted.forEach((h,i)=>{
+          const isLast=i===sorted.length-1;
+          const isCur=h.stage===p.stage;
+          const stageLabel=(STAGES.find(x=>x.id===h.stage)||{label:h.stage}).label;
+          const enteredDate=h.entered?new Date(h.entered):null;
+          // Calculate duration: time until next stage entry, or now if current
+          let dur='';
+          if(enteredDate){
+            const nextEntry=sorted[i+1];
+            const end=nextEntry&&nextEntry.entered?new Date(nextEntry.entered):now;
+            const days=Math.round((end-enteredDate)/(1000*60*60*24));
+            if(days>=0) dur=`<span class="stl-dur">${days}d</span>`;
+          }
+          const enteredStr=enteredDate?enteredDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+          html+=`<div class="stl-row">
+            <div class="stl-spine">
+              <div class="stl-dot${isCur?' current':' done'}"></div>
+              ${!isLast?'<div class="stl-line"></div>':''}
+            </div>
+            <div class="stl-body">
+              <div class="stl-stage${isCur?' current':''}">${stageLabel}${dur}</div>
+              <div class="stl-meta">${enteredStr}${isCur?' · current stage':''}</div>
+            </div>
+          </div>`;
+        });
+        html+='</div>';
+        return html;
+      })()}
     </div>
     <div class="sec"><div class="sec-title">Move stage</div>
       <div class="stage-move">
