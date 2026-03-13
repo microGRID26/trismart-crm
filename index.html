@@ -459,7 +459,7 @@ select.np-input{cursor:pointer;}
     <div id="g_id_onload"
       data-client_id="628637774830-q3097k1680on1nk51jjjfv8jlsn7b4p2.apps.googleusercontent.com"
       data-callback="onGoogleSignIn"
-      data-auto_select="true"
+      data-auto_select="false"
       data-itp_support="true">
     </div>
     <div class="g_id_signin"
@@ -474,8 +474,9 @@ select.np-input{cursor:pointer;}
     <div class="login-hint">Sign in with your TriSMART Google Workspace account</div>
     <div class="login-fallback">
       <div class="login-fallback-label">Or enter your name to continue</div>
-      <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last" onkeydown="if(event.key==='Enter') manualSignIn()">
-      <button class="login-name-btn" onclick="manualSignIn()">Continue</button>
+      <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();doManualLogin();}">
+      <button class="login-name-btn" type="button" onclick="doManualLogin()">Continue</button>
     </div>
   </div>
 </div>
@@ -1751,16 +1752,18 @@ function parseJwt(token){
   try{return JSON.parse(atob(token.split('.')[1]));}catch(e){return {};}
 }
 
-function manualSignIn(){
+function doManualLogin(){
   const inp=document.getElementById('login-name-input');
   const name=(inp?inp.value.trim():'');
-  if(!name){inp&&inp.focus();return;}
+  if(!name){if(inp){inp.style.borderColor='var(--red)';inp.focus();}return;}
   currentUser={name,fullName:name,email:'',picture:''};
   sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
   showUserChip();
   document.getElementById('login-screen').style.display='none';
   loadData();
 }
+window.doManualLogin=doManualLogin;
+function manualSignIn(){doManualLogin();}
 function onGoogleSignIn(response){
   const payload=parseJwt(response.credential);
   const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
