@@ -1,2 +1,2 @@
-# trismart-crm
-TriSMART Solar CRM
+# MicroGRID
+MicroGRID CRM
