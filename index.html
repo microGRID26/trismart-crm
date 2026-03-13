@@ -2191,7 +2191,7 @@ function renderAudit(){
       <thead><tr><th>Customer</th><th>ID</th><th>Stage</th><th>PM</th><th>Contract</th><th>SLA</th><th>Flagged tasks</th></tr></thead>
       <tbody>${rows.map(({p,flagged})=>{
         const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);
-        return `<tr onclick="openPanel('${p.id}');setView('command',document.getElementById('btn-command'))">
+        return `<tr onclick="openPanel('${p.id}')" style="cursor:pointer;">
           <td><strong>${p.name}</strong></td>
           <td style="color:var(--text3);font-size:10px;">${p.id}</td>
           <td>${s?s.label:p.stage}</td>
