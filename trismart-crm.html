@@ -1466,14 +1466,14 @@ async function loadData(){
       {data:svcData,     error:e7},
       {data:svcNoteData, error:e8},
     ] = await Promise.all([
-      sb.from('projects').select('*'),
-      sb.from('stage_history').select('*'),
-      sb.from('task_due_dates').select('*'),
-      sb.from('project_folders').select('*'),
-      sb.from('crews').select('*'),
-      sb.from('schedule').select('*'),
-      sb.from('service_calls').select('*'),
-      sb.from('service_call_notes').select('*'),
+      sb.from('projects').select('*').limit(5000),
+      sb.from('stage_history').select('*').limit(10000),
+      sb.from('task_due_dates').select('*').limit(10000),
+      sb.from('project_folders').select('*').limit(5000),
+      sb.from('crews').select('*').limit(100),
+      sb.from('schedule').select('*').limit(5000),
+      sb.from('service_calls').select('*').limit(2000),
+      sb.from('service_call_notes').select('*').limit(5000),
     ]);
 
     const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8].find(Boolean);
@@ -3158,7 +3158,7 @@ async function submitNewProject(){
     disposition:get('np-disposition'),contract:Number(get('np-contract')),
     systemkw:Number(get('np-systemkw')),ahj:get('np-ahj'),utility:get('np-utility'),
     advisor:get('np-advisor'),consultant:get('np-consultant'),
-    financier:get('np-financier'),blocker:'',priority:'med',
+    financier:get('np-financier'),blocker:'',
   };
   projects.unshift(newProject);
   projectMap[String(newProject.id)]=newProject; // keep map in sync
@@ -3167,10 +3167,10 @@ async function submitNewProject(){
   stageHistory[newProject.id]=[{stage:stageLabel,entered:dateStr}];
   notes[newProject.id]=[];
   closeNewProject();render();showToast('Project created — '+newProject.name);openPanel(newProject.id);
-  // Persist new project + initial stage history to Supabase
+  // Insert project row, then write initial stage history entry separately
+  // (no need to call moveStage which would redundantly update stage+stageDate)
   await post({action:'addProject',project:newProject});
-  await post({action:'moveStage',projectId:newProject.id,stage:newProject.stage,
-    stageDate:dateStr,stageLabel:stageLabel,completed:false});
+  await sbRun(sb.from('stage_history').insert({project_id:newProject.id,stage:stageLabel,entered:dateStr}));
   btn.textContent='Create Project';btn.disabled=false;
 }
 
@@ -3529,8 +3529,8 @@ function syncMasterCrewRoster(){
       const newCrew={...master,active:'true'};
       if(legacy) CREW_ROLES.forEach(r=>{if(legacy[r]) newCrew[r]=legacy[r];});
       crews.push(newCrew);
-      // Only write to sheet if truly new — addCrewRow now checks for duplicates
-      post({action:'addCrew',crewId:master.id,name:master.name,warehouse:master.warehouse});
+      // Note: don't auto-write to Supabase here — crew data was migrated.
+      // Add crews manually via the Schedule → Manage Crews UI if needed.
     } else {
       // Lock name and warehouse to master definition, preserve roles
       existing.name=master.name;
