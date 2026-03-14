@@ -240,6 +240,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .assign-btn-cancel{padding:10px 16px;background:var(--bg2);color:var(--text2);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;cursor:pointer;}
 .assign-btn-delete{padding:10px 16px;background:#FEF2F2;color:#DC2626;border:0.5px solid #FECACA;border-radius:var(--radius);font-size:13px;cursor:pointer;}
 
+/* ── SERVICE CALLS ──────────────────────────────────────── */
+.svc-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.svc-table{width:100%;border-collapse:collapse;font-size:12px;}
+.svc-table th{padding:7px 10px;background:var(--bg2);border:0.5px solid var(--border);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:left;position:sticky;top:0;z-index:1;}
+.svc-table td{padding:8px 10px;border-bottom:0.5px solid var(--border);vertical-align:top;cursor:pointer;}
+.svc-table tr:hover td{background:var(--bg2);}
+.svc-status{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.svc-status.open{background:#FEF3C7;color:#92400E;}
+.svc-status.scheduled{background:#DBEAFE;color:#1E40AF;}
+.svc-status.inprog{background:#D1FAE5;color:#065F46;}
+.svc-status.closed{background:var(--bg2);color:var(--text3);}
+.svc-priority{display:inline-flex;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;}
+.svc-priority.high{background:#FEE2E2;color:#991B1B;}
+.svc-priority.medium{background:#FEF3C7;color:#92400E;}
+.svc-priority.low{background:var(--bg2);color:var(--text3);}
+
+/* SERVICE MODAL */
+.svc-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
+.svc-card{background:var(--bg);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.25);}
+.svc-card-header{background:var(--bg2);padding:16px 20px;border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;}
+.svc-card-title{font-size:15px;font-weight:600;color:var(--text);}
+.svc-card-body{padding:18px 20px;display:flex;flex-direction:column;gap:12px;}
+.svc-field label{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px;}
+.svc-field input,.svc-field select,.svc-field textarea{width:100%;font-size:13px;padding:7px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit;box-sizing:border-box;}
+.svc-field textarea{resize:vertical;min-height:70px;}
+.svc-row{display:flex;gap:10px;}
+.svc-row .svc-field{flex:1;}
+.svc-card-actions{display:flex;gap:8px;padding:0 20px 18px;}
+.svc-btn-save{flex:1;padding:10px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;}
+.svc-btn-cancel{padding:10px 16px;background:var(--bg2);color:var(--text2);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;cursor:pointer;}
+.svc-btn-close{padding:4px 10px;background:var(--bg);color:var(--text3);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;}
+.svc-timeline{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.svc-tl-entry{display:flex;gap:8px;font-size:11px;}
+.svc-tl-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:3px;}
+.svc-tl-time{color:var(--text3);white-space:nowrap;min-width:80px;}
+
 /* COMPLETION MODAL */
 .completion-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
 .completion-card{background:var(--bg);border-radius:16px;width:100%;max-width:500px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
@@ -600,6 +636,7 @@ select.np-input{cursor:pointer;}
   <button class="nav-btn" id="btn-analytics"        onclick="setView('analytics',this)">Analytics</button>
   <button class="nav-btn" id="btn-audit"            onclick="setView('audit',this)">Task audit</button>
   <button class="nav-btn" id="btn-schedule"         onclick="setView('schedule',this)">Schedule</button>
+  <button class="nav-btn" id="btn-service"          onclick="setView('service',this)">Service Calls</button>
   <div class="search-wrap">
     <input class="search-input" type="text" placeholder="Search projects..." oninput="searchProjects(this.value)" onblur="setTimeout(closeSearch,200)">
     <div class="search-results" id="search-results" style="display:none;"></div>
@@ -839,6 +876,7 @@ select.np-input{cursor:pointer;}
   <div class="view" id="view-analytics" style="display:none;"><div class="an-page" id="an-page"></div></div>
   <div class="view" id="view-audit" style="display:none;"><div id="audit-page" style="padding:4px 0;"></div></div>
   <div class="view" id="view-schedule" style="display:none;"><div id="schedule-page"></div></div>
+  <div class="view" id="view-service"  style="display:none;"><div id="service-page"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
     <div class="panel-head">
@@ -911,6 +949,110 @@ select.np-input{cursor:pointer;}
       <button class="assign-btn-cancel" onclick="closeAssignModal()">Cancel</button>
       <button class="assign-btn-delete" id="am-delete-btn" style="display:none;" onclick="deleteScheduleEntry()">Remove</button>
       <button class="assign-btn-save" id="am-save-btn" onclick="saveAssignment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- SERVICE CALL MODAL -->
+<div class="svc-overlay" id="svc-overlay" style="display:none;">
+  <div class="svc-card">
+    <div class="svc-card-header">
+      <span class="svc-card-title" id="svc-modal-title">New Service Call</span>
+      <button class="svc-btn-close" onclick="closeSvcModal()">✕</button>
+    </div>
+    <div class="svc-card-body">
+      <div class="svc-row">
+        <div class="svc-field">
+          <label>Customer Name *</label>
+          <input type="text" id="svc-customer" placeholder="Full name">
+        </div>
+        <div class="svc-field">
+          <label>Phone *</label>
+          <input type="tel" id="svc-phone" placeholder="(555) 000-0000">
+        </div>
+      </div>
+      <div class="svc-row">
+        <div class="svc-field">
+          <label>Email</label>
+          <input type="email" id="svc-email" placeholder="email@example.com">
+        </div>
+        <div class="svc-field">
+          <label>Linked Project (optional)</label>
+          <select id="svc-project"><option value="">— None —</option></select>
+        </div>
+      </div>
+      <div class="svc-field">
+        <label>Address</label>
+        <input type="text" id="svc-address" placeholder="Street address, city">
+      </div>
+      <div class="svc-row">
+        <div class="svc-field">
+          <label>Issue Type *</label>
+          <select id="svc-type">
+            <option value="monitoring">Monitoring / System Alert</option>
+            <option value="production">Low Production</option>
+            <option value="inverter">Inverter Issue</option>
+            <option value="battery">Battery Issue</option>
+            <option value="panel">Panel / Racking</option>
+            <option value="electrical">Electrical / MPU</option>
+            <option value="permit">Permit / Inspection Follow-up</option>
+            <option value="warranty">Warranty Claim</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="svc-field">
+          <label>Priority</label>
+          <select id="svc-priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="svc-field">
+        <label>Issue Description *</label>
+        <textarea id="svc-issue" placeholder="Describe the issue..."></textarea>
+      </div>
+      <div class="svc-row">
+        <div class="svc-field">
+          <label>Assigned Crew</label>
+          <select id="svc-crew"><option value="">— Unassigned —</option></select>
+        </div>
+        <div class="svc-field">
+          <label>Scheduled Date</label>
+          <input type="date" id="svc-date">
+        </div>
+        <div class="svc-field">
+          <label>Time</label>
+          <input type="time" id="svc-time" value="08:00">
+        </div>
+      </div>
+      <div class="svc-field">
+        <label>Status</label>
+        <select id="svc-status">
+          <option value="open">Open</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="inprog">In Progress</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+      <div class="svc-field" id="svc-resolution-wrap" style="display:none;">
+        <label>Resolution Notes</label>
+        <textarea id="svc-resolution" placeholder="What was done to resolve the issue?"></textarea>
+      </div>
+      <!-- Activity timeline (shown in edit mode) -->
+      <div id="svc-timeline-wrap" style="display:none;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Activity</div>
+        <div class="svc-timeline" id="svc-timeline"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <input type="text" id="svc-note-input" placeholder="Add a note..." style="flex:1;font-size:12px;padding:6px 9px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);">
+          <button onclick="addSvcNote()" style="padding:6px 12px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="svc-card-actions">
+      <button class="svc-btn-cancel" onclick="closeSvcModal()">Cancel</button>
+      <button class="svc-btn-save" onclick="saveSvcCall()">Save Service Call</button>
     </div>
   </div>
 </div>
@@ -1050,7 +1192,8 @@ const TASKS={
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
 let crews=[];       // [{id,name,members,active}]
-let schedule=[];    // [{id,projectId,crewId,jobType,date,status,notes,pm}]
+let schedule=[];    // [{id,projectId,crewId,jobType,date,time,status,notes,pm}]
+let serviceCalls=[]; // service call tickets
 let schedWeekOffset=0;  // weeks from today
 let blockerDates={};  // pid -> ISO date string, persisted in localStorage
 try{ blockerDates=JSON.parse(localStorage.getItem('ts_blockerDates')||'{}'); }catch(e){}
@@ -1187,16 +1330,9 @@ async function loadData(){
     taskState={};   // loaded per-project on panel open
     notes={};       // loaded per-project on panel open
     stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
-    crews=data.crews||[];schedule=data.schedule||[];
-    // Seed defaults if backend hasn't created the sheet yet
-    if(!crews.length){
-      crews=[
-        {id:'crew1',name:'Crew 1',warehouse:'',members:'',active:'true'},
-        {id:'crew2',name:'Crew 2',warehouse:'',members:'',active:'true'},
-        {id:'crew3',name:'Crew 3',warehouse:'',members:'',active:'true'},
-      ];
-      crews.forEach(c=>post({action:'addCrew',crewId:c.id,name:c.name}));
-    }
+    crews=data.crews||[];schedule=data.schedule||[];serviceCalls=data.serviceCalls||[];
+    // Sync master roster — always ensure these crews exist
+    syncMasterCrewRoster();
     // Merge any locally stored folder URLs
     try{
       const local=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');
@@ -2258,7 +2394,7 @@ function toggleSection(el){
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
 function setView(v,btn){
   currentView=v;
-  ['command','queue','pipeline','analytics','audit','schedule'].forEach(id=>{
+  ['command','queue','pipeline','analytics','audit','schedule','service'].forEach(id=>{
     const el=document.getElementById('view-'+id);
     if(el) el.style.display=(id===v)?'block':'none';
   });
@@ -2315,6 +2451,7 @@ function render(){
   else if(currentView==='analytics') renderAnalytics();
   else if(currentView==='audit') renderAudit();
   else if(currentView==='schedule') renderSchedule();
+  else if(currentView==='service') renderService();
 }
 // ── GOOGLE AUTH ──────────────────────────────────────────
 let currentUser={name:'',email:'',picture:''};
@@ -2918,9 +3055,40 @@ function buildTSV(list,cols){
 document.getElementById('export-overlay').addEventListener('click',function(e){if(e.target===this)closeExport();});
 document.getElementById('completion-overlay').addEventListener('click',function(e){if(e.target===this)closeCompletionModal();});
 document.getElementById('assign-overlay').addEventListener('click',function(e){if(e.target===this)closeAssignModal();});
+document.getElementById('svc-overlay').addEventListener('click',function(e){if(e.target===this)closeSvcModal();});
 
 // ── SCHEDULE ─────────────────────────────────────────────
 const JOB_TYPES={survey:{label:'Site Survey',cls:'survey'},install:{label:'Installation',cls:'install'},inspection:{label:'Inspection',cls:'inspection'},service:{label:'Service Call',cls:'service'}};
+// ── MASTER CREW ROSTER ───────────────────────────────────
+// Update this list to add/rename crews. warehouse must match exactly.
+const MASTER_CREWS=[
+  {id:'hou1', name:'HOU 1', warehouse:'Houston'},
+  {id:'hou2', name:'HOU 2', warehouse:'Houston'},
+  {id:'dfw1', name:'DFW 1', warehouse:'DFW'},
+  {id:'dfw2', name:'DFW 2', warehouse:'DFW'},
+];
+
+function syncMasterCrewRoster(){
+  let changed=false;
+  MASTER_CREWS.forEach(master=>{
+    const existing=crews.find(c=>c.id===master.id);
+    if(!existing){
+      const newCrew={...master,active:'true',members:''};
+      crews.push(newCrew);
+      post({action:'addCrew',crewId:master.id,name:master.name,warehouse:master.warehouse});
+      changed=true;
+    } else {
+      // Always keep name and warehouse in sync with master roster
+      if(existing.name!==master.name||existing.warehouse!==master.warehouse){
+        existing.name=master.name;
+        existing.warehouse=master.warehouse;
+        post({action:'updateCrew',crewId:master.id,name:master.name,warehouse:master.warehouse});
+        changed=true;
+      }
+    }
+  });
+}
+
 const CREW_ROLES=['licenseHolder','electrician','solarLead','batteryLead',
   'installer1','installer2','batteryTech1','batteryTech2','batteryApprentice','mpuElectrician'];
 
@@ -3122,53 +3290,46 @@ function renderSchedule(){
     ${schedView==='grid'?gridHTML:agendaHTML}
 
     <div class="sch-crew-mgmt">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px;">Manage Crews</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px;">Manage Crews</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">Crew names and warehouses are defined in the master roster. Assign roles to each crew below.</div>
       ${(()=>{
-        // Build per-role name lists from all crews for datalist suggestions
-        const roleLists={};
-        CREW_ROLES.forEach(r=>{
-          roleLists[r]=[...new Set(allCrews.map(c=>c[r]||'').filter(Boolean))];
-        });
-        // Build datalist HTML (one per role, shared across all crew cards)
-        const datalists=CREW_ROLES.map(r=>
-          `<datalist id="dl-${r}">${roleLists[r].map(n=>`<option value="${n}">`).join('')}</datalist>`
-        ).join('');
-
         const roleLabels={licenseHolder:'License Holder',electrician:'Electrician',mpuElectrician:'MPU Electrician',
           solarLead:'Solar Lead',batteryLead:'Battery Lead',installer1:'Installer 1',installer2:'Installer 2',
           batteryTech1:'Battery Tech 1',batteryTech2:'Battery Tech 2',batteryApprentice:'Battery Apprentice'};
 
-        // fi uses actual property names — no aliases
-        function fi(prop,label,width,listId){
-          return `<div style="flex:0 0 ${width||'130px'};min-width:0;">
-            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${label}</div>
-            <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;" id="crew-${prop}-${CURID}" value="${CURVAL(prop)}" placeholder="${label}"${listId?` list="${listId}"`:''}>
-          </div>`;
-        }
+        // Build datalists from all assigned names across all crews per role
+        const rolePeople={};
+        CREW_ROLES.forEach(r=>{
+          rolePeople[r]=[...new Set(allCrews.map(c=>c[r]||'').filter(Boolean))];
+        });
+        const datalists=CREW_ROLES.map(r=>
+          `<datalist id="dl-${r}">${rolePeople[r].map(n=>`<option value="${n}">`).join('')}</datalist>`
+        ).join('');
 
         const cards=allCrews.map(c=>{
-          // Inject crew-specific values via closure replacement
-          const localFi=(prop,label,width,listId)=>`<div style="flex:0 0 ${width||'130px'};min-width:0;">
-            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${label}</div>
-            <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;" id="crew-${prop}-${c.id}" value="${(c[prop]||'').replace(/"/g,'&quot;')}" placeholder="${label}"${listId?` list="dl-${listId}"`:''}>
-          </div>`;
+          const roleInputs=CREW_ROLES.map(r=>`
+            <div style="flex:0 0 140px;min-width:0;">
+              <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${roleLabels[r]}</div>
+              <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;"
+                id="crew-${r}-${c.id}" value="${(c[r]||'').replace(/"/g,'&quot;')}"
+                placeholder="${roleLabels[r]}" list="dl-${r}">
+            </div>`).join('');
 
           return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-              ${localFi('name','Crew Name','160px')}
-              ${localFi('warehouse','Warehouse','130px')}
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+              <div style="font-size:14px;font-weight:700;color:var(--text);">${c.name||c.id}</div>
+              ${c.warehouse?`<span style="font-size:10px;padding:2px 8px;background:rgba(29,158,117,0.1);color:var(--green);border-radius:10px;">📦 ${c.warehouse}</span>`:''}
             </div>
             <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Assigned Roles</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-              ${CREW_ROLES.map(r=>localFi(r,roleLabels[r],'140px',r)).join('')}
-            </div>
-            <button style="font-size:11px;padding:5px 16px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;" onclick="saveCrewRow('${c.id}')">Save ${(c.name||'Crew').replace(/'/g,"\\'")} </button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">${roleInputs}</div>
+            <button style="font-size:11px;padding:5px 16px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;"
+              onclick="saveCrewRow('${c.id}')">Save ${c.name||'Crew'}</button>
+            <span id="crew-saved-${c.id}" style="font-size:11px;color:var(--green);margin-left:8px;display:none;">✓ Saved</span>
           </div>`;
         }).join('');
 
         return datalists+cards;
       })()}
-      <button style="font-size:11px;padding:6px 16px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
     </div>`;
 }
 
@@ -3176,20 +3337,24 @@ function saveCrewRow(id){
   let c=crews.find(x=>x.id===id);
   if(!c){c={id,active:'true'};crews.push(c);}
 
-  // Read using EXACT property names matching crew object and DOM ids
   const readField=prop=>{
     const el=document.getElementById(`crew-${prop}-${id}`);
     return el?el.value.trim():'';
   };
 
-  c.name      = readField('name')||c.name||'Crew';
-  c.warehouse = readField('warehouse');
+  // Name and warehouse come from MASTER_CREWS, not DOM
+  const master=MASTER_CREWS.find(m=>m.id===id);
+  if(master){c.name=master.name;c.warehouse=master.warehouse;}
+
+  // Read role fields from DOM
   CREW_ROLES.forEach(r=>{ c[r]=readField(r); });
 
-  renderSchedule();
+  // Show inline confirmation without rebuilding the whole schedule
+  const badge=document.getElementById(`crew-saved-${id}`);
+  if(badge){badge.style.display='inline';setTimeout(()=>badge.style.display='none',2500);}
+
   post({action:'updateCrew',crewId:id,name:c.name,warehouse:c.warehouse,
     ...Object.fromEntries(CREW_ROLES.map(r=>[r,c[r]]))});
-  showToast(`${c.name} saved`);
 }
 function saveCrewName(id){saveCrewRow(id);}
 
@@ -3295,19 +3460,231 @@ function saveAssignment(){
     const pm=currentUser.name||currentPM||'Team';
     schedule.push({id,projectId,crewId,jobType,date,time,notes,status:'scheduled',pm});
     post({action:'addSchedule',id,projectId,crewId,jobType,date,time,notes,pm});
-    showToast('Scheduled');
+    showToast('Scheduled ✓');
   }
   closeAssignModal();
-  renderSchedule();
+
+  // Always re-render schedule view if active
+  if(currentView==='schedule') renderSchedule();
+
+  // If a project panel is open, refresh its schedule tab + badge
+  if(selectedId){
+    // Update badge count
+    const schedCount=schedule.filter(s=>String(s.projectId)===String(selectedId)).length;
+    const badge=document.getElementById('ptab-schedule');
+    if(badge) badge.innerHTML=`Schedule${schedCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg2);color:var(--text2);">${schedCount}</span>`:''}`;
+    // Re-render schedule pane if it's currently showing
+    if(currentPanelTab==='schedule') renderPanelSchedule(selectedId);
+  }
 }
 
 function deleteScheduleEntry(){
   if(!assignEditId) return;
+  const entry=schedule.find(s=>s.id===assignEditId);
+  const affectedPid=entry?String(entry.projectId):null;
   schedule=schedule.filter(s=>s.id!==assignEditId);
   post({action:'deleteSchedule',id:assignEditId});
   closeAssignModal();
-  renderSchedule();
+  if(currentView==='schedule') renderSchedule();
+  if(selectedId&&affectedPid===String(selectedId)){
+    const schedCount=schedule.filter(s=>String(s.projectId)===String(selectedId)).length;
+    const badge=document.getElementById('ptab-schedule');
+    if(badge) badge.innerHTML=`Schedule${schedCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg2);color:var(--text2);">${schedCount}</span>`:''}`;
+    if(currentPanelTab==='schedule') renderPanelSchedule(selectedId);
+  }
   showToast('Removed');
+}
+
+// ── SERVICE CALLS ────────────────────────────────────────
+let svcEditId=null;
+let svcFilter='all'; // all | open | scheduled | inprog | closed
+let svcSort='created'; // created | priority | date | customer
+
+const SVC_ISSUE_LABELS={
+  monitoring:'Monitoring / System Alert',production:'Low Production',inverter:'Inverter Issue',
+  battery:'Battery Issue',panel:'Panel / Racking',electrical:'Electrical / MPU',
+  permit:'Permit / Inspection Follow-up',warranty:'Warranty Claim',other:'Other'
+};
+
+function renderService(){
+  const el=document.getElementById('service-page');if(!el) return;
+  const filtered=svcFilter==='all'?[...serviceCalls]:serviceCalls.filter(s=>s.status===svcFilter);
+  const sorted=[...filtered].sort((a,b)=>{
+    if(svcSort==='priority'){const p={high:0,medium:1,low:2};return (p[a.priority]||1)-(p[b.priority]||1);}
+    if(svcSort==='date') return (a.date||'9999')>(b.date||'9999')?1:-1;
+    if(svcSort==='customer') return (a.customer||'').localeCompare(b.customer||'');
+    return (b.created||'')>(a.created||'')?1:-1; // newest first
+  });
+
+  const counts={all:serviceCalls.length,open:0,scheduled:0,inprog:0,closed:0};
+  serviceCalls.forEach(s=>{if(counts[s.status]!==undefined) counts[s.status]++;});
+
+  const priorityCls={high:'high',medium:'medium',low:'low'};
+  const statusCls={open:'open',scheduled:'scheduled',inprog:'inprog',closed:'closed'};
+  const statusLabel={open:'Open',scheduled:'Scheduled',inprog:'In Progress',closed:'Closed'};
+
+  el.innerHTML=`
+    <div class="svc-toolbar">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${['all','open','scheduled','inprog','closed'].map(f=>`
+          <button class="sch-filter-btn ${svcFilter===f?'active':''}" onclick="svcFilter='${f}';renderService()">
+            ${f==='all'?'All':statusLabel[f]} <span style="font-size:9px;opacity:.7;">${counts[f]}</span>
+          </button>`).join('')}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+        <span style="font-size:10px;color:var(--text3);">Sort:</span>
+        <select class="pf-sel" onchange="svcSort=this.value;renderService()">
+          <option value="created" ${svcSort==='created'?'selected':''}>Newest</option>
+          <option value="priority" ${svcSort==='priority'?'selected':''}>Priority</option>
+          <option value="date" ${svcSort==='date'?'selected':''}>Scheduled date</option>
+          <option value="customer" ${svcSort==='customer'?'selected':''}>Customer</option>
+        </select>
+        <button style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;" onclick="openSvcModal(null)">+ New Service Call</button>
+      </div>
+    </div>
+    ${!sorted.length?`<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px;">No service calls${svcFilter!=='all'?' with this status':''}.</div>`:`
+    <div style="overflow-x:auto;">
+    <table class="svc-table">
+      <thead><tr>
+        <th>Customer</th>
+        <th>Issue</th>
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Crew</th>
+        <th>Scheduled</th>
+        <th>PM</th>
+        <th>Created</th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(s=>{
+          const crew=crews.find(c=>c.id===s.crewId);
+          const dateStr=s.date?new Date(s.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
+          return `<tr onclick="openSvcModal('${s.id}')">
+            <td>
+              <div style="font-weight:500;">${s.customer||'—'}</div>
+              <div style="font-size:10px;color:var(--text3);">${s.phone||''}</div>
+            </td>
+            <td>
+              <div>${SVC_ISSUE_LABELS[s.type]||s.type||'—'}</div>
+              <div style="font-size:10px;color:var(--text3);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.issue||''}</div>
+            </td>
+            <td><span class="svc-priority ${priorityCls[s.priority]||'medium'}">${s.priority||'medium'}</span></td>
+            <td><span class="svc-status ${statusCls[s.status]||'open'}">${statusLabel[s.status]||s.status}</span></td>
+            <td style="color:var(--text2);">${crew?crew.name:'—'}</td>
+            <td style="color:var(--text2);">${dateStr}${s.time?' '+s.time:''}</td>
+            <td style="color:var(--text3);">${s.pm||'—'}</td>
+            <td style="color:var(--text3);font-size:11px;">${s.created||'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`}`;
+}
+
+function openSvcModal(id){
+  svcEditId=id||null;
+  const s=id?serviceCalls.find(x=>x.id===id):null;
+
+  // Populate project dropdown
+  const pSel=document.getElementById('svc-project');
+  pSel.innerHTML='<option value="">— None —</option>'+
+    projects.map(p=>`<option value="${p.id}" ${s&&s.projectId===p.id?'selected':''}>${p.name} (${p.id})</option>`).join('');
+
+  // Populate crew dropdown
+  const cSel=document.getElementById('svc-crew');
+  cSel.innerHTML='<option value="">— Unassigned —</option>'+
+    crews.map(c=>`<option value="${c.id}" ${s&&s.crewId===c.id?'selected':''}>${c.name}${c.warehouse?' · '+c.warehouse:''}</option>`).join('');
+
+  // Populate fields
+  const f=(id,val)=>{const el=document.getElementById(id);if(el) el.value=val||'';};
+  f('svc-customer',s?s.customer:'');
+  f('svc-phone',s?s.phone:'');
+  f('svc-email',s?s.email:'');
+  f('svc-address',s?s.address:'');
+  f('svc-type',s?s.type:'monitoring');
+  f('svc-priority',s?s.priority:'medium');
+  f('svc-issue',s?s.issue:'');
+  f('svc-date',s?s.date:'');
+  f('svc-time',s?s.time||'08:00':'08:00');
+  f('svc-status',s?s.status:'open');
+  f('svc-resolution',s?s.resolution||'':'');
+
+  document.getElementById('svc-modal-title').textContent=s?`Service Call — ${s.customer||s.id}`:'New Service Call';
+  document.getElementById('svc-resolution-wrap').style.display=s&&s.status==='closed'?'':'none';
+  document.getElementById('svc-status').onchange=function(){
+    document.getElementById('svc-resolution-wrap').style.display=this.value==='closed'?'':'none';
+  };
+
+  // Timeline
+  const tlWrap=document.getElementById('svc-timeline-wrap');
+  const tl=document.getElementById('svc-timeline');
+  if(s&&s.notes&&s.notes.length){
+    tlWrap.style.display='';
+    tl.innerHTML=(Array.isArray(s.notes)?s.notes:[]).map(n=>
+      `<div class="svc-tl-entry"><div class="svc-tl-dot"></div><span class="svc-tl-time">${n.time||''}</span><span>${n.pm||''}: ${n.text||''}</span></div>`
+    ).join('');
+  } else {
+    tlWrap.style.display=s?'':'none';
+    if(tl) tl.innerHTML='';
+  }
+
+  document.getElementById('svc-overlay').style.display='flex';
+}
+
+function closeSvcModal(){
+  document.getElementById('svc-overlay').style.display='none';
+  svcEditId=null;
+}
+
+function saveSvcCall(){
+  const get=id=>document.getElementById(id)?.value.trim()||'';
+  const customer=get('svc-customer'),phone=get('svc-phone'),issue=get('svc-issue');
+  if(!customer||!phone||!issue){showToast('Customer, phone, and issue are required');return;}
+
+  const pm=currentUser.name||currentPM||'Team';
+  const now=today.toLocaleDateString();
+
+  if(svcEditId){
+    const s=serviceCalls.find(x=>x.id===svcEditId);
+    if(s){
+      Object.assign(s,{
+        customer,phone,email:get('svc-email'),address:get('svc-address'),
+        projectId:get('svc-project'),type:get('svc-type'),priority:get('svc-priority'),
+        issue,crewId:get('svc-crew'),date:get('svc-date'),time:get('svc-time'),
+        status:get('svc-status'),resolution:get('svc-resolution'),
+      });
+    }
+    post({action:'updateServiceCall',id:svcEditId,...s});
+    showToast('Service call updated');
+  } else {
+    const id='svc'+Date.now();
+    const entry={
+      id,customer,phone,email:get('svc-email'),address:get('svc-address'),
+      projectId:get('svc-project'),type:get('svc-type'),priority:get('svc-priority'),
+      issue,crewId:get('svc-crew'),date:get('svc-date'),time:get('svc-time'),
+      status:get('svc-status'),resolution:'',notes:[],pm,created:now,
+    };
+    serviceCalls.push(entry);
+    post({action:'addServiceCall',...entry});
+    showToast('Service call created');
+  }
+  closeSvcModal();
+  renderService();
+}
+
+function addSvcNote(){
+  if(!svcEditId) return;
+  const inp=document.getElementById('svc-note-input');
+  const text=inp?inp.value.trim():'';if(!text) return;
+  const s=serviceCalls.find(x=>x.id===svcEditId);if(!s) return;
+  if(!Array.isArray(s.notes)) s.notes=[];
+  const note={text,time:today.toLocaleDateString(),pm:currentUser.name||currentPM||'Team'};
+  s.notes.push(note);
+  inp.value='';
+  const tl=document.getElementById('svc-timeline');
+  if(tl) tl.innerHTML+=`<div class="svc-tl-entry"><div class="svc-tl-dot"></div><span class="svc-tl-time">${note.time}</span><span>${note.pm}: ${note.text}</span></div>`;
+  document.getElementById('svc-timeline-wrap').style.display='';
+  post({action:'addSvcNote',id:svcEditId,...note});
 }
 
 // ── KEYBOARD SHORTCUTS ───────────────────────────────────
@@ -3332,7 +3709,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='n'||e.key==='N'){ openNewProject(); return; }
 
   // 1-6 — switch views
-  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule'};
+  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule','7':'service'};
   if(viewMap[e.key]){
     const v=viewMap[e.key];
     setView(v,document.getElementById('btn-'+v));
