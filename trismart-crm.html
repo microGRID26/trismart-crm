@@ -2683,8 +2683,8 @@ function confirmCompletion(){
       (checkedItems.length?'✓ '+checkedItems.join('\n✓ '):'');
     if(!notes[pid]) notes[pid]=[];
     const who=currentUser.name||currentPM||'Team';
-    notes[pid].push({text:noteText,time:today.toLocaleDateString(),pm:who});
-    post({action:'addNote',projectId:pid,text:noteText,time:today.toLocaleDateString(),pm:who});
+    notes[pid].push({text:noteText,time:new Date().toISOString(),pm:who});
+    post({action:'addNote',projectId:pid,text:noteText,time:new Date().toISOString(),pm:who});
   }
 
   closeCompletionModal();
@@ -2707,7 +2707,7 @@ function saveBlocker(pid){
 function addNote(pid){
   const p=projects.find(x=>x.id===pid);const inp=document.getElementById('note-input');
   if(!p||!inp||!inp.value.trim()) return;
-  const note={text:inp.value.trim(),time:today.toLocaleDateString(),pm:currentPM==='all'?'Team':currentPM};
+  const note={text:inp.value.trim(),time:new Date().toISOString(),pm:currentPM==='all'?'Team':currentPM};
   if(!notes[pid]) notes[pid]=[];
   notes[pid].push(note);renderPanel(pid);showToast('Note saved');
   markDetailStale(pid); // force re-fetch next open so other PMs see this note
@@ -2743,7 +2743,7 @@ async function openPanel(pid){
     if(dp) dp.insertAdjacentHTML('afterbegin',`<div id="detail-loading-${pid}" style="font-size:11px;color:var(--text3);padding:8px 12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading tasks...</div>`);
     try {
       const res1=sb.from('task_state').select('*').eq('project_id',pid);
-      const res2=sb.from('notes').select('*').eq('project_id',pid).order('time',{ascending:true});
+      const res2=sb.from('notes').select('*').eq('project_id',pid).order('id',{ascending:true});
       const [{data:tsData,error:te},{data:notesData,error:ne}]=await Promise.all([res1,res2]);
       if(te||ne) throw new Error((te||ne).message);
       const mergedTs={};
@@ -2816,8 +2816,10 @@ function hasMention(pid){
 }
 function fmtTimestamp(raw){
   if(!raw) return '';
-  // if it looks like a JS Date string (contains GMT or UTC), reformat it
-  if(raw.includes('GMT')||raw.includes('UTC')||raw.includes('Central')){
+  // Handle ISO 8601 (2026-03-14T19:45:00.000Z), GMT, UTC, and Central strings
+  const looksLikeDate = raw.includes('T') || raw.includes('GMT') ||
+                        raw.includes('UTC') || raw.includes('Central');
+  if(looksLikeDate){
     try{
       const d=new Date(raw);
       if(!isNaN(d)){
