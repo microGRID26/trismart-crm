@@ -1372,6 +1372,8 @@ function getReadyTasks(pid,stageId){
   return (TASKS[stageId]||[]).filter(t=>{const s=ts(pid,t.id);return s&&s!=='Not Ready'&&s!=='Complete';});
 }
 function recalcUnlocks(pid){
+  // Guard: if task detail hasn't loaded yet, taskState[pid] may not exist
+  if(!taskState[pid]) return;
   Object.values(TASKS).flat().forEach(t=>{
     if(ts(pid,t.id)==='Not Ready'&&t.pre.every(p2=>ts(pid,p2)==='Complete'))
       taskState[pid][t.id]={status:'Ready To Start',completedDate:''};
@@ -1430,6 +1432,9 @@ async function loadData(){
     notes={};       // loaded per-project on panel open
     stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
     crews=data.crews||[];schedule=data.schedule||[];serviceCalls=data.serviceCalls||[];
+    // Normalize: API returns objects with property 'crewId' (sheet header name)
+    // but all frontend code uses 'id'. Map it here once.
+    crews=crews.map(c=>({...c, id:c.crewId||c.id}));
     // Sync master roster — always ensure these crews exist
     syncMasterCrewRoster();
     // Rebuild crew map after sync
@@ -1493,16 +1498,16 @@ async function post(body){
 function setStatus(pid,tid,val,e){
   if(e) e.stopPropagation();
   if(val==='Not Ready') return;
+  // Initialize taskState[pid] if it doesn't exist yet (detail may still be loading)
   if(!taskState[pid]) taskState[pid]={};
   const completedDate=val==='Complete'?new Date().toLocaleDateString():'';
   taskState[pid][tid]={status:val,completedDate};
+  // recalcUnlocks now guards internally if taskState[pid] is sparse
   recalcUnlocks(pid);
-  // Only re-render the panel — NOT the full pipeline/command center.
-  // The broader view catches up on next navigation. This avoids scanning
-  // 487 projects on every checkbox tap.
   if(selectedId===pid) renderPanel(pid);
-  // Invalidate SLA cache for this project so next full render picks up any stage change
-  delete _slaCache[pid];
+  // Bust SLA cache for this project by prefix — stage key may have changed
+  Object.keys(_slaCache).forEach(k=>{if(k.startsWith(pid+'|')) delete _slaCache[k];});
+  markDetailStale(pid); // other PMs will re-fetch task state on next open
   post({action:'updateTask',projectId:pid,taskId:tid,status:val});
 }
 function statusDropdown(pid,tid){
@@ -1550,16 +1555,26 @@ function renderCmdScheduleWidget(){
   if(!el) return;
   if(!schedule.length){el.innerHTML='';return;}
   const todayIso=isoDate(today);
+
+  // Build date→jobs map in a single O(n) pass — no per-day filter loops
+  const byDate={};
+  schedule.forEach(s=>{
+    if(!s.date) return;
+    if(!byDate[s.date]) byDate[s.date]=[];
+    byDate[s.date].push(s);
+  });
+
   // Next 5 days
   const days=Array.from({length:5},(_,i)=>{
     const d=new Date(today);d.setDate(d.getDate()+i);return d;
   });
   const dayCols=days.map(d=>{
     const iso=isoDate(d);
-    const jobs=schedule.filter(s=>s.date===iso);
+    const jobs=byDate[iso]||[];
     return {d,iso,jobs};
   }).filter(x=>x.jobs.length>0||x.iso===todayIso);
   if(!dayCols.length){el.innerHTML='';return;}
+
   const JT_COLOR={survey:'#DBEAFE',install:'#D1FAE5',inspection:'#FEF3C7',service:'#FCE7F3'};
   const JT_TEXT={survey:'#1E40AF',install:'#065F46',inspection:'#92400E',service:'#9D174D'};
   el.innerHTML=`<div style="margin-bottom:14px;">
@@ -2459,6 +2474,8 @@ function confirmCompletion(){
   if(!stageHistory[pid]) stageHistory[pid]=[];
   stageHistory[pid].push({stage:'Completion',entered:dateStr});
   p.stage='complete';p.stageDate=dateStr;
+  // Bust SLA cache — stage and stageDate both changed
+  Object.keys(_slaCache).forEach(k=>{if(k.startsWith(pid+'|')) delete _slaCache[k];});
 
   // Add closing note if provided
   if(closingNote||checkedItems.length){
@@ -2493,10 +2510,21 @@ function addNote(pid){
   const note={text:inp.value.trim(),time:today.toLocaleDateString(),pm:currentPM==='all'?'Team':currentPM};
   if(!notes[pid]) notes[pid]=[];
   notes[pid].push(note);renderPanel(pid);showToast('Note saved');
+  markDetailStale(pid); // force re-fetch next open so other PMs see this note
   post({action:'addNote',projectId:pid,...note});
 }
-// Track which project IDs have had their detail loaded
-const detailLoaded = new Set();
+// Detail cache: pid → timestamp of last fetch
+// Entries expire after DETAIL_TTL ms so server-side changes (from other PMs)
+// are picked up automatically without a full page reload.
+const DETAIL_TTL = 10 * 60 * 1000; // 10 minutes
+const detailLoaded = new Map(); // pid → Date.now() of last fetch
+
+function detailIsStale(pid) {
+  const t = detailLoaded.get(pid);
+  return !t || (Date.now() - t) > DETAIL_TTL;
+}
+function markDetailFresh(pid) { detailLoaded.set(pid, Date.now()); }
+function markDetailStale(pid) { detailLoaded.delete(pid); }
 
 async function openPanel(pid){
   selectedId=pid;
@@ -2504,25 +2532,38 @@ async function openPanel(pid){
   renderPanel(pid);render();
   setTimeout(()=>document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 
-  // If detail not yet loaded for this project, fetch it
-  if(!detailLoaded.has(pid)){
-    // Show loading indicator in right panel
+  // Fetch detail if never loaded or stale (>10 min old)
+  if(detailIsStale(pid)){
+    // Capture the current selection so we can detect if user navigated away
+    // before the fetch completes (race condition guard)
+    const fetchToken=pid;
+
+    // Show loading indicator
     const dp=document.getElementById('dp-right');
     if(dp) dp.insertAdjacentHTML('afterbegin',`<div id="detail-loading-${pid}" style="font-size:11px;color:var(--text3);padding:8px 12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading tasks...</div>`);
     try {
       const res=await fetch(`${API}?action=getDetail&id=${encodeURIComponent(pid)}`);
       const data=await res.json();
-      // Merge into global state
+
+      // RACE GUARD: only merge if the user is still on the same project
+      // If selectedId changed while we were awaiting, discard silently
+      if(selectedId!==fetchToken){
+        console.log(`Detail fetch for ${fetchToken} discarded — user moved to ${selectedId}`);
+        return;
+      }
+
       if(data.taskState) Object.assign(taskState,data.taskState);
       if(data.notes)     Object.assign(notes,data.notes);
-      detailLoaded.add(pid);
+      markDetailFresh(pid);
     } catch(e) {
       console.warn('Detail fetch failed',e);
     }
-    // Remove loading indicator and re-render
-    const loader=document.getElementById(`detail-loading-${pid}`);
-    if(loader) loader.remove();
-    if(selectedId===pid) renderPanel(pid);
+    // Remove loading indicator — only if we're still on this project
+    if(selectedId===pid){
+      const loader=document.getElementById(`detail-loading-${pid}`);
+      if(loader) loader.remove();
+      renderPanel(pid);
+    }
   }
 }
 function toggleSection(el){
@@ -2772,6 +2813,7 @@ function sendChat(pid){
   // Re-render chat messages
   const msgEl=document.getElementById('chat-messages-'+pid);
   if(msgEl){msgEl.innerHTML=renderChatMessages(notes[pid]);msgEl.scrollTop=msgEl.scrollHeight;}
+  markDetailStale(pid); // other PMs will re-fetch this on next open
   post({action:'addNote',projectId:pid,text:note.text,time:note.time,pm:note.pm});
 }
 
@@ -3242,31 +3284,28 @@ const MASTER_CREWS=[
 
 function syncMasterCrewRoster(){
   const masterIds=MASTER_CREWS.map(m=>m.id);
-
-  // Old crew IDs that may exist in the sheet from before master roster was added
-  // We try to carry over their role assignments to the matching master crew
-  const legacyMap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'}; // best-guess migration
+  const legacyMap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'};
 
   MASTER_CREWS.forEach(master=>{
+    // After normalization, crew objects from API have 'id' property
     const existing=crews.find(c=>c.id===master.id);
     if(!existing){
-      // Check if there's legacy data we can migrate
+      // Check for legacy data to carry over roles
       const legacyId=Object.keys(legacyMap).find(k=>legacyMap[k]===master.id);
-      const legacy=legacyId?crews.find(c=>c.id===legacyId):null;
+      const legacy=legacyId?crews.find(c=>c.id===legacyId||c.crewId===legacyId):null;
       const newCrew={...master,active:'true'};
-      if(legacy){
-        // Carry over role assignments from legacy crew
-        CREW_ROLES.forEach(r=>{if(legacy[r]) newCrew[r]=legacy[r];});
-      }
+      if(legacy) CREW_ROLES.forEach(r=>{if(legacy[r]) newCrew[r]=legacy[r];});
       crews.push(newCrew);
+      // Only write to sheet if truly new — addCrewRow now checks for duplicates
       post({action:'addCrew',crewId:master.id,name:master.name,warehouse:master.warehouse});
     } else {
+      // Lock name and warehouse to master definition, preserve roles
       existing.name=master.name;
       existing.warehouse=master.warehouse;
     }
   });
 
-  // Strip crews not in master roster
+  // Strip any crews not in the master roster
   crews=crews.filter(c=>masterIds.includes(c.id));
 }
 
@@ -3693,7 +3732,7 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
 
   // Populate crew dropdown
   const crewSel=document.getElementById('am-crew');
-  crewSel.innerHTML=crews.map(c=>`<option value="${c.id}" ${(existing?existing.crewId:crewId)===c.id?'selected':''}>${c.name}${c.warehouse?' · '+c.warehouse:''}</option>`).join('');
+  crewSel.innerHTML=crews.map(c=>`<option value="${c.id}" ${((existing?existing.crewId||existing.id:crewId))===c.id?'selected':''}>${c.name}${c.warehouse?' · '+c.warehouse:''}</option>`).join('');
 
   document.getElementById('am-type').value=preJobType||(existing?existing.jobType:(schedJobFilter!=='all'?schedJobFilter:'install'));
   document.getElementById('am-date').value=existing?existing.date:(dateIso||isoDate(today));
