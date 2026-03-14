@@ -1303,15 +1303,23 @@ function getAgeWarning(p){
   if(days>=90)  return {level:'warn',days,label:`${days}d total — review recommended`};
   return null;
 }
+
+// SLA result cache — keyed by projectId+stageDate so stale entries auto-invalidate on stage move
+// Busted on full reload, and per-project when stage changes
+const _slaCache={};
 function getSLA(p){
+  const key=p.id+'|'+p.stage+'|'+p.stageDate;
+  if(_slaCache[key]) return _slaCache[key];
   const s=STAGES.find(x=>x.id===p.stage);
-  if(!s) return {days:0,status:'ok',pct:0,sla:3,risk:5,crit:7};
+  if(!s){const r={days:0,status:'ok',pct:0,sla:3,risk:5,crit:7};_slaCache[key]=r;return r;}
   const days=daysAgo(p.stageDate);
   let status='ok';
   if(days>=s.crit) status='crit';
   else if(days>=s.risk) status='risk';
   else if(days>=s.sla) status='warn';
-  return {days,status,pct:Math.min(100,Math.round(days/s.crit*100)),sla:s.sla,risk:s.risk,crit:s.crit};
+  const r={days,status,pct:Math.min(100,Math.round(days/s.crit*100)),sla:s.sla,risk:s.risk,crit:s.crit};
+  _slaCache[key]=r;
+  return r;
 }
 function isStalled(p){return !p.blocker&&daysAgo(p.stageDate)>=5&&getSLA(p).status==='ok';}
 function todayStr(){return today.toISOString().slice(0,10);}
@@ -1427,6 +1435,16 @@ async function loadData(){
     // Rebuild crew map after sync
     crewMap={};
     crews.forEach(c=>{ crewMap[c.id]=c; });
+
+    // Migrate any schedule entries that used old crew IDs (crew1→hou1 etc.)
+    const legacyCrewRemap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'};
+    let scheduleNeedsMigration=false;
+    schedule.forEach(s=>{
+      if(legacyCrewRemap[s.crewId]){
+        s.crewId=legacyCrewRemap[s.crewId];
+        scheduleNeedsMigration=true;
+      }
+    });
     // Merge any locally stored folder URLs
     try{
       const local=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');
@@ -1440,6 +1458,8 @@ async function loadData(){
     projects.forEach(p=>{ projectMap[String(p.id)]=p; });
     crewMap={};
     crews.forEach(c=>{ crewMap[c.id]=c; });
+    // Clear SLA cache — stageDate values may have changed
+    Object.keys(_slaCache).forEach(k=>delete _slaCache[k]);
     updateFreshnessUI();
     if(freshnessTimer) clearInterval(freshnessTimer);
     freshnessTimer=setInterval(updateFreshnessUI,60000);
@@ -1455,8 +1475,17 @@ async function loadData(){
 }
 async function post(body){
   setSaving(true);
-  try{await fetch(API,{method:'POST',body:JSON.stringify(body)});}
-  catch(e){showToast('Save failed');}
+  try{
+    const res=await fetch(API,{method:'POST',body:JSON.stringify(body)});
+    const json=await res.json().catch(()=>null);
+    if(json&&json.error){
+      console.error('API error for action',body.action,':',json.error);
+      showToast('⚠ Save error: '+json.error.slice(0,60));
+    }
+  }catch(e){
+    console.error('Post failed',body.action,e);
+    showToast('Save failed — check connection');
+  }
   setSaving(false);
 }
 
@@ -1467,8 +1496,13 @@ function setStatus(pid,tid,val,e){
   if(!taskState[pid]) taskState[pid]={};
   const completedDate=val==='Complete'?new Date().toLocaleDateString():'';
   taskState[pid][tid]={status:val,completedDate};
-  recalcUnlocks(pid);render();
+  recalcUnlocks(pid);
+  // Only re-render the panel — NOT the full pipeline/command center.
+  // The broader view catches up on next navigation. This avoids scanning
+  // 487 projects on every checkbox tap.
   if(selectedId===pid) renderPanel(pid);
+  // Invalidate SLA cache for this project so next full render picks up any stage change
+  delete _slaCache[pid];
   post({action:'updateTask',projectId:pid,taskId:tid,status:val});
 }
 function statusDropdown(pid,tid){
@@ -2376,6 +2410,8 @@ function moveStage(pid){
   if(!stageHistory[pid]) stageHistory[pid]=[];
   stageHistory[pid].push({stage:s.label,entered:dateStr});
   p.stage=newStage;p.stageDate=dateStr;
+  // Bust SLA cache for this project — stageDate changed
+  Object.keys(_slaCache).forEach(k=>{if(k.startsWith(pid+'|')) delete _slaCache[k];});
   render();renderPanel(pid);showToast('Moved to '+s.label);
   post({action:'moveStage',projectId:pid,stage:newStage,stageDate:dateStr,stageLabel:s.label});
 }
@@ -3207,20 +3243,30 @@ const MASTER_CREWS=[
 function syncMasterCrewRoster(){
   const masterIds=MASTER_CREWS.map(m=>m.id);
 
-  // Ensure every master crew exists in state with correct name/warehouse
+  // Old crew IDs that may exist in the sheet from before master roster was added
+  // We try to carry over their role assignments to the matching master crew
+  const legacyMap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'}; // best-guess migration
+
   MASTER_CREWS.forEach(master=>{
     const existing=crews.find(c=>c.id===master.id);
     if(!existing){
-      crews.push({...master,active:'true'});
+      // Check if there's legacy data we can migrate
+      const legacyId=Object.keys(legacyMap).find(k=>legacyMap[k]===master.id);
+      const legacy=legacyId?crews.find(c=>c.id===legacyId):null;
+      const newCrew={...master,active:'true'};
+      if(legacy){
+        // Carry over role assignments from legacy crew
+        CREW_ROLES.forEach(r=>{if(legacy[r]) newCrew[r]=legacy[r];});
+      }
+      crews.push(newCrew);
       post({action:'addCrew',crewId:master.id,name:master.name,warehouse:master.warehouse});
     } else {
-      // Lock name and warehouse to master definition
       existing.name=master.name;
       existing.warehouse=master.warehouse;
     }
   });
 
-  // Strip any crews not in the master roster (old Crew 1/2/3 etc.)
+  // Strip crews not in master roster
   crews=crews.filter(c=>masterIds.includes(c.id));
 }
 
