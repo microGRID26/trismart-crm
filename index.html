@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TriSMART Solar CRM</title>
+<title>MicroGRID CRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -580,7 +580,7 @@ select.np-input{cursor:pointer;}
       data-logo_alignment="left"
       data-width="260">
     </div>
-    <div class="login-hint">Sign in with your TriSMART Google Workspace account</div>
+    <div class="login-hint">Sign in with your MicroGRID Google Workspace account</div>
     <div class="login-fallback">
       <div class="login-fallback-label">Or enter your name to continue</div>
       <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last"
@@ -1173,9 +1173,18 @@ async function loadData(){
     projects=data.projects||[];taskState=data.taskState||{};
     notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
     crews=data.crews||[];schedule=data.schedule||[];
+    // Seed defaults if backend hasn't created the sheet yet
+    if(!crews.length){
+      crews=[
+        {id:'crew1',name:'Crew 1',warehouse:'',members:'',active:'true'},
+        {id:'crew2',name:'Crew 2',warehouse:'',members:'',active:'true'},
+        {id:'crew3',name:'Crew 3',warehouse:'',members:'',active:'true'},
+      ];
+      crews.forEach(c=>post({action:'addCrew',crewId:c.id,name:c.name}));
+    }
     // Merge any locally stored folder URLs
     try{
-      const local=JSON.parse(localStorage.getItem('trismart_folders')||'{}');
+      const local=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');
       Object.entries(local).forEach(([pid,url])=>{
         if(!projectFolders[pid]||!projectFolders[pid].folderUrl) projectFolders[pid]={folderUrl:url,folderId:''};
       });
@@ -2035,6 +2044,20 @@ function setTaskDue(pid,taskId,date){
   if(selectedId===pid) renderPanel(pid);
   showToast(date?'Due date set':'Due date cleared');
   post({action:'setTaskDue',projectId:pid,taskId,dueDate:date||''});
+
+  // Auto-schedule: when install date is set, prompt crew assignment
+  if(taskId==='sched_install'&&date){
+    autoScheduleInstall(pid,date);
+  }
+}
+
+function autoScheduleInstall(pid,date){
+  const p=projects.find(x=>x.id===pid);if(!p) return;
+  // Check if already scheduled for this project+date
+  const existing=schedule.find(s=>String(s.projectId)===String(pid)&&s.jobType==='install'&&s.date===date);
+  if(existing){showToast('Install date updated — already on schedule');return;}
+  // Open assign modal pre-filled for install
+  openAssignModal(null,date,null,pid,'install');
 }
 function moveStage(pid){
   const p=projects.find(x=>x.id===pid);const sel=document.getElementById('stage-sel');
@@ -2575,14 +2598,14 @@ async function saveFolderUrl(pid){
   const url=(inp?inp.value:'').trim();
   if(!url||!url.includes('drive.google.com')){showToast('Paste a valid Google Drive URL');return;}
   projectFolders[pid]={folderUrl:url,folderId:''};
-  try{const stored=JSON.parse(localStorage.getItem('trismart_folders')||'{}');stored[pid]=url;localStorage.setItem('trismart_folders',JSON.stringify(stored));}catch(e){}
+  try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');stored[pid]=url;localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
   renderFilesSection(pid);
   showToast('Drive folder linked');
 }
 function clearFolderUrl(pid){
   if(!confirm('Remove the Drive folder link for this project?')) return;
   delete projectFolders[pid];
-  try{const stored=JSON.parse(localStorage.getItem('trismart_folders')||'{}');delete stored[pid];localStorage.setItem('trismart_folders',JSON.stringify(stored));}catch(e){}
+  try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');delete stored[pid];localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
   renderFilesSection(pid);
 }
 async function loadProjectFiles(pid){}
@@ -2739,7 +2762,7 @@ function runExport(type){
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     const date=new Date().toISOString().slice(0,10);
-    a.href=url;a.download=`trismart-projects-${date}.csv`;
+    a.href=url;a.download=`microgrid-projects-${date}.csv`;
     a.click();URL.revokeObjectURL(url);
     showToast(`Downloaded ${list.length} projects`);
     closeExport();
@@ -2753,7 +2776,7 @@ function runExport(type){
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     const date=new Date().toISOString().slice(0,10);
-    a.href=url;a.download=`trismart-projects-${date}.tsv`;
+    a.href=url;a.download=`microgrid-projects-${date}.tsv`;
     a.click();URL.revokeObjectURL(url);
     // Also open a new blank Sheet
     setTimeout(()=>window.open('https://sheets.new','_blank'),300);
@@ -2790,10 +2813,7 @@ function renderSchedule(){
   const el=document.getElementById('schedule-page');if(!el) return;
   const days=schedWeekDates();
   const todayIso=isoDate(today);
-  const defaultCrews=[{id:'crew1',name:'Crew 1',warehouse:'',members:'',active:'true'},
-    {id:'crew2',name:'Crew 2',warehouse:'',members:'',active:'true'},
-    {id:'crew3',name:'Crew 3',warehouse:'',members:'',active:'true'}];
-  const allCrews=crews.length?crews:defaultCrews;
+  const allCrews=crews;
 
   // Derive warehouse list
   const warehouses=[...new Set(allCrews.map(c=>c.warehouse||'').filter(Boolean))].sort();
@@ -2973,42 +2993,60 @@ function renderSchedule(){
     ${schedView==='grid'?gridHTML:agendaHTML}
 
     <div class="sch-crew-mgmt">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;">Manage Crews</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;max-width:600px;">
-        <tr style="background:var(--bg2);">
-          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Crew name</th>
-          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Warehouse</th>
-          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Members</th>
-          <th style="padding:5px 10px;"></th>
-        </tr>
-        ${allCrews.map(c=>`
-          <tr style="border-bottom:0.5px solid var(--border);">
-            <td style="padding:5px 6px;"><input class="sch-crew-name-edit" value="${c.name}" id="crew-name-${c.id}" placeholder="Crew name"></td>
-            <td style="padding:5px 6px;"><input class="sch-crew-name-edit" value="${c.warehouse||''}" id="crew-wh-${c.id}" placeholder="Warehouse" style="width:120px;"></td>
-            <td style="padding:5px 6px;"><input class="sch-crew-name-edit" value="${c.members||''}" id="crew-mem-${c.id}" placeholder="Names..." style="width:160px;"></td>
-            <td style="padding:5px 6px;"><button style="font-size:11px;padding:3px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;" onclick="saveCrewRow('${c.id}')">Save</button></td>
-          </tr>`).join('')}
-      </table>
-      <button style="margin-top:10px;font-size:11px;padding:5px 14px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px;">Manage Crews</div>
+      ${allCrews.map(c=>{
+        function fi(field,label,placeholder,width){
+          return `<div style="flex:0 0 ${width||'130px'};"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${label}</div>
+            <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;" id="crew-${field}-${c.id}" value="${c[field]||''}" placeholder="${placeholder}"></div>`;
+        }
+        return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            ${fi('name','Crew Name','e.g. Crew Alpha','140px')}
+            ${fi('wh','Warehouse','Location','120px')}
+            ${fi('mem','Members (general)','Names...','180px')}
+          </div>
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Assigned Roles</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            ${fi('licenseHolder','License Holder','Name','140px')}
+            ${fi('electrician','Electrician','Name','130px')}
+            ${fi('mpuElectrician','MPU Electrician','Name','140px')}
+            ${fi('solarLead','Solar Lead','Name','120px')}
+            ${fi('batteryLead','Battery Lead','Name','120px')}
+            ${fi('installer1','Installer 1','Name','120px')}
+            ${fi('installer2','Installer 2','Name','120px')}
+            ${fi('batteryTech1','Battery Tech 1','Name','130px')}
+            ${fi('batteryTech2','Battery Tech 2','Name','130px')}
+            ${fi('batteryApprentice','Battery Apprentice','Name','150px')}
+          </div>
+          <button style="font-size:11px;padding:5px 16px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;" onclick="saveCrewRow('${c.id}')">Save ${c.name||'Crew'}</button>
+        </div>`;
+      }).join('')}
+      <button style="font-size:11px;padding:6px 16px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
     </div>`;
 }
 
-function saveCrewRow(id){
-  const nameInp=document.getElementById('crew-name-'+id);
-  const whInp=document.getElementById('crew-wh-'+id);
-  const memInp=document.getElementById('crew-mem-'+id);
-  if(!nameInp) return;
-  const name=nameInp.value.trim()||'Crew';
-  const warehouse=(whInp?whInp.value.trim():'');
-  const members=(memInp?memInp.value.trim():'');
-  const c=crews.find(x=>x.id===id);
-  if(c){c.name=name;c.warehouse=warehouse;c.members=members;}
-  renderSchedule();
-  post({action:'updateCrew',crewId:id,name,warehouse,members});
-  showToast('Crew saved');
+const CREW_ROLES=['licenseHolder','electrician','solarLead','batteryLead',
+  'installer1','installer2','batteryTech1','batteryTech2','batteryApprentice','mpuElectrician'];
+
+function getCrewFieldVal(id,field){
+  const el=document.getElementById(`crew-${field}-${id}`);
+  return el?el.value.trim():'';
 }
 
-// Keep old name for backward compat
+function saveCrewRow(id){
+  // Find or create crew in state
+  let c=crews.find(x=>x.id===id);
+  if(!c){c={id,active:'true'};crews.push(c);}
+
+  c.name        = getCrewFieldVal(id,'name')||c.name||'Crew';
+  c.warehouse   = getCrewFieldVal(id,'wh');
+  c.members     = getCrewFieldVal(id,'mem');
+  CREW_ROLES.forEach(r=>{ c[r]=getCrewFieldVal(id,r); });
+
+  renderSchedule();
+  post({action:'updateCrew',crewId:id,name:c.name,warehouse:c.warehouse,members:c.members,...Object.fromEntries(CREW_ROLES.map(r=>[r,c[r]]))});
+  showToast(`${c.name} saved`);
+}
 function saveCrewName(id){saveCrewRow(id);}
 
 function addCrew(){
@@ -3023,28 +3061,27 @@ function addCrew(){
 // ── ASSIGN MODAL ─────────────────────────────────────────
 let assignEditId=null;
 
-function openAssignModal(crewId,dateIso,schedId){
+function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   const existing=schedId?schedule.find(s=>s.id===schedId):null;
   assignEditId=schedId||null;
 
-  // Populate project dropdown — filter to relevant stages
+  // Populate project dropdown
   const sel=document.getElementById('am-project');
-  const relevant=projects.filter(p=>['survey','design','permit','install','inspection','complete'].includes(p.stage)||true);
-  sel.innerHTML=relevant.map(p=>`<option value="${p.id}" ${existing&&String(existing.projectId)===String(p.id)?'selected':''}>${p.name} (${p.id})</option>`).join('');
+  sel.innerHTML=projects.map(p=>`<option value="${p.id}" ${String(preProjectId||'')===String(p.id)||(existing&&String(existing.projectId)===String(p.id))?'selected':''}>${p.name} (${p.id})</option>`).join('');
 
-  // Populate crew dropdown
+  // Populate crew dropdown — show warehouse in label
   const crewSel=document.getElementById('am-crew');
-  const activeCrews=crews.length?crews:[{id:'crew1',name:'Crew 1'},{id:'crew2',name:'Crew 2'},{id:'crew3',name:'Crew 3'}];
-  crewSel.innerHTML=activeCrews.map(c=>`<option value="${c.id}" ${(existing?existing.crewId:crewId)===c.id?'selected':''}>${c.name}</option>`).join('');
+  crewSel.innerHTML=crews.map(c=>`<option value="${c.id}" ${(existing?existing.crewId:crewId)===c.id?'selected':''}>${c.name}${c.warehouse?' · '+c.warehouse:''}</option>`).join('');
 
-  document.getElementById('am-type').value=existing?existing.jobType:(schedJobFilter!=='all'?schedJobFilter:'install');
+  document.getElementById('am-type').value=preJobType||(existing?existing.jobType:(schedJobFilter!=='all'?schedJobFilter:'install'));
   document.getElementById('am-date').value=existing?existing.date:(dateIso||isoDate(today));
   document.getElementById('am-notes').value=existing?existing.notes||'':'';
-  document.getElementById('am-title').textContent=existing?'Edit Scheduled Job':'Schedule Job';
+  const preProj=preProjectId?projects.find(x=>String(x.id)===String(preProjectId)):null;
+  document.getElementById('am-title').textContent=existing?'Edit Scheduled Job':(preProjectId?'Schedule Installation':'Schedule Job');
+  document.getElementById('am-sub').textContent=preProj?preProj.name:'';
   document.getElementById('am-delete-btn').style.display=existing?'':'none';
   document.getElementById('am-conflict').style.display='none';
 
-  // Check conflicts on change
   ['am-crew','am-date','am-type'].forEach(id=>{
     document.getElementById(id).onchange=checkAssignConflict;
   });
