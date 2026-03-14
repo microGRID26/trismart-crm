@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MicroGRID CRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -657,7 +658,7 @@ select.np-input{cursor:pointer;}
       data-width="260">
     </div>
     <div class="login-hint">Sign in with your MicroGRID Google Workspace account</div>
-    <div class="login-fallback">
+    <div class="login-fallback" style="display:none;">
       <div class="login-fallback-label">Or enter your name to continue</div>
       <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last"
         onkeydown="if(event.key==='Enter'){event.preventDefault();doManualLogin();}">
@@ -1210,7 +1211,33 @@ select.np-input{cursor:pointer;}
 </div>
 
 <script>
-const API='https://script.google.com/macros/s/AKfycbyNA5rmaznOKFXMVPlFK4okvTxwmoNXNkznKqR_M69nP5corAuOTtZdXAnXkBjG77zbzw/exec';
+// ── SUPABASE ─────────────────────────────────────────────
+// Replace these two values with your project's credentials.
+// Find them at: Supabase project → Settings → API
+const SUPABASE_URL  = 'https://hzymsezqfxzpbcqryeim.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6eW1zZXpxZnh6cGJjcXJ5ZWltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTE0ODIsImV4cCI6MjA4OTA4NzQ4Mn0.eNUy8u7daCqHn3A-8Ss4PLsJ-_a2gh8pIbjFJVKo3KY';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// snake_case ↔ camelCase converters — used only in the data layer below.
+// All rendering code above continues to use p.stageDate, s.crewId, etc.
+function snakeToCamel(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const ck = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[ck] = v;
+  }
+  return out;
+}
+function camelToSnake(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const sk = k.replace(/([A-Z])/g, c => '_' + c.toLowerCase());
+    out[sk] = v;
+  }
+  return out;
+}
 
 const STAGES=[
   {id:'evaluation', label:'Evaluation',   sla:3,  risk:4,  crit:6},
@@ -1428,47 +1455,102 @@ async function reloadData(){
 async function loadData(){
   setLoadingBar(20);
   try{
-    const res=await fetch(API);setLoadingBar(70);
-    const data=await res.json();
-    if(data.error) throw new Error(data.error);
-    projects=data.projects||[];
-    taskState={};   // loaded per-project on panel open
-    notes={};       // loaded per-project on panel open
-    stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
-    crews=data.crews||[];schedule=data.schedule||[];serviceCalls=data.serviceCalls||[];
-    // Normalize: API returns objects with property 'crewId' (sheet header name)
-    // but all frontend code uses 'id'. Map it here once.
-    crews=crews.map(c=>({...c, id:c.crewId||c.id}));
-    // Sync master roster — always ensure these crews exist
-    syncMasterCrewRoster();
-    // Rebuild crew map after sync
-    crewMap={};
-    crews.forEach(c=>{ crewMap[c.id]=c; });
+    // Fetch all bulk tables in parallel
+    const [
+      {data:projData,    error:e1},
+      {data:shData,      error:e2},
+      {data:tddData,     error:e3},
+      {data:pfData,      error:e4},
+      {data:crewData,    error:e5},
+      {data:schedData,   error:e6},
+      {data:svcData,     error:e7},
+      {data:svcNoteData, error:e8},
+    ] = await Promise.all([
+      sb.from('projects').select('*'),
+      sb.from('stage_history').select('*'),
+      sb.from('task_due_dates').select('*'),
+      sb.from('project_folders').select('*'),
+      sb.from('crews').select('*'),
+      sb.from('schedule').select('*'),
+      sb.from('service_calls').select('*'),
+      sb.from('service_call_notes').select('*'),
+    ]);
 
-    // Migrate any schedule entries that used old crew IDs (crew1→hou1 etc.)
-    const legacyCrewRemap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'};
-    let scheduleNeedsMigration=false;
-    schedule.forEach(s=>{
-      if(legacyCrewRemap[s.crewId]){
-        s.crewId=legacyCrewRemap[s.crewId];
-        scheduleNeedsMigration=true;
-      }
+    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8].find(Boolean);
+    if (firstErr) throw new Error(firstErr.message);
+
+    setLoadingBar(70);
+
+    // Projects — snakeToCamel converts sale_date→saleDate, stage_date→stageDate, etc.
+    projects = (projData||[]).map(snakeToCamel);
+
+    // taskState and notes are NOT bulk-loaded — fetched per-project on panel open
+    taskState = {};
+    notes     = {};
+
+    // stageHistory — grouped by projectId
+    stageHistory = {};
+    (shData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!stageHistory[c.projectId]) stageHistory[c.projectId]=[];
+      stageHistory[c.projectId].push({stage:c.stage, entered:c.entered});
     });
-    // Merge any locally stored folder URLs
+
+    // taskDueDates — nested by projectId → taskId
+    taskDueDates = {};
+    (tddData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!taskDueDates[c.projectId]) taskDueDates[c.projectId]={};
+      taskDueDates[c.projectId][c.taskId] = c.dueDate ? String(c.dueDate).slice(0,10) : '';
+    });
+
+    // projectFolders — keyed by projectId
+    projectFolders = {};
+    (pfData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      projectFolders[c.projectId] = {folderId:c.folderId||'', folderUrl:c.folderUrl||''};
+    });
+    // Merge any locally cached folder URLs (fallback for offline edits)
     try{
       const local=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');
       Object.entries(local).forEach(([pid,url])=>{
         if(!projectFolders[pid]||!projectFolders[pid].folderUrl) projectFolders[pid]={folderUrl:url,folderId:''};
       });
     }catch(e){}
-    dataLoadedAt=Date.now();
+
+    // Crews
+    crews = (crewData||[]).map(snakeToCamel).map(c=>({...c, id:c.id}));
+    syncMasterCrewRoster();
+
+    // Schedule
+    schedule = (schedData||[]).map(snakeToCamel);
+    // Remap any legacy crew IDs
+    const legacyCrewRemap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'};
+    schedule.forEach(s=>{ if(legacyCrewRemap[s.crewId]) s.crewId=legacyCrewRemap[s.crewId]; });
+
+    // Service calls — embed notes by svcId
+    const notesBySvc={};
+    (svcNoteData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!notesBySvc[c.svcId]) notesBySvc[c.svcId]=[];
+      notesBySvc[c.svcId].push({text:c.text,time:c.time,pm:c.pm});
+    });
+    serviceCalls = (svcData||[]).map(r=>{
+      const c=snakeToCamel(r);
+      c.notes = notesBySvc[c.id]||[];
+      return c;
+    });
+
     // Rebuild O(1) lookup maps
     projectMap={};
     projects.forEach(p=>{ projectMap[String(p.id)]=p; });
     crewMap={};
     crews.forEach(c=>{ crewMap[c.id]=c; });
+
     // Clear SLA cache — stageDate values may have changed
     Object.keys(_slaCache).forEach(k=>delete _slaCache[k]);
+
+    dataLoadedAt=Date.now();
     updateFreshnessUI();
     if(freshnessTimer) clearInterval(freshnessTimer);
     freshnessTimer=setInterval(updateFreshnessUI,60000);
@@ -1479,21 +1561,110 @@ async function loadData(){
     render();
   }catch(err){
     setLoadingBar(0);
-    document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;padding:20px;">Failed to load. Check Apps Script deployment.<br><small>'+err.message+'</small></div>';
+    document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;padding:20px;">Failed to load data.<br><small>'+err.message+'</small><br><br><small>Check: Supabase URL/key, RLS policies, Google sign-in.</small></div>';
   }
 }
+// Supabase JS v2 never throws — errors come back as {data, error}.
+// This helper throws so the catch block in post() actually fires.
+async function sbRun(promise){
+  const result = await promise;
+  if(result && result.error) throw result.error;
+  return result;
+}
+
 async function post(body){
   setSaving(true);
   try{
-    const res=await fetch(API,{method:'POST',body:JSON.stringify(body)});
-    const json=await res.json().catch(()=>null);
-    if(json&&json.error){
-      console.error('API error for action',body.action,':',json.error);
-      showToast('⚠ Save error: '+json.error.slice(0,60));
+    const {action,...b} = body;
+
+    if(action==='updateTask'){
+      await sbRun(sb.from('task_state').upsert(camelToSnake({
+        projectId: b.projectId,
+        taskId:    b.taskId,
+        status:    b.status,
+        completedDate: b.status==='Complete' ? new Date().toLocaleDateString() : ''
+      }), {onConflict:'project_id,task_id'}));
+
+    } else if(action==='moveStage'){
+      await sbRun(sb.from('projects').update(camelToSnake({stageDate:b.stageDate, stage:b.stage})).eq('id',b.projectId));
+      await sbRun(sb.from('stage_history').insert(camelToSnake({projectId:b.projectId, stage:b.stageLabel, entered:b.stageDate})));
+
+    } else if(action==='saveBlocker'){
+      await sbRun(sb.from('projects').update({blocker:b.blocker}).eq('id',b.projectId));
+
+    } else if(action==='addNote'){
+      await sbRun(sb.from('notes').insert(camelToSnake({projectId:b.projectId, text:b.text, time:b.time, pm:b.pm})));
+
+    } else if(action==='addProject'){
+      await sbRun(sb.from('projects').insert(camelToSnake(b.project)));
+
+    } else if(action==='reassignPM'){
+      await sbRun(sb.from('projects').update({pm:b.pm}).eq('id',b.projectId));
+
+    } else if(action==='updateProject'){
+      await sbRun(sb.from('projects').update(camelToSnake(b.fields)).eq('id',b.projectId));
+
+    } else if(action==='setTaskDue'){
+      if(b.dueDate){
+        await sbRun(sb.from('task_due_dates').upsert(camelToSnake({projectId:b.projectId, taskId:b.taskId, dueDate:b.dueDate}), {onConflict:'project_id,task_id'}));
+      } else {
+        await sbRun(sb.from('task_due_dates').delete().eq('project_id',b.projectId).eq('task_id',b.taskId));
+      }
+
+    } else if(action==='addSchedule'){
+      await sbRun(sb.from('schedule').insert(camelToSnake({
+        id:b.id, projectId:b.projectId, crewId:b.crewId, jobType:b.jobType,
+        date:b.date, time:b.time, notes:b.notes||'', status:b.status||'scheduled', pm:b.pm||''
+      })));
+
+    } else if(action==='updateSchedule'){
+      await sbRun(sb.from('schedule').update(camelToSnake({
+        projectId:b.projectId, crewId:b.crewId, jobType:b.jobType,
+        date:b.date, time:b.time, notes:b.notes||''
+      })).eq('id',b.id));
+
+    } else if(action==='deleteSchedule'){
+      await sbRun(sb.from('schedule').delete().eq('id',b.id));
+
+    } else if(action==='addCrew'){
+      await sbRun(sb.from('crews').upsert(camelToSnake({
+        id:b.crewId, name:b.name, warehouse:b.warehouse, active:'true'
+      }), {onConflict:'id', ignoreDuplicates:true}));
+
+    } else if(action==='updateCrew'){
+      const fields = {name:b.name, warehouse:b.warehouse};
+      const roles = ['licenseHolder','electrician','solarLead','batteryLead',
+        'installer1','installer2','batteryTech1','batteryTech2','batteryApprentice','mpuElectrician'];
+      roles.forEach(r=>{ if(b[r]!==undefined) fields[r]=b[r]; });
+      if(b.members!==undefined) fields.members=b.members;
+      await sbRun(sb.from('crews').update(camelToSnake(fields)).eq('id',b.crewId));
+
+    } else if(action==='addServiceCall'){
+      const {notes:_n,...svc}=b;
+      await sbRun(sb.from('service_calls').insert(camelToSnake(svc)));
+
+    } else if(action==='updateServiceCall'){
+      const {id,...fields}=b;
+      const allowed=['customer','phone','email','address','projectId','type',
+        'priority','issue','crewId','date','time','status','resolution'];
+      const upd={};
+      allowed.forEach(k=>{ if(fields[k]!==undefined) upd[k]=fields[k]; });
+      await sbRun(sb.from('service_calls').update(camelToSnake(upd)).eq('id',id));
+
+    } else if(action==='addSvcNote'){
+      await sbRun(sb.from('service_call_notes').insert(camelToSnake({svcId:b.id, text:b.text, time:b.time, pm:b.pm})));
+
+    } else if(action==='saveFolder'){
+      await sbRun(sb.from('project_folders').upsert(camelToSnake({
+        projectId:b.projectId, folderId:'', folderUrl:b.folderUrl
+      }), {onConflict:'project_id'}));
+
+    } else if(action==='deleteFolder'){
+      await sbRun(sb.from('project_folders').delete().eq('project_id',b.projectId));
     }
   }catch(e){
-    console.error('Post failed',body.action,e);
-    showToast('Save failed — check connection');
+    console.error('Supabase error ['+body.action+']:', e);
+    showToast('Save error — '+(e.message||e.details||'check console').slice(0,80));
   }
   setSaving(false);
 }
@@ -2571,18 +2742,25 @@ async function openPanel(pid){
     const dp=document.getElementById('dp-right');
     if(dp) dp.insertAdjacentHTML('afterbegin',`<div id="detail-loading-${pid}" style="font-size:11px;color:var(--text3);padding:8px 12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading tasks...</div>`);
     try {
-      const res=await fetch(`${API}?action=getDetail&id=${encodeURIComponent(pid)}`);
-      const data=await res.json();
-
-      // RACE GUARD: only merge if the user is still on the same project
-      // If selectedId changed while we were awaiting, discard silently
-      if(selectedId!==fetchToken){
-        console.log(`Detail fetch for ${fetchToken} discarded — user moved to ${selectedId}`);
-        return;
-      }
-
-      if(data.taskState) Object.assign(taskState,data.taskState);
-      if(data.notes)     Object.assign(notes,data.notes);
+      const res1=sb.from('task_state').select('*').eq('project_id',pid);
+      const res2=sb.from('notes').select('*').eq('project_id',pid).order('time',{ascending:true});
+      const [{data:tsData,error:te},{data:notesData,error:ne}]=await Promise.all([res1,res2]);
+      if(te||ne) throw new Error((te||ne).message);
+      const mergedTs={};
+      (tsData||[]).forEach(r=>{
+        const c=snakeToCamel(r);
+        if(!mergedTs[c.projectId]) mergedTs[c.projectId]={};
+        mergedTs[c.projectId][c.taskId]={status:c.status,completedDate:c.completedDate||''};
+      });
+      const mergedNotes={};
+      (notesData||[]).forEach(r=>{
+        const c=snakeToCamel(r);
+        if(!mergedNotes[c.projectId]) mergedNotes[c.projectId]=[];
+        mergedNotes[c.projectId].push({text:c.text,time:c.time||'',pm:c.pm||''});
+      });
+      if(selectedId!==fetchToken){ return; }
+      Object.assign(taskState,mergedTs);
+      Object.assign(notes,mergedNotes);
       markDetailFresh(pid);
     } catch(e) {
       console.warn('Detail fetch failed',e);
@@ -2672,18 +2850,23 @@ function parseJwt(token){
 }
 
 function doManualLogin(){
-  const inp=document.getElementById('login-name-input');
-  const name=(inp?inp.value.trim():'');
-  if(!name){if(inp){inp.style.borderColor='var(--red)';inp.focus();}return;}
-  currentUser={name,fullName:name,email:'',picture:''};
-  sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
-  showUserChip();
-  document.getElementById('login-screen').style.display='none';
-  loadData();
+  // Manual login disabled — use Google Sign-In above.
+  google.accounts.id.prompt();
 }
 window.doManualLogin=doManualLogin;
 function manualSignIn(){doManualLogin();}
-function onGoogleSignIn(response){
+async function onGoogleSignIn(response){
+  // 1. Establish a Supabase session from the Google ID token
+  const {error:authErr} = await sb.auth.signInWithIdToken({
+    provider: 'google',
+    token:    response.credential,
+  });
+  if(authErr){
+    console.error('Supabase auth error',authErr);
+    showToast('Sign-in failed: '+authErr.message);
+    return;
+  }
+  // 2. Parse display info from the JWT (same as before)
   const payload=parseJwt(response.credential);
   const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
   currentUser={
@@ -2692,7 +2875,6 @@ function onGoogleSignIn(response){
     email:payload.email||'',
     picture:payload.picture||'',
   };
-  // Store in sessionStorage so refresh keeps you logged in
   sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
   showUserChip();
   document.getElementById('login-screen').style.display='none';
@@ -2713,23 +2895,40 @@ function showUserChip(){
   chip.style.display='flex';
 }
 
-function signOut(){
+async function signOut(){
   sessionStorage.removeItem('crm_user');
   currentUser={name:'',email:'',picture:''};
   document.getElementById('user-chip').style.display='none';
   document.getElementById('login-screen').style.display='flex';
+  await sb.auth.signOut();
 }
 
-// Check session on load
-(function(){
+// Check for an existing Supabase session on page load.
+// If one exists, restore currentUser and go straight to the app.
+(async function(){
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session) return; // login screen remains visible
+
+  // Restore display name from sessionStorage (avoids a round-trip)
   const saved=sessionStorage.getItem('crm_user');
   if(saved){
-    try{
-      currentUser=JSON.parse(saved);
-      showUserChip();
-      document.getElementById('login-screen').style.display='none';
-      // loadData() called below after DOM ready
-    }catch(e){}
+    try{ currentUser=JSON.parse(saved); }catch(e){}
+  }
+  // Fall back to Supabase session metadata if sessionStorage was cleared
+  if(!currentUser.name && session.user){
+    const u=session.user;
+    currentUser={
+      name:     u.user_metadata?.full_name||u.email||'',
+      fullName: u.user_metadata?.full_name||u.email||'',
+      email:    u.email||'',
+      picture:  u.user_metadata?.avatar_url||'',
+    };
+    sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
+  }
+  if(currentUser.name){
+    showUserChip();
+    document.getElementById('login-screen').style.display='none';
+    loadData();
   }
 })();
 
@@ -2968,8 +3167,10 @@ async function submitNewProject(){
   stageHistory[newProject.id]=[{stage:stageLabel,entered:dateStr}];
   notes[newProject.id]=[];
   closeNewProject();render();showToast('Project created — '+newProject.name);openPanel(newProject.id);
-  try{await fetch(API,{method:'POST',body:JSON.stringify({action:'addProject',project:newProject})});}
-  catch(e){showToast('Saved locally — sync failed');}
+  // Persist new project + initial stage history to Supabase
+  await post({action:'addProject',project:newProject});
+  await post({action:'moveStage',projectId:newProject.id,stage:newProject.stage,
+    stageDate:dateStr,stageLabel:stageLabel,completed:false});
   btn.textContent='Create Project';btn.disabled=false;
 }
 
@@ -3004,10 +3205,8 @@ async function submitEditProject(){
   if(selectedId===_editPid) renderPanel(_editPid);
   showToast('Project updated');
 
-  // persist each changed field
-  try{
-    await fetch(API,{method:'POST',body:JSON.stringify({action:'updateProject',projectId:p.id,fields:editable})});
-  }catch(e){showToast('Saved locally — sync failed');}
+  // persist changed fields
+  await post({action:'updateProject',projectId:p.id,fields:editable});
   btn.textContent='Save Changes';btn.disabled=false;
 }
 
@@ -3109,12 +3308,14 @@ async function saveFolderUrl(pid){
   try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');stored[pid]=url;localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
   renderFilesSection(pid);
   showToast('Drive folder linked');
+  post({action:'saveFolder',projectId:pid,folderUrl:url});
 }
 function clearFolderUrl(pid){
   if(!confirm('Remove the Drive folder link for this project?')) return;
   delete projectFolders[pid];
   try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');delete stored[pid];localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
   renderFilesSection(pid);
+  post({action:'deleteFolder',projectId:pid});
 }
 async function loadProjectFiles(pid){}
 // ── TASK AUDIT ────────────────────────────────────────────
@@ -4228,8 +4429,7 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-// Only load data if already logged in from session
-if(currentUser.name) loadData();
+// Session restore and initial load handled by the async IIFE above.
 </script>
 </body>
 </html>
