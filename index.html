@@ -953,7 +953,7 @@ select.np-input{cursor:pointer;}
         <label>Project</label>
         <div class="am-search-wrap" id="am-project-wrap">
           <input type="text" class="am-search-input" id="am-project-search"
-            placeholder="Search by name, ID, city..."
+            placeholder="Type name, ID, or city to search existing projects..."
             oninput="amSearchProjects(this.value)"
             onfocus="amSearchProjects(this.value)"
             onkeydown="amSearchKeydown(event)"
@@ -3305,8 +3305,16 @@ function syncMasterCrewRoster(){
     }
   });
 
-  // Strip any crews not in the master roster
-  crews=crews.filter(c=>masterIds.includes(c.id));
+  // Strip crews not in master roster, then deduplicate by id
+  // The sheet may have accumulated duplicate rows — keep the last one
+  // (last row tends to have the most complete role data)
+  const filtered=crews.filter(c=>masterIds.includes(c.id));
+  const seen={};
+  crews=filtered.reverse().filter(c=>{
+    if(seen[c.id]) return false;
+    seen[c.id]=true;
+    return true;
+  }).reverse(); // restore original order
 }
 
 const CREW_ROLES=['licenseHolder','electrician','solarLead','batteryLead',
@@ -3618,6 +3626,7 @@ let amSearchIdx=-1;
 function amSearchProjects(q){
   const drop=document.getElementById('am-search-drop');
   if(!drop) return;
+  if(!projects.length){drop.innerHTML='<div class="am-search-opt" style="color:var(--text3);">Loading projects...</div>';drop.style.display='';return;}
   const pid=document.getElementById('am-project-id').value;
   // If already selected, don't re-open dropdown
   if(pid&&!q) return;
