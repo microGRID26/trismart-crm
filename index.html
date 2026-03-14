@@ -2773,6 +2773,10 @@ document.getElementById('assign-overlay').addEventListener('click',function(e){i
 // ── SCHEDULE ─────────────────────────────────────────────
 const JOB_TYPES={survey:{label:'Site Survey',cls:'survey'},install:{label:'Installation',cls:'install'},inspection:{label:'Inspection',cls:'inspection'},service:{label:'Service Call',cls:'service'}};
 let schedJobFilter='all';
+let schedWarehouseFilter='all';
+let schedPMFilter='all';
+let schedCityFilter='';
+let schedView='grid'; // 'grid' | 'agenda'
 
 function schedWeekDates(){
   const base=new Date(today);
@@ -2786,97 +2790,226 @@ function renderSchedule(){
   const el=document.getElementById('schedule-page');if(!el) return;
   const days=schedWeekDates();
   const todayIso=isoDate(today);
-  const activeCrews=crews.length?crews:[{id:'crew1',name:'Crew 1'},{id:'crew2',name:'Crew 2'},{id:'crew3',name:'Crew 3'}];
+  const defaultCrews=[{id:'crew1',name:'Crew 1',warehouse:'',members:'',active:'true'},
+    {id:'crew2',name:'Crew 2',warehouse:'',members:'',active:'true'},
+    {id:'crew3',name:'Crew 3',warehouse:'',members:'',active:'true'}];
+  const allCrews=crews.length?crews:defaultCrews;
 
-  const weekLabel=`${days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${days[5].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+  // Derive warehouse list
+  const warehouses=[...new Set(allCrews.map(c=>c.warehouse||'').filter(Boolean))].sort();
 
-  // build lookup: crewId+date -> [schedule entries]
+  // Filter crews by warehouse
+  const filteredCrews=schedWarehouseFilter==='all'?allCrews:allCrews.filter(c=>(c.warehouse||'')=== schedWarehouseFilter);
+
+  // Derive PM list from schedule
+  const pms=[...new Set(schedule.map(s=>s.pm||'').filter(Boolean))].sort();
+
+  // City list from projects that appear in schedule
+  const schedPids=new Set(schedule.map(s=>String(s.projectId)));
+  const cities=[...new Set([...schedPids].map(pid=>{const p=projects.find(x=>String(x.id)===pid);return p?p.city:'';}).filter(Boolean))].sort();
+
+  // Master job filter
   function jobsFor(crewId,dateIso){
-    return schedule.filter(s=>s.crewId===crewId&&s.date===dateIso&&(schedJobFilter==='all'||s.jobType===schedJobFilter));
+    return schedule.filter(s=>{
+      if(s.crewId!==crewId||s.date!==dateIso) return false;
+      if(schedJobFilter!=='all'&&s.jobType!==schedJobFilter) return false;
+      if(schedPMFilter!=='all'&&(s.pm||'')!==schedPMFilter) return false;
+      if(schedCityFilter){
+        const p=projects.find(x=>String(x.id)===String(s.projectId));
+        if(!p||(p.city||'').toLowerCase().indexOf(schedCityFilter.toLowerCase())<0) return false;
+      }
+      return true;
+    });
   }
 
-  // count scheduled per crew this week for summary
-  const weekJobCount=activeCrews.map(c=>days.reduce((a,d)=>a+jobsFor(c.id,isoDate(d)).length,0));
-  const totalWeek=weekJobCount.reduce((a,b)=>a+b,0);
+  // All jobs this week across filtered crews
+  function allJobsForDay(dateIso){
+    return filteredCrews.flatMap(c=>jobsFor(c.id,dateIso));
+  }
 
-  el.innerHTML=`
-    <div class="sch-toolbar">
-      <div class="sch-week-nav">
-        <button class="sch-week-btn" onclick="schedWeekOffset--;renderSchedule()">◀ Prev</button>
-        <span class="sch-week-label">${weekLabel}</span>
-        <button class="sch-week-btn" onclick="schedWeekOffset++;renderSchedule()">Next ▶</button>
-        ${schedWeekOffset!==0?`<button class="sch-week-btn" onclick="schedWeekOffset=0;renderSchedule()">Today</button>`:''}
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="sch-filter-btn ${schedJobFilter==='all'?'active':''}" onclick="schedJobFilter='all';renderSchedule()">All</button>
-        ${Object.entries(JOB_TYPES).map(([k,v])=>`<button class="sch-filter-btn ${schedJobFilter===k?'active':''}" onclick="schedJobFilter='${k}';renderSchedule()">${v.label}</button>`).join('')}
-      </div>
-      <button style="margin-left:auto;padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;" onclick="openAssignModal(null,null,null)">+ Schedule Job</button>
-    </div>
-    <div class="sch-legend">
-      ${Object.entries(JOB_TYPES).map(([k,v])=>`<div class="sch-leg"><div class="sch-leg-dot sch-job ${v.cls}"></div>${v.label}</div>`).join('')}
-      <span style="margin-left:auto;font-size:11px;color:var(--text3);">${totalWeek} job${totalWeek!==1?'s':''} this week</span>
-    </div>
+  const weekJobCount=filteredCrews.map(c=>days.reduce((a,d)=>a+jobsFor(c.id,isoDate(d)).length,0));
+  const totalWeek=weekJobCount.reduce((a,b)=>a+b,0);
+  const weekLabel=`${days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${days[5].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+
+  function jobChip(j,crew,iso,stopProp=true){
+    const p=projects.find(x=>String(x.id)===String(j.projectId));
+    const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
+    return `<div class="sch-job ${jt.cls}${j.status==='cancelled'?' cancelled':''}" onclick="${stopProp?'event.stopPropagation();':''}openAssignModal('${crew.id}','${iso}','${j.id}')">
+      <span class="sch-job-name">${p?p.name:j.projectId}</span>
+      <span class="sch-job-type">${jt.label}${crew&&schedWarehouseFilter==='all'&&crew.warehouse?` · ${crew.warehouse}`:''}</span>
+      ${p?`<span style="font-size:9px;opacity:.7;">${p.city||''}</span>`:''}
+      ${j.notes?`<span style="font-size:9px;opacity:.65;">${j.notes.slice(0,40)}</span>`:''}
+    </div>`;
+  }
+
+  // ── Grid view ──────────────────────────────────────────
+  const gridHTML=`
     <div style="overflow-x:auto;">
     <table class="sch-grid">
       <thead><tr>
-        <th style="min-width:110px;">Crew</th>
+        <th style="min-width:120px;">Crew</th>
         ${days.map(d=>{
-          const iso=isoDate(d);
-          const isToday=iso===todayIso;
+          const iso=isoDate(d);const isToday=iso===todayIso;
           const dayLabel=d.toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
-          return `<th class="${isToday?'today-col':''}">${isToday?'<span style="color:var(--green);">'+dayLabel+'</span>':dayLabel}</th>`;
+          const dayJobs=allJobsForDay(iso).length;
+          return `<th class="${isToday?'today-col':''}">${isToday?`<span style="color:var(--green);">${dayLabel}</span>`:dayLabel}${dayJobs?`<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:1px;">${dayJobs} job${dayJobs!==1?'s':''}</div>`:''}`;
         }).join('')}
       </tr></thead>
       <tbody>
-        ${activeCrews.map(crew=>`
+        ${filteredCrews.map((crew,ci)=>`
           <tr>
-            <td class="sch-crew-label">
-              <div>${crew.name}</div>
-              <div style="font-size:9px;color:var(--text3);margin-top:2px;">${weekJobCount[activeCrews.indexOf(crew)]} this week</div>
+            <td class="sch-crew-label" onclick="openAssignModal('${crew.id}',null,null)">
+              <div style="font-weight:600;">${crew.name}</div>
+              ${crew.warehouse?`<div style="font-size:9px;color:var(--green);margin-top:1px;">📦 ${crew.warehouse}</div>`:''}
+              <div style="font-size:9px;color:var(--text3);margin-top:1px;">${weekJobCount[ci]} job${weekJobCount[ci]!==1?'s':''} this week</div>
             </td>
             ${days.map(d=>{
-              const iso=isoDate(d);
-              const isToday=iso===todayIso;
+              const iso=isoDate(d);const isToday=iso===todayIso;
               const jobs=jobsFor(crew.id,iso);
-              return `<td class="${isToday?'today-col':''}" onclick="openAssignModal('${crew.id}','${iso}',null)">
-                ${jobs.map(j=>{
-                  const p=projects.find(x=>String(x.id)===String(j.projectId));
-                  const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
-                  return `<div class="sch-job ${jt.cls}${j.status==='cancelled'?' cancelled':''}" onclick="event.stopPropagation();openAssignModal('${crew.id}','${iso}','${j.id}')">
-                    <span class="sch-job-name">${p?p.name:j.projectId}</span>
-                    <span class="sch-job-type">${jt.label}</span>
-                    ${j.notes?`<span style="font-size:9px;opacity:.7;">${j.notes.slice(0,30)}</span>`:''}
-                  </div>`;
-                }).join('')}
+              const overloaded=jobs.length>1;
+              return `<td class="${isToday?'today-col':''}" style="${overloaded?'background:rgba(239,159,39,0.07);':''}" onclick="openAssignModal('${crew.id}','${iso}',null)">
+                ${jobs.map(j=>jobChip(j,crew,iso)).join('')}
                 <div class="sch-add-btn" onclick="event.stopPropagation();openAssignModal('${crew.id}','${iso}',null)">+</div>
               </td>`;
             }).join('')}
           </tr>`).join('')}
       </tbody>
     </table>
+    </div>`;
+
+  // ── Agenda view ────────────────────────────────────────
+  const agendaHTML=`
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${days.map(d=>{
+        const iso=isoDate(d);const isToday=iso===todayIso;
+        const dayJobs=filteredCrews.flatMap(crew=>jobsFor(crew.id,iso).map(j=>({j,crew})));
+        if(!dayJobs.length&&!isToday) return '';
+        const dayLabel=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+        return `<div style="border-radius:var(--radius);border:0.5px solid ${isToday?'var(--green)':'var(--border)'};overflow:hidden;">
+          <div style="padding:8px 14px;background:${isToday?'rgba(29,158,117,0.08)':'var(--bg2)'};display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:600;color:${isToday?'var(--green)':'var(--text)'};">${dayLabel}${isToday?' <span style="font-size:10px;background:var(--green);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;">Today</span>':''}</span>
+            <span style="font-size:11px;color:var(--text3);">${dayJobs.length} job${dayJobs.length!==1?'s':''}</span>
+          </div>
+          ${dayJobs.length?`
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:var(--bg2);">
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Project</th>
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Type</th>
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Crew</th>
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Warehouse</th>
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">City</th>
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">PM</th>
+              <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Notes</th>
+            </tr>
+            ${dayJobs.map(({j,crew},idx)=>{
+              const p=projects.find(x=>String(x.id)===String(j.projectId));
+              const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
+              return `<tr style="background:${idx%2===0?'var(--bg)':'var(--bg2)'};cursor:pointer;" onclick="openAssignModal('${crew.id}','${iso}','${j.id}')">
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);">
+                  <div style="font-weight:500;">${p?p.name:j.projectId}</div>
+                  <div style="font-size:10px;color:var(--text3);">${p?p.id:''}</div>
+                </td>
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);">
+                  <span class="sch-job ${jt.cls}" style="padding:2px 7px;border-radius:4px;">${jt.label}</span>
+                </td>
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);color:var(--text2);">${crew.name}</td>
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);color:var(--text3);">${crew.warehouse||'—'}</td>
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);color:var(--text2);">${p?p.city||'—':'—'}</td>
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);color:var(--text2);">${j.pm||'—'}</td>
+                <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);color:var(--text3);">${j.notes||''}</td>
+              </tr>`;
+            }).join('')}
+          </table>`:`<div style="padding:10px 14px;font-size:12px;color:var(--text3);">No jobs scheduled</div>`}
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  el.innerHTML=`
+    <div class="sch-toolbar" style="align-items:flex-start;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap;">
+        <div class="sch-week-nav">
+          <button class="sch-week-btn" onclick="schedWeekOffset--;renderSchedule()">◀</button>
+          <span class="sch-week-label">${weekLabel}</span>
+          <button class="sch-week-btn" onclick="schedWeekOffset++;renderSchedule()">▶</button>
+          ${schedWeekOffset!==0?`<button class="sch-week-btn" onclick="schedWeekOffset=0;renderSchedule()">Today</button>`:''}
+        </div>
+        <div style="display:flex;gap:4px;margin-left:auto;">
+          <button class="sch-week-btn${schedView==='grid'?' active':''}" style="${schedView==='grid'?'background:var(--green);color:#fff;border-color:var(--green);':''}" onclick="schedView='grid';renderSchedule()">⊞ Grid</button>
+          <button class="sch-week-btn${schedView==='agenda'?' active':''}" style="${schedView==='agenda'?'background:var(--green);color:#fff;border-color:var(--green);':''}" onclick="schedView='agenda';renderSchedule()">≡ Agenda</button>
+        </div>
+        <button style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;" onclick="openAssignModal(null,null,null)">+ Schedule Job</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;">
+        <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);">Filter:</span>
+
+        ${warehouses.length?`<select class="pf-sel" onchange="schedWarehouseFilter=this.value;renderSchedule()">
+          <option value="all" ${schedWarehouseFilter==='all'?'selected':''}>All warehouses</option>
+          ${warehouses.map(w=>`<option value="${w}" ${schedWarehouseFilter===w?'selected':''}>${w}</option>`).join('')}
+        </select>`:''}
+
+        <select class="pf-sel" onchange="schedJobFilter=this.value;renderSchedule()">
+          <option value="all" ${schedJobFilter==='all'?'selected':''}>All job types</option>
+          ${Object.entries(JOB_TYPES).map(([k,v])=>`<option value="${k}" ${schedJobFilter===k?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+
+        ${pms.length?`<select class="pf-sel" onchange="schedPMFilter=this.value;renderSchedule()">
+          <option value="all" ${schedPMFilter==='all'?'selected':''}>All PMs</option>
+          ${pms.map(pm=>`<option value="${pm}" ${schedPMFilter===pm?'selected':''}>${pm}</option>`).join('')}
+        </select>`:''}
+
+        <input class="pf-input" type="text" placeholder="City..." value="${schedCityFilter}" oninput="schedCityFilter=this.value;renderSchedule()" style="width:90px;">
+
+        ${(schedWarehouseFilter!=='all'||schedJobFilter!=='all'||schedPMFilter!=='all'||schedCityFilter)?
+          `<button class="sch-week-btn" onclick="schedWarehouseFilter='all';schedJobFilter='all';schedPMFilter='all';schedCityFilter='';renderSchedule()">✕ Clear</button>`:''}
+
+        <span style="margin-left:auto;font-size:11px;color:var(--text3);">${totalWeek} job${totalWeek!==1?'s':''} this week · ${filteredCrews.length} crew${filteredCrews.length!==1?'s':''}</span>
+      </div>
+      <div class="sch-legend">
+        ${Object.entries(JOB_TYPES).map(([k,v])=>`<div class="sch-leg"><div class="sch-leg-dot sch-job ${v.cls}"></div>${v.label}</div>`).join('')}
+        ${filteredCrews.filter(c=>weekJobCount[filteredCrews.indexOf(c)]>5).length?`<span style="margin-left:8px;font-size:10px;color:#D97706;">⚠ Cells with 2+ jobs on same day are highlighted</span>`:''}
+      </div>
     </div>
-    ${activeCrews.length<20?`
+
+    ${schedView==='grid'?gridHTML:agendaHTML}
+
     <div class="sch-crew-mgmt">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;">Manage Crews</div>
-      ${activeCrews.map(c=>`
-        <div class="sch-crew-row">
-          <input class="sch-crew-name-edit" value="${c.name}" id="crew-name-${c.id}" placeholder="Crew name">
-          <button style="font-size:11px;padding:4px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;" onclick="saveCrewName('${c.id}')">Save</button>
-        </div>`).join('')}
-      <button style="margin-top:8px;font-size:11px;padding:5px 14px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
-    </div>`:''}`;
+      <table style="width:100%;border-collapse:collapse;font-size:12px;max-width:600px;">
+        <tr style="background:var(--bg2);">
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Crew name</th>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Warehouse</th>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Members</th>
+          <th style="padding:5px 10px;"></th>
+        </tr>
+        ${allCrews.map(c=>`
+          <tr style="border-bottom:0.5px solid var(--border);">
+            <td style="padding:5px 6px;"><input class="sch-crew-name-edit" value="${c.name}" id="crew-name-${c.id}" placeholder="Crew name"></td>
+            <td style="padding:5px 6px;"><input class="sch-crew-name-edit" value="${c.warehouse||''}" id="crew-wh-${c.id}" placeholder="Warehouse" style="width:120px;"></td>
+            <td style="padding:5px 6px;"><input class="sch-crew-name-edit" value="${c.members||''}" id="crew-mem-${c.id}" placeholder="Names..." style="width:160px;"></td>
+            <td style="padding:5px 6px;"><button style="font-size:11px;padding:3px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;" onclick="saveCrewRow('${c.id}')">Save</button></td>
+          </tr>`).join('')}
+      </table>
+      <button style="margin-top:10px;font-size:11px;padding:5px 14px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
+    </div>`;
 }
 
-function saveCrewName(id){
-  const inp=document.getElementById('crew-name-'+id);if(!inp) return;
-  const name=inp.value.trim();if(!name) return;
+function saveCrewRow(id){
+  const nameInp=document.getElementById('crew-name-'+id);
+  const whInp=document.getElementById('crew-wh-'+id);
+  const memInp=document.getElementById('crew-mem-'+id);
+  if(!nameInp) return;
+  const name=nameInp.value.trim()||'Crew';
+  const warehouse=(whInp?whInp.value.trim():'');
+  const members=(memInp?memInp.value.trim():'');
   const c=crews.find(x=>x.id===id);
-  if(c) c.name=name;
+  if(c){c.name=name;c.warehouse=warehouse;c.members=members;}
   renderSchedule();
-  post({action:'updateCrew',crewId:id,name});
-  showToast('Crew updated');
+  post({action:'updateCrew',crewId:id,name,warehouse,members});
+  showToast('Crew saved');
 }
+
+// Keep old name for backward compat
+function saveCrewName(id){saveCrewRow(id);}
 
 function addCrew(){
   const id='crew'+Date.now();
