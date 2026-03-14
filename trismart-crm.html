@@ -1559,11 +1559,139 @@ async function loadData(){
     document.getElementById('cmd-content').style.display='block';
     setTimeout(()=>setLoadingBar(0),400);
     render();
+    // Start realtime subscriptions after data is loaded
+    setupRealtime();
   }catch(err){
     setLoadingBar(0);
     document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;padding:20px;">Failed to load data.<br><small>'+err.message+'</small><br><br><small>Check: Supabase URL/key, RLS policies, Google sign-in.</small></div>';
   }
 }
+
+// ── REALTIME ─────────────────────────────────────────────
+// Live sync — changes made by other PMs appear instantly without a refresh.
+// Requires Realtime enabled on tables in Supabase: Database → Replication
+let _realtimeChannel = null;
+
+function setupRealtime(){
+  if(_realtimeChannel){
+    sb.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+
+  _realtimeChannel = sb.channel('crm-live')
+
+    // ── Projects: stage moves, PM changes, field edits, new projects ──────────
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'projects'}, payload=>{
+      const p=snakeToCamel(payload.new);
+      const idx=projects.findIndex(x=>x.id===p.id);
+      if(idx===-1) return;
+      Object.assign(projects[idx],p);
+      projectMap[String(p.id)]=projects[idx];
+      Object.keys(_slaCache).forEach(k=>{if(k.startsWith(p.id+'|')) delete _slaCache[k];});
+      render();
+      if(selectedId===p.id) renderPanel(p.id);
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'projects'}, payload=>{
+      const p=snakeToCamel(payload.new);
+      if(projectMap[String(p.id)]) return; // already have it (own write)
+      projects.unshift(p);
+      projectMap[String(p.id)]=p;
+      render();
+      showToast('New project added: '+p.name);
+    })
+
+    // ── Task state: status changes ────────────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'task_state'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId||!r.taskId) return;
+      if(!taskState[r.projectId]) taskState[r.projectId]={};
+      // Skip if we already have the same value (own write echo)
+      const cur=taskState[r.projectId][r.taskId];
+      if(cur&&cur.status===r.status) return;
+      taskState[r.projectId][r.taskId]={status:r.status,completedDate:r.completedDate||''};
+      if(selectedId===r.projectId) renderPanel(r.projectId);
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'task_state'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId||!r.taskId) return;
+      if(!taskState[r.projectId]) taskState[r.projectId]={};
+      const cur=taskState[r.projectId][r.taskId];
+      if(cur&&cur.status===r.status) return; // skip own write echo
+      taskState[r.projectId][r.taskId]={status:r.status,completedDate:r.completedDate||''};
+      if(selectedId===r.projectId) renderPanel(r.projectId);
+    })
+
+    // ── Notes: new messages from other PMs ────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes'}, payload=>{
+      const n=snakeToCamel(payload.new);
+      if(!n.projectId) return;
+      if(!notes[n.projectId]) notes[n.projectId]=[];
+      // Dedup: skip if we already optimistically inserted this exact note
+      const already=notes[n.projectId].some(x=>x.text===n.text&&x.pm===n.pm&&x.time===n.time);
+      if(already) return;
+      notes[n.projectId].push({text:n.text,time:n.time||'',pm:n.pm||''});
+      // Live-update chat panel if it's open on this project
+      if(selectedId===n.projectId&&currentPanelTab==='notes'){
+        const msgEl=document.getElementById('chat-messages-'+n.projectId);
+        if(msgEl){
+          msgEl.innerHTML=renderChatMessages(notes[n.projectId]);
+          msgEl.scrollTop=msgEl.scrollHeight;
+        }
+      }
+      // Badge on Notes tab if panel is open but on a different tab
+      if(selectedId===n.projectId&&currentPanelTab!=='notes'){
+        const tab=document.getElementById('ptab-notes');
+        if(tab) tab.style.background='rgba(29,158,117,0.1)';
+      }
+    })
+
+    // ── Stage history: stage advances ─────────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'stage_history'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!stageHistory[r.projectId]) stageHistory[r.projectId]=[];
+      const already=stageHistory[r.projectId].some(x=>x.stage===r.stage&&x.entered===r.entered);
+      if(already) return;
+      stageHistory[r.projectId].push({stage:r.stage,entered:r.entered});
+      if(selectedId===r.projectId) renderPanel(r.projectId);
+    })
+
+    // ── Schedule: job additions, updates, deletions ───────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'schedule'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(schedule.find(s=>s.id===r.id)) return; // own write
+      schedule.push(r);
+      if(currentView==='schedule') renderSchedule();
+      if(selectedId&&String(r.projectId)===String(selectedId)&&currentPanelTab==='schedule')
+        renderPanelSchedule(selectedId);
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'schedule'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      const idx=schedule.findIndex(s=>s.id===r.id);
+      if(idx>-1) Object.assign(schedule[idx],r);
+      if(currentView==='schedule') renderSchedule();
+    })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'schedule'}, payload=>{
+      const id=payload.old?.id;
+      if(!id) return;
+      schedule=schedule.filter(s=>s.id!==id);
+      if(currentView==='schedule') renderSchedule();
+    })
+
+    .subscribe(status=>{
+      // Update the freshness dot to indicate live connection
+      const dot=document.querySelector('.fresh-dot');
+      if(status==='SUBSCRIBED'){
+        if(dot) dot.style.background='var(--green)';
+        const lbl=document.getElementById('freshness-label');
+        if(lbl&&lbl.textContent==='Refreshing...') lbl.textContent='Live';
+      } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        if(dot) dot.style.background='var(--red)';
+        console.warn('Realtime disconnected:',status);
+      }
+    });
+}
+
 // Supabase JS v2 never throws — errors come back as {data, error}.
 // This helper throws so the catch block in post() actually fires.
 async function sbRun(promise){
@@ -2902,6 +3030,7 @@ async function signOut(){
   currentUser={name:'',email:'',picture:''};
   document.getElementById('user-chip').style.display='none';
   document.getElementById('login-screen').style.display='flex';
+  if(_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel=null; }
   await sb.auth.signOut();
 }
 
