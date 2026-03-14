@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MicroGRID CRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -19,7 +20,7 @@
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:var(--bg3);color:var(--text);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
-.topbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg);border-bottom:0.5px solid var(--border2);flex-wrap:wrap;position:sticky;top:0;z-index:10;}
+.topbar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg);border-bottom:0.5px solid var(--border2);flex-wrap:nowrap;position:sticky;top:0;z-index:10;overflow-x:auto;}
 .logo{font-size:14px;font-weight:600;color:var(--text);margin-right:4px;}
 .logo span{color:var(--green);}
 .nav-btn{font-size:12px;padding:5px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
@@ -485,7 +486,7 @@ select.np-input{cursor:pointer;}
 .atc-scheduled{background:#d4edda;color:#155724;}
 
 /* PANEL TABS */
-.panel-tabs{display:flex;gap:0;border-bottom:0.5px solid var(--border);padding:0 16px;background:var(--bg);}
+.panel-tabs{display:flex;gap:0;border-bottom:0.5px solid var(--border);padding:0 16px;background:var(--bg);overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;}
 .ptab{font-size:11px;font-weight:500;padding:8px 14px;border:none;background:none;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;}
 .ptab:hover{color:var(--text);}
 .ptab.active{color:var(--green);border-bottom-color:var(--green);}
@@ -631,6 +632,42 @@ select.np-input{cursor:pointer;}
   /* chat */
   .chat-messages{max-height:240px;}
 }
+
+/* ── HELP ──────────────────────────────────────────────── */
+.help-hero{background:linear-gradient(135deg,#1D9E75,#0D5C44);border-radius:12px;padding:28px 32px;margin-bottom:24px;color:#fff;}
+.help-hero h1{font-size:22px;font-weight:600;margin:0 0 6px;}
+.help-hero p{font-size:13px;opacity:.85;margin:0;}
+.help-search{width:100%;padding:10px 14px;border-radius:8px;border:none;font-size:13px;margin-top:16px;outline:none;}
+.help-tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border2);padding-bottom:0;}
+.help-tab{font-size:12px;font-weight:500;padding:8px 16px;cursor:pointer;border:none;background:none;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.help-tab.active{color:var(--green);border-bottom-color:var(--green);}
+.help-section{margin-bottom:28px;}
+.help-section h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px;}
+.help-card{background:var(--bg);border:0.5px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:10px;}
+.help-card h3{font-size:13px;font-weight:600;color:var(--text);margin:0 0 6px;}
+.help-card p{font-size:12px;color:var(--text2);margin:0 0 8px;line-height:1.6;}
+.help-card p:last-child{margin-bottom:0;}
+.help-card ul{font-size:12px;color:var(--text2);margin:6px 0 0 0;padding-left:18px;line-height:1.8;}
+.help-kbd{display:inline-block;font-size:10px;font-family:monospace;padding:1px 6px;border-radius:4px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text2);margin:0 2px;}
+.help-badge{display:inline-block;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:500;margin:0 2px;}
+.help-badge.green{background:#E1F5EE;color:#085041;}
+.help-badge.amber{background:#faeeda;color:#633806;}
+.help-badge.red{background:#fcebeb;color:#a32d2d;}
+.help-badge.purple{background:#eeedfe;color:#3c3489;}
+
+/* ── TOOLTIPS ───────────────────────────────────────────── */
+[data-tip]{position:relative;cursor:help;}
+[data-tip]:hover::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:#1a1a1a;color:#fff;font-size:11px;padding:5px 9px;border-radius:6px;
+  white-space:nowrap;z-index:1000;pointer-events:none;max-width:240px;white-space:normal;
+  text-align:left;line-height:1.4;font-weight:400;
+}
+[data-tip]:hover::before{
+  content:'';position:absolute;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);
+  border:4px solid transparent;border-top-color:#1a1a1a;z-index:1000;pointer-events:none;
+}
 </style>
 </head>
 <body>
@@ -657,7 +694,7 @@ select.np-input{cursor:pointer;}
       data-width="260">
     </div>
     <div class="login-hint">Sign in with your MicroGRID Google Workspace account</div>
-    <div class="login-fallback">
+    <div class="login-fallback" style="display:none;">
       <div class="login-fallback-label">Or enter your name to continue</div>
       <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last"
         onkeydown="if(event.key==='Enter'){event.preventDefault();doManualLogin();}">
@@ -668,13 +705,15 @@ select.np-input{cursor:pointer;}
 <div class="app">
 <div class="topbar">
   <span class="logo">Micro<span>GRID</span></span>
-  <button class="nav-btn active" id="btn-command"  onclick="setView('command',this)">Command center</button>
-  <button class="nav-btn" id="btn-queue"            onclick="setView('queue',this)">My queue</button>
+  <button class="nav-btn active" id="btn-command"  onclick="setView('command',this)">Command</button>
+  <button class="nav-btn" id="btn-queue"            onclick="setView('queue',this)">Queue</button>
   <button class="nav-btn" id="btn-pipeline"         onclick="setView('pipeline',this)">Pipeline</button>
   <button class="nav-btn" id="btn-analytics"        onclick="setView('analytics',this)">Analytics</button>
-  <button class="nav-btn" id="btn-audit"            onclick="setView('audit',this)">Task audit</button>
+  <button class="nav-btn" id="btn-audit"            onclick="setView('audit',this)">Audit</button>
   <button class="nav-btn" id="btn-schedule"         onclick="setView('schedule',this)">Schedule</button>
-  <button class="nav-btn" id="btn-service"          onclick="setView('service',this)">Service Calls</button>
+  <button class="nav-btn" id="btn-service"          onclick="setView('service',this)">Service</button>
+  <button class="nav-btn" id="btn-funding"         onclick="setView('funding',this)">Funding</button>
+  <button class="nav-btn" id="btn-help" onclick="openHelp()" title="Help" style="font-size:13px;padding:4px 9px;">?</button>
   <div class="search-wrap">
     <input class="search-input" type="text" placeholder="Search projects..." oninput="searchProjects(this.value)" onblur="setTimeout(closeSearch,200)">
     <div class="search-results" id="search-results" style="display:none;"></div>
@@ -687,7 +726,7 @@ select.np-input{cursor:pointer;}
   <span class="saving-badge" id="saving-badge">Saving...</span>
   <button class="nav-btn" style="background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:500;" onclick="openNewProject()">+ New Project</button>
   <button class="nav-btn" onclick="openExport()" style="font-size:11px;">↓ Export</button>
-  <div class="data-freshness" id="data-freshness" onclick="reloadData()" title="Click to refresh data" style="display:none;">
+  <div class="data-freshness" id="data-freshness" onclick="reloadData()" data-tip="Click to reload all project data from the server" style="display:none;">
     <div class="fresh-dot"></div>
     <span id="freshness-label">Loaded just now</span>
   </div>
@@ -699,96 +738,138 @@ select.np-input{cursor:pointer;}
   </div>
 </div>
 
-<!-- NEW PROJECT MODAL -->
+<!-- NEW / EDIT PROJECT MODAL -->
+<style>
+.np-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border2);margin-bottom:20px;}
+.np-tab{font-size:12px;padding:7px 14px;cursor:pointer;border:none;background:none;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.np-tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:500;}
+.np-tab-pane{display:none;}
+.np-tab-pane.active{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.np-full{grid-column:1/-1;}
+</style>
 <div id="np-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;overflow-y:auto;">
-  <div style="background:#fff;border-radius:12px;max-width:620px;margin:40px auto;padding:24px 28px;position:relative;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div style="background:#fff;border-radius:12px;max-width:680px;margin:40px auto;padding:24px 28px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div>
-        <div style="font-size:16px;font-weight:500;">New Project</div>
-        <div style="font-size:11px;color:#999;margin-top:2px;">All fields required unless marked optional</div>
+        <div style="font-size:16px;font-weight:500;" id="np-title">New Project</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;" id="np-subtitle">All fields required unless marked optional</div>
       </div>
       <button onclick="closeNewProject()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&#x2715;</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div style="grid-column:1/-1;">
-        <div class="np-label">Customer Name</div>
-        <input class="np-input" id="np-name" type="text" placeholder="First Last">
-      </div>
-      <div style="grid-column:1/-1;">
-        <div class="np-label">Street Address</div>
-        <input class="np-input" id="np-address" type="text" placeholder="123 Main St, Austin, TX 78701">
-      </div>
-      <div>
-        <div class="np-label">City, State</div>
-        <input class="np-input" id="np-city" type="text" placeholder="Austin, TX">
-      </div>
-      <div>
-        <div class="np-label">Phone</div>
-        <input class="np-input" id="np-phone" type="text" placeholder="(555) 555-5555">
-      </div>
-      <div style="grid-column:1/-1;">
-        <div class="np-label">Email</div>
-        <input class="np-input" id="np-email" type="email" placeholder="customer@email.com">
-      </div>
-      <div>
-        <div class="np-label">Sale Date</div>
-        <input class="np-input" id="np-saledate" type="date">
-      </div>
-      <div>
-        <div class="np-label">Current Stage</div>
+    <!-- Tabs — Basic always shows; extra tabs only in edit mode -->
+    <div class="np-tabs">
+      <button class="np-tab active" id="np-tab-basic" onclick="npSwitchTab('basic')">Basic</button>
+      <button class="np-tab" id="np-tab-equipment" onclick="npSwitchTab('equipment')" style="display:none;">Equipment</button>
+      <button class="np-tab" id="np-tab-site" onclick="npSwitchTab('site')" style="display:none;">Site & Permitting</button>
+      <button class="np-tab" id="np-tab-milestones" onclick="npSwitchTab('milestones')" style="display:none;">Milestones & Funding</button>
+    </div>
+
+    <!-- TAB 1: BASIC -->
+    <div class="np-tab-pane active" id="np-pane-basic">
+      <div class="np-full"><div class="np-label">Customer Name</div><input class="np-input" id="np-name" type="text" placeholder="First Last"></div>
+      <div class="np-full"><div class="np-label">Street Address</div><input class="np-input" id="np-address" type="text" placeholder="123 Main St, Austin, TX 78701"></div>
+      <div><div class="np-label">City, State</div><input class="np-input" id="np-city" type="text" placeholder="Austin, TX"></div>
+      <div><div class="np-label">Phone</div><input class="np-input" id="np-phone" type="text" placeholder="(555) 555-5555"></div>
+      <div class="np-full"><div class="np-label">Email</div><input class="np-input" id="np-email" type="email" placeholder="customer@email.com"></div>
+      <div><div class="np-label">Sale Date</div><input class="np-input" id="np-saledate" type="date"></div>
+      <div><div class="np-label">Current Stage</div>
         <select class="np-input" id="np-stage">
-          <option value="evaluation">Evaluation</option>
-          <option value="survey">Site Survey</option>
-          <option value="design">Design</option>
-          <option value="permit">Permitting</option>
-          <option value="install">Installation</option>
-          <option value="inspection">Inspection</option>
+          <option value="evaluation">Evaluation</option><option value="survey">Site Survey</option>
+          <option value="design">Design</option><option value="permit">Permitting</option>
+          <option value="install">Installation</option><option value="inspection">Inspection</option>
           <option value="complete">Completion</option>
         </select>
       </div>
-      <div>
-        <div class="np-label">Project Manager</div>
-        <select class="np-input" id="np-pm">
-          <option value="Ari">Ari</option>
-          <option value="Jen">Jen</option>
-        </select>
+      <div><div class="np-label">Project Manager</div>
+        <select class="np-input" id="np-pm"><option value="Ari">Ari</option><option value="Jen">Jen</option></select>
       </div>
-      <div>
-        <div class="np-label">Disposition</div>
-        <select class="np-input" id="np-disposition">
-          <option value="Sale">Sale</option>
-          <option value="Loyalty">Loyalty</option>
-        </select>
+      <div><div class="np-label">Disposition</div>
+        <select class="np-input" id="np-disposition"><option value="Sale">Sale</option><option value="Loyalty">Loyalty</option><option value="Cancelled">Cancelled</option></select>
       </div>
-      <div>
-        <div class="np-label">Contract Value ($)</div>
-        <input class="np-input" id="np-contract" type="number" placeholder="75000">
+      <div><div class="np-label">Contract Value ($)</div><input class="np-input" id="np-contract" type="number" placeholder="75000"></div>
+      <div><div class="np-label">System Size (kW)</div><input class="np-input" id="np-systemkw" type="number" step="0.001" placeholder="18.00"></div>
+      <div><div class="np-label">Financier</div><input class="np-input" id="np-financier" type="text" placeholder="Edge"></div>
+      <div><div class="np-label">AHJ</div><input class="np-input" id="np-ahj" type="text" placeholder="City name or County"></div>
+      <div><div class="np-label">Utility</div><input class="np-input" id="np-utility" type="text" placeholder="Oncor"></div>
+      <div><div class="np-label">Energy Advisor</div><input class="np-input" id="np-advisor" type="text" placeholder="Full name"></div>
+      <div><div class="np-label">Energy Consultant</div><input class="np-input" id="np-consultant" type="text" placeholder="Full name"></div>
+    </div>
+
+    <!-- TAB 2: EQUIPMENT -->
+    <div class="np-tab-pane" id="np-pane-equipment">
+      <div><div class="np-label">Module Model</div><input class="np-input" id="np-module" type="text" placeholder="HY-DH108P8-405B"></div>
+      <div><div class="np-label">Module Qty</div><input class="np-input" id="np-module-qty" type="number" placeholder="53"></div>
+      <div><div class="np-label">Inverter</div><input class="np-input" id="np-inverter" type="text" placeholder="Model name"></div>
+      <div><div class="np-label">Inverter Qty</div><input class="np-input" id="np-inverter-qty" type="number" placeholder="1"></div>
+      <div><div class="np-label">Battery</div><input class="np-input" id="np-battery" type="text" placeholder="EcoFlow"></div>
+      <div><div class="np-label">Battery Qty</div><input class="np-input" id="np-battery-qty" type="number" placeholder="8"></div>
+      <div><div class="np-label">Optimizer</div><input class="np-input" id="np-optimizer" type="text" placeholder="Model name"></div>
+      <div><div class="np-label">Optimizer Qty</div><input class="np-input" id="np-optimizer-qty" type="number" placeholder="0"></div>
+      <div><div class="np-label">Financing Type</div><input class="np-input" id="np-financing-type" type="text" placeholder="TPO (Lease, PPA)"></div>
+      <div><div class="np-label">Down Payment ($)</div><input class="np-input" id="np-down-payment" type="number" placeholder="0"></div>
+      <div><div class="np-label">TPO Escalator</div><input class="np-input" id="np-tpo-escalator" type="text" placeholder="0"></div>
+      <div><div class="np-label">Adv Pmt Schedule</div><input class="np-input" id="np-financier-adv-pmt" type="text" placeholder="Edge"></div>
+    </div>
+
+    <!-- TAB 3: SITE & PERMITTING -->
+    <div class="np-tab-pane" id="np-pane-site">
+      <div><div class="np-label">Meter Location</div><input class="np-input" id="np-meter-location" type="text" placeholder="Right side of house"></div>
+      <div><div class="np-label">Panel Location</div><input class="np-input" id="np-panel-location" type="text" placeholder="Inside garage"></div>
+      <div><div class="np-label">Voltage</div><input class="np-input" id="np-voltage" type="text" placeholder="240"></div>
+      <div><div class="np-label">MSP Bus Rating</div><input class="np-input" id="np-msp-bus-rating" type="text" placeholder="225A"></div>
+      <div><div class="np-label">MPU</div>
+        <select class="np-input" id="np-mpu"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
       </div>
-      <div>
-        <div class="np-label">System Size (kW)</div>
-        <input class="np-input" id="np-systemkw" type="number" step="0.001" placeholder="18.00">
+      <div><div class="np-label">Shutdown</div>
+        <select class="np-input" id="np-shutdown"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
       </div>
-      <div>
-        <div class="np-label">Financier</div>
-        <input class="np-input" id="np-financier" type="text" placeholder="Edge">
+      <div><div class="np-label">Performance Meter</div>
+        <select class="np-input" id="np-performance-meter"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
       </div>
-      <div>
-        <div class="np-label">AHJ</div>
-        <input class="np-input" id="np-ahj" type="text" placeholder="City name or County">
-      </div>
-      <div>
-        <div class="np-label">Utility</div>
-        <input class="np-input" id="np-utility" type="text" placeholder="Oncor">
-      </div>
-      <div>
-        <div class="np-label">Energy Advisor</div>
-        <input class="np-input" id="np-advisor" type="text" placeholder="Full name">
-      </div>
-      <div>
-        <div class="np-label">Energy Consultant</div>
-        <input class="np-input" id="np-consultant" type="text" placeholder="Full name">
-      </div>
+      <div><div class="np-label">Interconnect Breaker</div><input class="np-input" id="np-interconnection-breaker" type="text" placeholder="30A"></div>
+      <div><div class="np-label">Main Breaker</div><input class="np-input" id="np-main-breaker" type="text" placeholder="200A"></div>
+      <div><div class="np-label">HOA</div><input class="np-input" id="np-hoa" type="text" placeholder="HOA name or None"></div>
+      <div><div class="np-label">ESID #</div><input class="np-input" id="np-esid" type="text" placeholder="10443700000000000"></div>
+      <div class="np-full"><div class="np-label">Permit Number</div><input class="np-input" id="np-permit-number" type="text" placeholder="PB25-11359"></div>
+      <div><div class="np-label">Utility App #</div><input class="np-input" id="np-utility-app-number" type="text" placeholder="DRG-156817"></div>
+      <div><div class="np-label">Permit Fee ($)</div><input class="np-input" id="np-permit-fee" type="number" placeholder="340.55"></div>
+      <div><div class="np-label">City Permit Date</div><input class="np-input" id="np-city-permit-date" type="date"></div>
+      <div><div class="np-label">Utility Permit Date</div><input class="np-input" id="np-utility-permit-date" type="date"></div>
+      <div><div class="np-label">Site Surveyor</div><input class="np-input" id="np-site-surveyor" type="text" placeholder="Full name"></div>
+      <div><div class="np-label">Consultant Email</div><input class="np-input" id="np-consultant-email" type="email" placeholder="email@example.com"></div>
+    </div>
+
+    <!-- TAB 4: MILESTONES & FUNDING -->
+    <div class="np-tab-pane" id="np-pane-milestones">
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);">Milestone Dates</div>
+      <div><div class="np-label">NTP Date</div><input class="np-input" id="np-ntp-date" type="date"></div>
+      <div><div class="np-label">Survey Scheduled</div><input class="np-input" id="np-survey-scheduled-date" type="date"></div>
+      <div><div class="np-label">Survey Complete</div><input class="np-input" id="np-survey-date" type="date"></div>
+      <div><div class="np-label">Install Scheduled</div><input class="np-input" id="np-install-scheduled-date" type="date"></div>
+      <div><div class="np-label">Install Complete</div><input class="np-input" id="np-install-complete-date" type="date"></div>
+      <div><div class="np-label">City Inspection</div><input class="np-input" id="np-city-inspection-date" type="date"></div>
+      <div><div class="np-label">Utility Inspection</div><input class="np-input" id="np-utility-inspection-date" type="date"></div>
+      <div><div class="np-label">PTO Date</div><input class="np-input" id="np-pto-date" type="date"></div>
+      <div><div class="np-label">In Service Date</div><input class="np-input" id="np-in-service-date" type="date"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">M1 Funding</div>
+      <div><div class="np-label">M1 Amount ($)</div><input class="np-input" id="np-m1-amount" type="number" placeholder="0"></div>
+      <div><div class="np-label">M1 Funded Date</div><input class="np-input" id="np-m1-funded-date" type="date"></div>
+      <div><div class="np-label">M1 Chargeback ($)</div><input class="np-input" id="np-m1-cb" type="number" placeholder="0"></div>
+      <div><div class="np-label">M1 CB Credit ($)</div><input class="np-input" id="np-m1-cb-credit" type="number" placeholder="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">M2 Funding</div>
+      <div><div class="np-label">M2 Amount ($)</div><input class="np-input" id="np-m2-amount" type="number" placeholder="0"></div>
+      <div><div class="np-label">M2 Funded Date</div><input class="np-input" id="np-m2-funded-date" type="date"></div>
+      <div><div class="np-label">M2 Chargeback ($)</div><input class="np-input" id="np-m2-cb" type="number" placeholder="0"></div>
+      <div><div class="np-label">M2 CB Credit ($)</div><input class="np-input" id="np-m2-cb-credit" type="number" placeholder="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">M3 Funding</div>
+      <div><div class="np-label">M3 Amount ($)</div><input class="np-input" id="np-m3-amount" type="number" placeholder="0"></div>
+      <div><div class="np-label">M3 Funded Date</div><input class="np-input" id="np-m3-funded-date" type="date"></div>
+      <div><div class="np-label">M3 Projected ($)</div><input class="np-input" id="np-m3-projected" type="number" placeholder="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">Nonfunded Codes</div>
+      <div><div class="np-label">Nonfunded Code 1</div><input class="np-input" id="np-nonfunded-code-1" type="text"></div>
+      <div><div class="np-label">Nonfunded Code 2</div><input class="np-input" id="np-nonfunded-code-2" type="text"></div>
+      <div><div class="np-label">Nonfunded Code 3</div><input class="np-input" id="np-nonfunded-code-3" type="text"></div>
     </div>
 
     <div id="np-error" style="display:none;margin-top:12px;padding:8px 12px;background:#fcebeb;color:#a32d2d;border-radius:8px;font-size:12px;"></div>
@@ -915,10 +996,19 @@ select.np-input{cursor:pointer;}
     </div>
     <div class="board-wrap"><div class="board" id="board"></div></div>
   </div>
-  <div class="view" id="view-analytics" style="display:none;"><div class="an-page" id="an-page"></div></div>
+  <div class="view" id="view-analytics" style="display:none;">
+    <div style="display:flex;gap:4px;padding:12px 16px 0;border-bottom:1px solid var(--border2);background:var(--bg);position:sticky;top:44px;z-index:5;">
+      <button class="np-tab active" id="an-tab-leadership" onclick="anTab='leadership';renderAnalytics()">Leadership</button>
+      <button class="np-tab" id="an-tab-pipeline" onclick="anTab='pipeline';renderAnalytics()">Pipeline Health</button>
+      <button class="np-tab" id="an-tab-pm" onclick="anTab='pm';renderAnalytics()">PM Performance</button>
+    </div>
+    <div class="an-page" id="an-page" style="padding:16px;"></div>
+  </div>
   <div class="view" id="view-audit" style="display:none;"><div id="audit-page" style="padding:4px 0;"></div></div>
   <div class="view" id="view-schedule" style="display:none;"><div id="schedule-page"></div></div>
   <div class="view" id="view-service"  style="display:none;"><div id="service-page"></div></div>
+  <div class="view" id="view-funding"  style="display:none;"><div id="funding-page"></div></div>
+  <div class="view" id="view-help" style="display:none;"><div id="help-page" style="max-width:900px;margin:0 auto;padding:8px 0;"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
     <div class="panel-head">
@@ -935,6 +1025,7 @@ select.np-input{cursor:pointer;}
       <button class="ptab" id="ptab-notes" onclick="setPanelTab('notes')">Notes</button>
       <button class="ptab" id="ptab-files" onclick="setPanelTab('files')">Files</button>
       <button class="ptab" id="ptab-schedule" onclick="setPanelTab('schedule')">Schedule</button>
+      <button class="ptab" id="ptab-bom" onclick="setPanelTab('bom')">BOM</button>
     </div>
     <div class="panel-body">
       <div class="panel-left" id="dp-left"></div>
@@ -1210,7 +1301,33 @@ select.np-input{cursor:pointer;}
 </div>
 
 <script>
-const API='https://script.google.com/macros/s/AKfycbyNA5rmaznOKFXMVPlFK4okvTxwmoNXNkznKqR_M69nP5corAuOTtZdXAnXkBjG77zbzw/exec';
+// ── SUPABASE ─────────────────────────────────────────────
+// Replace these two values with your project's credentials.
+// Find them at: Supabase project → Settings → API
+const SUPABASE_URL  = 'https://hzymsezqfxzpbcqryeim.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6eW1zZXpxZnh6cGJjcXJ5ZWltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTE0ODIsImV4cCI6MjA4OTA4NzQ4Mn0.eNUy8u7daCqHn3A-8Ss4PLsJ-_a2gh8pIbjFJVKo3KY';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// snake_case ↔ camelCase converters — used only in the data layer below.
+// All rendering code above continues to use p.stageDate, s.crewId, etc.
+function snakeToCamel(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const ck = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[ck] = v;
+  }
+  return out;
+}
+function camelToSnake(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const sk = k.replace(/([A-Z])/g, c => '_' + c.toLowerCase());
+    out[sk] = v;
+  }
+  return out;
+}
 
 const STAGES=[
   {id:'evaluation', label:'Evaluation',   sla:3,  risk:4,  crit:6},
@@ -1283,7 +1400,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={},projectBoms={};
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -1296,7 +1413,7 @@ try{ blockerDates=JSON.parse(localStorage.getItem('ts_blockerDates')||'{}'); }ca
 function ts(pid,tid){const v=(taskState[pid]||{})[tid];return v?(typeof v==='object'?v.status:v):'Not Ready';}
 function tcd(pid,tid){const v=(taskState[pid]||{})[tid];return v&&typeof v==='object'?v.completedDate:'';}
 
-let selectedId=null,currentPM='all',currentView='command';
+let selectedId=null,currentPM='all',currentView='command',anTab='leadership';
 const today=new Date();
 
 function daysAgo(d){if(!d) return 0;const n=new Date(d);if(isNaN(n)) return 0;return Math.max(0,Math.floor((today-n)/(1000*60*60*24)));}
@@ -1390,7 +1507,8 @@ function canAdvanceStage(pid,stg){
 function visProjects(){return currentPM==='all'?projects:projects.filter(p=>p.pm===currentPM);}
 function slaBadge(status,days){
   const cls=status==='crit'?'sb-crit':status==='risk'?'sb-risk':status==='warn'?'sb-warn':'sb-ok';
-  return `<span class="sla-badge ${cls}">${days}d</span>`;
+  const tip=status==='crit'?'Critical — past SLA limit':status==='risk'?'At risk — approaching SLA limit':status==='warn'?'Past target — exceeded SLA target':'On track';
+  return `<span class="sla-badge ${cls}" data-tip="${tip} (${days} days in stage)">${days}d</span>`;
 }
 function ageColor(s){return s==='crit'?'#E24B4A':s==='risk'?'#EF9F27':s==='warn'?'#639922':'#1D9E75';}
 function fmt$(n){return '$'+Number(n||0).toLocaleString();}
@@ -1428,47 +1546,130 @@ async function reloadData(){
 async function loadData(){
   setLoadingBar(20);
   try{
-    const res=await fetch(API);setLoadingBar(70);
-    const data=await res.json();
-    if(data.error) throw new Error(data.error);
-    projects=data.projects||[];
-    taskState={};   // loaded per-project on panel open
-    notes={};       // loaded per-project on panel open
-    stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
-    crews=data.crews||[];schedule=data.schedule||[];serviceCalls=data.serviceCalls||[];
-    // Normalize: API returns objects with property 'crewId' (sheet header name)
-    // but all frontend code uses 'id'. Map it here once.
-    crews=crews.map(c=>({...c, id:c.crewId||c.id}));
-    // Sync master roster — always ensure these crews exist
-    syncMasterCrewRoster();
-    // Rebuild crew map after sync
-    crewMap={};
-    crews.forEach(c=>{ crewMap[c.id]=c; });
+    // Fetch all bulk tables in parallel
+    const [
+      {data:projData,    error:e1},
+      {data:shData,      error:e2},
+      {data:tddData,     error:e3},
+      {data:pfData,      error:e4},
+      {data:crewData,    error:e5},
+      {data:schedData,   error:e6},
+      {data:svcData,     error:e7},
+      {data:svcNoteData, error:e8},
+      {data:fundData,    error:e9},
+      {data:feData,      error:e10},
+      {data:bomData,     error:e11},
+    ] = await Promise.all([
+      sb.from('projects').select('*').limit(5000),
+      sb.from('stage_history').select('*').limit(10000),
+      sb.from('task_due_dates').select('*').limit(10000),
+      sb.from('project_folders').select('*').limit(5000),
+      sb.from('crews').select('*').limit(100),
+      sb.from('schedule').select('*').limit(5000),
+      sb.from('service_calls').select('*').limit(2000),
+      sb.from('service_call_notes').select('*').limit(5000),
+      sb.from('project_funding').select('*').limit(5000),
+      sb.from('funding_events').select('*').order('created_at',{ascending:false}).limit(10000),
+      sb.from('project_boms').select('*').order('created_at',{ascending:false}).limit(2000),
+    ]);
 
-    // Migrate any schedule entries that used old crew IDs (crew1→hou1 etc.)
-    const legacyCrewRemap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'};
-    let scheduleNeedsMigration=false;
-    schedule.forEach(s=>{
-      if(legacyCrewRemap[s.crewId]){
-        s.crewId=legacyCrewRemap[s.crewId];
-        scheduleNeedsMigration=true;
-      }
+    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11].find(Boolean);
+    if (firstErr) throw new Error(firstErr.message);
+
+    setLoadingBar(70);
+
+    // Projects — snakeToCamel converts sale_date→saleDate, stage_date→stageDate, etc.
+    projects = (projData||[]).map(snakeToCamel);
+
+    // taskState and notes are NOT bulk-loaded — fetched per-project on panel open
+    taskState = {};
+    notes     = {};
+
+    // stageHistory — grouped by projectId
+    stageHistory = {};
+    (shData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!stageHistory[c.projectId]) stageHistory[c.projectId]=[];
+      stageHistory[c.projectId].push({stage:c.stage, entered:c.entered});
     });
-    // Merge any locally stored folder URLs
+
+    // taskDueDates — nested by projectId → taskId
+    taskDueDates = {};
+    (tddData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!taskDueDates[c.projectId]) taskDueDates[c.projectId]={};
+      taskDueDates[c.projectId][c.taskId] = c.dueDate ? String(c.dueDate).slice(0,10) : '';
+    });
+
+    // projectFolders — keyed by projectId
+    projectFolders = {};
+    (pfData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      projectFolders[c.projectId] = {folderId:c.folderId||'', folderUrl:c.folderUrl||''};
+    });
+    // Merge any locally cached folder URLs (fallback for offline edits)
     try{
       const local=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');
       Object.entries(local).forEach(([pid,url])=>{
         if(!projectFolders[pid]||!projectFolders[pid].folderUrl) projectFolders[pid]={folderUrl:url,folderId:''};
       });
     }catch(e){}
-    dataLoadedAt=Date.now();
+
+    // Project funding — keyed by projectId
+    projectFunding = {};
+    (fundData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      projectFunding[c.projectId]=c;
+    });
+
+    // Funding events — grouped by projectId
+    fundingEvents = {};
+    (feData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!fundingEvents[c.projectId]) fundingEvents[c.projectId]=[];
+      fundingEvents[c.projectId].push(c);
+    });
+
+    // BOMs — latest per project
+    projectBoms = {};
+    (bomData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!projectBoms[c.projectId]) projectBoms[c.projectId]=c; // already sorted desc
+    });
+
+    // Crews
+    crews = (crewData||[]).map(snakeToCamel).map(c=>({...c, id:c.id}));
+    syncMasterCrewRoster();
+
+    // Schedule
+    schedule = (schedData||[]).map(snakeToCamel);
+    // Remap any legacy crew IDs
+    const legacyCrewRemap={crew1:'hou1',crew2:'hou2',crew3:'dfw1'};
+    schedule.forEach(s=>{ if(legacyCrewRemap[s.crewId]) s.crewId=legacyCrewRemap[s.crewId]; });
+
+    // Service calls — embed notes by svcId
+    const notesBySvc={};
+    (svcNoteData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!notesBySvc[c.svcId]) notesBySvc[c.svcId]=[];
+      notesBySvc[c.svcId].push({text:c.text,time:c.time,pm:c.pm});
+    });
+    serviceCalls = (svcData||[]).map(r=>{
+      const c=snakeToCamel(r);
+      c.notes = notesBySvc[c.id]||[];
+      return c;
+    });
+
     // Rebuild O(1) lookup maps
     projectMap={};
     projects.forEach(p=>{ projectMap[String(p.id)]=p; });
     crewMap={};
     crews.forEach(c=>{ crewMap[c.id]=c; });
+
     // Clear SLA cache — stageDate values may have changed
     Object.keys(_slaCache).forEach(k=>delete _slaCache[k]);
+
+    dataLoadedAt=Date.now();
     updateFreshnessUI();
     if(freshnessTimer) clearInterval(freshnessTimer);
     freshnessTimer=setInterval(updateFreshnessUI,60000);
@@ -1477,23 +1678,259 @@ async function loadData(){
     document.getElementById('cmd-content').style.display='block';
     setTimeout(()=>setLoadingBar(0),400);
     render();
+    // Start realtime subscriptions after data is loaded
+    setupRealtime();
   }catch(err){
     setLoadingBar(0);
-    document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;padding:20px;">Failed to load. Check Apps Script deployment.<br><small>'+err.message+'</small></div>';
+    document.getElementById('cmd-loader').innerHTML='<div style="color:#A32D2D;padding:20px;">Failed to load data.<br><small>'+err.message+'</small><br><br><small>Check: Supabase URL/key, RLS policies, Google sign-in.</small></div>';
   }
 }
+
+// ── REALTIME ─────────────────────────────────────────────
+// Live sync — changes made by other PMs appear instantly without a refresh.
+// Requires Realtime enabled on tables in Supabase: Database → Replication
+let _realtimeChannel = null;
+
+function setupRealtime(){
+  if(_realtimeChannel){
+    sb.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+
+  _realtimeChannel = sb.channel('crm-live')
+
+    // ── Projects: stage moves, PM changes, field edits, new projects ──────────
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'projects'}, payload=>{
+      const p=snakeToCamel(payload.new);
+      const idx=projects.findIndex(x=>x.id===p.id);
+      if(idx===-1) return;
+      Object.assign(projects[idx],p);
+      projectMap[String(p.id)]=projects[idx];
+      Object.keys(_slaCache).forEach(k=>{if(k.startsWith(p.id+'|')) delete _slaCache[k];});
+      render();
+      if(selectedId===p.id) renderPanel(p.id);
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'projects'}, payload=>{
+      const p=snakeToCamel(payload.new);
+      if(projectMap[String(p.id)]) return; // already have it (own write)
+      projects.unshift(p);
+      projectMap[String(p.id)]=p;
+      render();
+      showToast('New project added: '+p.name);
+    })
+
+    // ── Task state: status changes ────────────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'task_state'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId||!r.taskId) return;
+      if(!taskState[r.projectId]) taskState[r.projectId]={};
+      // Skip if we already have the same value (own write echo)
+      const cur=taskState[r.projectId][r.taskId];
+      if(cur&&cur.status===r.status) return;
+      taskState[r.projectId][r.taskId]={status:r.status,completedDate:r.completedDate||''};
+      if(selectedId===r.projectId) renderPanel(r.projectId);
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'task_state'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId||!r.taskId) return;
+      if(!taskState[r.projectId]) taskState[r.projectId]={};
+      const cur=taskState[r.projectId][r.taskId];
+      if(cur&&cur.status===r.status) return; // skip own write echo
+      taskState[r.projectId][r.taskId]={status:r.status,completedDate:r.completedDate||''};
+      if(selectedId===r.projectId) renderPanel(r.projectId);
+    })
+
+    // ── Notes: new messages from other PMs ────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes'}, payload=>{
+      const n=snakeToCamel(payload.new);
+      if(!n.projectId) return;
+      if(!notes[n.projectId]) notes[n.projectId]=[];
+      // Dedup: skip if we already optimistically inserted this exact note
+      const already=notes[n.projectId].some(x=>x.text===n.text&&x.pm===n.pm&&x.time===n.time);
+      if(already) return;
+      notes[n.projectId].push({text:n.text,time:n.time||'',pm:n.pm||''});
+      // Live-update chat panel if it's open on this project
+      if(selectedId===n.projectId&&currentPanelTab==='notes'){
+        const msgEl=document.getElementById('chat-messages-'+n.projectId);
+        if(msgEl){
+          msgEl.innerHTML=renderChatMessages(notes[n.projectId]);
+          msgEl.scrollTop=msgEl.scrollHeight;
+        }
+      }
+      // Badge on Notes tab if panel is open but on a different tab
+      if(selectedId===n.projectId&&currentPanelTab!=='notes'){
+        const tab=document.getElementById('ptab-notes');
+        if(tab) tab.style.background='rgba(29,158,117,0.1)';
+      }
+    })
+
+    // ── Stage history: stage advances ─────────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'stage_history'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!stageHistory[r.projectId]) stageHistory[r.projectId]=[];
+      const already=stageHistory[r.projectId].some(x=>x.stage===r.stage&&x.entered===r.entered);
+      if(already) return;
+      stageHistory[r.projectId].push({stage:r.stage,entered:r.entered});
+      if(selectedId===r.projectId) renderPanel(r.projectId);
+    })
+
+    // ── Schedule: job additions, updates, deletions ───────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'schedule'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(schedule.find(s=>s.id===r.id)) return; // own write
+      schedule.push(r);
+      if(currentView==='schedule') renderSchedule();
+      if(selectedId&&String(r.projectId)===String(selectedId)&&currentPanelTab==='schedule')
+        renderPanelSchedule(selectedId);
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'schedule'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      const idx=schedule.findIndex(s=>s.id===r.id);
+      if(idx>-1) Object.assign(schedule[idx],r);
+      if(currentView==='schedule') renderSchedule();
+    })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'schedule'}, payload=>{
+      const id=payload.old?.id;
+      if(!id) return;
+      schedule=schedule.filter(s=>s.id!==id);
+      if(currentView==='schedule') renderSchedule();
+    })
+
+    // ── Funding events ───────────────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'funding_events'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!fundingEvents[r.projectId]) fundingEvents[r.projectId]=[];
+      // Skip own writes (optimistically inserted already)
+      const already=fundingEvents[r.projectId].some(x=>x.id===r.id);
+      if(already) return;
+      fundingEvents[r.projectId].unshift(r);
+      if(currentView==='funding') renderFunding();
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'project_funding'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!projectFunding[r.projectId]) projectFunding[r.projectId]={};
+      Object.assign(projectFunding[r.projectId], r);
+      if(currentView==='funding') renderFunding();
+    })
+
+    .subscribe(status=>{
+      // Update the freshness dot to indicate live connection
+      const dot=document.querySelector('.fresh-dot');
+      if(status==='SUBSCRIBED'){
+        if(dot) dot.style.background='var(--green)';
+        const lbl=document.getElementById('freshness-label');
+        if(lbl&&lbl.textContent==='Refreshing...') lbl.textContent='Live';
+      } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        if(dot) dot.style.background='var(--red)';
+        console.warn('Realtime disconnected:',status);
+      }
+    });
+}
+
+// Supabase JS v2 never throws — errors come back as {data, error}.
+// This helper throws so the catch block in post() actually fires.
+async function sbRun(promise){
+  const result = await promise;
+  if(result && result.error) throw result.error;
+  return result;
+}
+
 async function post(body){
   setSaving(true);
   try{
-    const res=await fetch(API,{method:'POST',body:JSON.stringify(body)});
-    const json=await res.json().catch(()=>null);
-    if(json&&json.error){
-      console.error('API error for action',body.action,':',json.error);
-      showToast('⚠ Save error: '+json.error.slice(0,60));
+    const {action,...b} = body;
+
+    if(action==='updateTask'){
+      await sbRun(sb.from('task_state').upsert(camelToSnake({
+        projectId: b.projectId,
+        taskId:    b.taskId,
+        status:    b.status,
+        completedDate: b.status==='Complete' ? new Date().toLocaleDateString() : ''
+      }), {onConflict:'project_id,task_id'}));
+
+    } else if(action==='moveStage'){
+      await sbRun(sb.from('projects').update(camelToSnake({stageDate:b.stageDate, stage:b.stage})).eq('id',b.projectId));
+      await sbRun(sb.from('stage_history').insert(camelToSnake({projectId:b.projectId, stage:b.stageLabel, entered:b.stageDate})));
+
+    } else if(action==='saveBlocker'){
+      await sbRun(sb.from('projects').update({blocker:b.blocker}).eq('id',b.projectId));
+
+    } else if(action==='addNote'){
+      await sbRun(sb.from('notes').insert(camelToSnake({projectId:b.projectId, text:b.text, time:b.time, pm:b.pm})));
+
+    } else if(action==='addProject'){
+      await sbRun(sb.from('projects').insert(camelToSnake(b.project)));
+
+    } else if(action==='reassignPM'){
+      await sbRun(sb.from('projects').update({pm:b.pm}).eq('id',b.projectId));
+
+    } else if(action==='updateProject'){
+      await sbRun(sb.from('projects').update(camelToSnake(b.fields)).eq('id',b.projectId));
+
+    } else if(action==='setTaskDue'){
+      if(b.dueDate){
+        await sbRun(sb.from('task_due_dates').upsert(camelToSnake({projectId:b.projectId, taskId:b.taskId, dueDate:b.dueDate}), {onConflict:'project_id,task_id'}));
+      } else {
+        await sbRun(sb.from('task_due_dates').delete().eq('project_id',b.projectId).eq('task_id',b.taskId));
+      }
+
+    } else if(action==='addSchedule'){
+      await sbRun(sb.from('schedule').insert(camelToSnake({
+        id:b.id, projectId:b.projectId, crewId:b.crewId, jobType:b.jobType,
+        date:b.date, time:b.time, notes:b.notes||'', status:b.status||'scheduled', pm:b.pm||''
+      })));
+
+    } else if(action==='updateSchedule'){
+      await sbRun(sb.from('schedule').update(camelToSnake({
+        projectId:b.projectId, crewId:b.crewId, jobType:b.jobType,
+        date:b.date, time:b.time, notes:b.notes||''
+      })).eq('id',b.id));
+
+    } else if(action==='deleteSchedule'){
+      await sbRun(sb.from('schedule').delete().eq('id',b.id));
+
+    } else if(action==='addCrew'){
+      await sbRun(sb.from('crews').upsert(camelToSnake({
+        id:b.crewId, name:b.name, warehouse:b.warehouse, active:'true'
+      }), {onConflict:'id', ignoreDuplicates:true}));
+
+    } else if(action==='updateCrew'){
+      const fields = {name:b.name, warehouse:b.warehouse};
+      const roles = ['licenseHolder','electrician','solarLead','batteryLead',
+        'installer1','installer2','batteryTech1','batteryTech2','batteryApprentice','mpuElectrician'];
+      roles.forEach(r=>{ if(b[r]!==undefined) fields[r]=b[r]; });
+      if(b.members!==undefined) fields.members=b.members;
+      await sbRun(sb.from('crews').update(camelToSnake(fields)).eq('id',b.crewId));
+
+    } else if(action==='addServiceCall'){
+      const {notes:_n,...svc}=b;
+      await sbRun(sb.from('service_calls').insert(camelToSnake(svc)));
+
+    } else if(action==='updateServiceCall'){
+      const {id,...fields}=b;
+      const allowed=['customer','phone','email','address','projectId','type',
+        'priority','issue','crewId','date','time','status','resolution'];
+      const upd={};
+      allowed.forEach(k=>{ if(fields[k]!==undefined) upd[k]=fields[k]; });
+      await sbRun(sb.from('service_calls').update(camelToSnake(upd)).eq('id',id));
+
+    } else if(action==='addSvcNote'){
+      await sbRun(sb.from('service_call_notes').insert(camelToSnake({svcId:b.id, text:b.text, time:b.time, pm:b.pm})));
+
+    } else if(action==='saveFolder'){
+      await sbRun(sb.from('project_folders').upsert(camelToSnake({
+        projectId:b.projectId, folderId:'', folderUrl:b.folderUrl
+      }), {onConflict:'project_id'}));
+
+    } else if(action==='deleteFolder'){
+      await sbRun(sb.from('project_folders').delete().eq('project_id',b.projectId));
     }
   }catch(e){
-    console.error('Post failed',body.action,e);
-    showToast('Save failed — check connection');
+    console.error('Supabase error ['+body.action+']:', e);
+    showToast('Save error — '+(e.message||e.details||'check console').slice(0,80));
   }
   setSaving(false);
 }
@@ -1955,6 +2392,312 @@ function renderPipeline(){
 
 // ── ANALYTICS (LEADERSHIP) ───────────────────────────────
 function renderAnalytics(){
+  // Sync tab button states
+  ['leadership','pipeline','pm'].forEach(t=>{
+    const btn=document.getElementById('an-tab-'+t);
+    if(btn) btn.classList.toggle('active',t===anTab);
+  });
+
+  if(anTab==='leadership') renderLeadershipDashboard();
+  else if(anTab==='pipeline') renderPipelineAnalytics();
+  else renderPMAnalytics();
+}
+
+function renderLeadershipDashboard(){
+  const pg=document.getElementById('an-page');
+  if(!pg) return;
+  const vis=visProjects();
+  if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
+
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
+
+  // ── Date range helpers ───────────────────────────────────────────────────
+  function rangeStart(period){
+    const d=new Date(now);
+    switch(period){
+      case 'wtd': d.setDate(d.getDate()-d.getDay()); break; // Sunday
+      case 'mtd': d.setDate(1); break;
+      case 'qtd': { const qm=Math.floor(d.getMonth()/3)*3; d.setMonth(qm,1); break; }
+      case 'ytd': d.setMonth(0,1); break;
+      case 'last7': d.setDate(d.getDate()-7); break;
+      case 'last30': d.setDate(d.getDate()-30); break;
+      case 'last90': d.setDate(d.getDate()-90); break;
+      case 'lastweek': { d.setDate(d.getDate()-d.getDay()-7); break; }
+      case 'lastmonth': { d.setMonth(d.getMonth()-1,1); break; }
+    }
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function rangeEnd(period){
+    const d=new Date(now);
+    if(period==='lastweek'){ d.setDate(d.getDate()-d.getDay()-1); }
+    else if(period==='lastmonth'){ d.setDate(0); } // last day of prev month
+    else return null; // open-ended (up to today)
+    d.setHours(23,59,59,999);
+    return d;
+  }
+  function inRange(dateStr, period){
+    if(!dateStr) return false;
+    const d=new Date(dateStr+'T00:00:00');
+    if(isNaN(d)) return false;
+    const s=rangeStart(period);
+    const e=rangeEnd(period);
+    return d>=s && (!e||d<=e);
+  }
+
+  // ── Period selector state ────────────────────────────────────────────────
+  if(!window._ldPeriod) window._ldPeriod='mtd';
+  const period=window._ldPeriod;
+  const periodLabels={wtd:'Week to Date',mtd:'This Month',qtd:'This Quarter',
+    ytd:'This Year',last7:'Last 7 Days',last30:'Last 30 Days',last90:'Last 90 Days',
+    lastweek:'Last Week',lastmonth:'Last Month'};
+
+  // ── Revenue recognized = install_complete_date in range ─────────────────
+  // OR fallback: projects in complete stage with stageDate in range
+  const recognized=vis.filter(p=>{
+    const d=p.installCompleteDate||
+             (p.stage==='complete'?p.stageDate:null);
+    return inRange(d, period);
+  });
+  const recognizedVal=recognized.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // ── Completions ──────────────────────────────────────────────────────────
+  const completions=vis.filter(p=>p.stage==='complete'&&inRange(p.stageDate,period));
+  const completionsVal=completions.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // ── Installs (install_complete_date in range) ─────────────────────────────
+  const installs=vis.filter(p=>inRange(p.installCompleteDate,period));
+
+  // ── M2 funding in range ──────────────────────────────────────────────────
+  const m2Funded=vis.filter(p=>{
+    const f=projectFunding[p.id];
+    return f&&f.m2FundedDate&&inRange(f.m2FundedDate,period);
+  });
+  const m2Val=m2Funded.reduce((a,p)=>{
+    const f=projectFunding[p.id];
+    return a+(Number(f?.m2Amount)||Number(p.contract)*0.65||0);
+  },0);
+
+  // ── M3 funding in range ──────────────────────────────────────────────────
+  const m3Funded=vis.filter(p=>{
+    const f=projectFunding[p.id];
+    return f&&f.m3FundedDate&&inRange(f.m3FundedDate,period);
+  });
+  const m3Val=m3Funded.reduce((a,p)=>{
+    const f=projectFunding[p.id];
+    return a+(Number(f?.m3Amount)||Number(p.contract)*0.35||0);
+  },0);
+
+  // ── Pending funding ──────────────────────────────────────────────────────
+  const m2Eligible=vis.filter(p=>{
+    const s=getFundingStatus(p.id,'m2');
+    return s==='eligible'||s==='submitted';
+  });
+  const m3Eligible=vis.filter(p=>{
+    const s=getFundingStatus(p.id,'m3');
+    return s==='eligible'||s==='submitted';
+  });
+  const pendingM2Val=m2Eligible.reduce((a,p)=>a+(Number(p.contract)||0)*0.65,0);
+  const pendingM3Val=m3Eligible.reduce((a,p)=>a+(Number(p.contract)||0)*0.35,0);
+
+  // ── 90-day pipeline forecast ─────────────────────────────────────────────
+  const active=vis.filter(p=>p.stage!=='complete');
+  const next30=active.filter(p=>(STAGE_DAYS_REMAINING[p.stage]||60)<=30);
+  const next60=active.filter(p=>{const d=STAGE_DAYS_REMAINING[p.stage]||60;return d>30&&d<=60;});
+  const next90=active.filter(p=>{const d=STAGE_DAYS_REMAINING[p.stage]||60;return d>60&&d<=90;});
+  const next30Val=next30.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const next60Val=next60.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const next90Val=next90.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // ── Monthly trend (last 6 months of completions) ─────────────────────────
+  const months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const label=d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const start=new Date(d.getFullYear(),d.getMonth(),1);
+    const end=new Date(d.getFullYear(),d.getMonth()+1,0);
+    const mps=vis.filter(p=>{
+      const cd=p.installCompleteDate||(p.stage==='complete'?p.stageDate:null);
+      if(!cd) return false;
+      const dt=new Date(cd+'T00:00:00');
+      return !isNaN(dt)&&dt>=start&&dt<=end;
+    });
+    months.push({label,count:mps.length,val:mps.reduce((a,p)=>a+(Number(p.contract)||0),0)});
+  }
+  const maxMonthVal=Math.max(...months.map(m=>m.val),1);
+
+  // ── Stage distribution ───────────────────────────────────────────────────
+  const stageDist=STAGES.filter(s=>s.id!=='complete').map(s=>{
+    const ps=active.filter(p=>p.stage===s.id);
+    return {label:s.label,count:ps.length,val:ps.reduce((a,p)=>a+(Number(p.contract)||0),0)};
+  });
+  const maxStageVal=Math.max(...stageDist.map(s=>s.val),1);
+
+  // ── PM breakdown ─────────────────────────────────────────────────────────
+  const pms=[...new Set(vis.map(p=>p.pm).filter(Boolean))].sort();
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  const fmt$=n=>'$'+Number(n||0).toLocaleString();
+  const fmtM=n=>'$'+(n/1000000).toFixed(1)+'M';
+  const fmtK=n=>n>=1000000?fmtM(n):'$'+Math.round(n/1000)+'k';
+
+  const periodSelector=`
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
+      <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-right:4px;">Period:</span>
+      ${Object.entries(periodLabels).map(([k,v])=>`
+        <button class="sch-filter-btn ${period===k?'active':''}" onclick="window._ldPeriod='${k}';renderAnalytics()" style="font-size:10px;padding:3px 8px;">${v}</button>
+      `).join('')}
+    </div>`;
+
+  // Row 1: Key metrics for period
+  const row1=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">Revenue Recognized</div>
+        <div class="an-sub">${periodLabels[period]} · install complete</div>
+        <div style="font-size:28px;font-weight:600;color:var(--green);margin:8px 0 2px;">${fmtK(recognizedVal)}</div>
+        <div style="font-size:11px;color:var(--text3);">${recognized.length} project${recognized.length!==1?'s':''}</div>
+      </div>
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">M2 Funded</div>
+        <div class="an-sub">${periodLabels[period]}</div>
+        <div style="font-size:28px;font-weight:600;color:#0C447C;margin:8px 0 2px;">${fmtK(m2Val)}</div>
+        <div style="font-size:11px;color:var(--text3);">${m2Funded.length} milestone${m2Funded.length!==1?'s':''}</div>
+      </div>
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">M3 Funded</div>
+        <div class="an-sub">${periodLabels[period]}</div>
+        <div style="font-size:28px;font-weight:600;color:#534AB7;margin:8px 0 2px;">${fmtK(m3Val)}</div>
+        <div style="font-size:11px;color:var(--text3);">${m3Funded.length} milestone${m3Funded.length!==1?'s':''}</div>
+      </div>
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">Completions</div>
+        <div class="an-sub">${periodLabels[period]}</div>
+        <div style="font-size:28px;font-weight:600;color:var(--text);margin:8px 0 2px;">${completions.length}</div>
+        <div style="font-size:11px;color:var(--text3);">${fmtK(completionsVal)} contract value</div>
+      </div>
+    </div>`;
+
+  // Row 2: Pending funding + 90-day forecast
+  const row2=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div class="an-card">
+        <div class="an-title">Pending Funding</div>
+        <div class="an-sub">Eligible + submitted milestones not yet funded</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+          <div style="padding:12px;background:var(--bg2);border-radius:8px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">M2 Pending</div>
+            <div style="font-size:22px;font-weight:600;color:#0C447C;">${fmtK(pendingM2Val)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${m2Eligible.length} projects</div>
+          </div>
+          <div style="padding:12px;background:var(--bg2);border-radius:8px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">M3 Pending</div>
+            <div style="font-size:22px;font-weight:600;color:#534AB7;">${fmtK(pendingM3Val)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${m3Eligible.length} projects</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--text3);">
+          Total pending: <strong style="color:var(--text);">${fmtK(pendingM2Val+pendingM3Val)}</strong>
+        </div>
+      </div>
+      <div class="an-card">
+        <div class="an-title">90-Day Installation Forecast</div>
+        <div class="an-sub">Active projects by estimated days to installation</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+          ${[
+            {label:'Next 30 days',list:next30,val:next30Val,color:'#1D9E75'},
+            {label:'31–60 days',list:next60,val:next60Val,color:'#4A8ED6'},
+            {label:'61–90 days',list:next90,val:next90Val,color:'#9B8EC4'},
+          ].map(({label,list,val,color})=>`
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:80px;font-size:11px;color:var(--text2);flex-shrink:0;">${label}</div>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:22px;overflow:hidden;">
+                <div style="height:100%;width:${Math.round(val/(next30Val+next60Val+next90Val||1)*100)}%;background:${color};border-radius:4px;display:flex;align-items:center;padding:0 8px;min-width:${list.length?30:0}px;">
+                  ${list.length?`<span style="font-size:10px;font-weight:600;color:#fff;">${list.length}</span>`:''}
+                </div>
+              </div>
+              <div style="width:60px;font-size:11px;color:var(--text3);text-align:right;">${fmtK(val)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // Row 3: Monthly trend chart
+  const row3=`
+    <div class="an-row-1"><div class="an-card">
+      <div class="an-title">Monthly Installation Trend — Last 6 Months</div>
+      <div class="an-sub">Projects completed (install complete) by month with contract value</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:140px;margin-top:16px;padding-bottom:24px;position:relative;border-bottom:1px solid var(--border);">
+        ${months.map(m=>{
+          const barH=Math.max(4,Math.round(m.val/maxMonthVal*120));
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;">
+            <div style="font-size:10px;color:var(--text3);font-weight:500;">${m.count||''}</div>
+            <div style="width:100%;background:${m.count?'var(--green)':'var(--bg3)'};border-radius:4px 4px 0 0;height:${barH}px;transition:height .3s;" title="${m.label}: ${m.count} projects · ${fmtK(m.val)}"></div>
+            <div style="position:absolute;bottom:4px;font-size:10px;color:var(--text3);">${m.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--text3);">
+        <span>Total: ${months.reduce((a,m)=>a+m.count,0)} installs · ${fmtK(months.reduce((a,m)=>a+m.val,0))}</span>
+        <span>Avg/month: ${Math.round(months.reduce((a,m)=>a+m.count,0)/6)} installs</span>
+      </div>
+    </div></div>`;
+
+  // Row 4: Active pipeline by stage + PM breakdown side by side
+  const row4=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div class="an-card">
+        <div class="an-title">Active Pipeline by Stage</div>
+        <div class="an-sub">Project count and contract value per stage</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+          ${stageDist.filter(s=>s.count>0).map(s=>`
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:88px;font-size:11px;color:var(--text2);text-align:right;flex-shrink:0;">${s.label}</div>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:20px;overflow:hidden;">
+                <div style="height:100%;width:${Math.round(s.val/maxStageVal*100)}%;background:var(--green);border-radius:4px;display:flex;align-items:center;padding:0 6px;min-width:24px;">
+                  <span style="font-size:10px;font-weight:600;color:#fff;">${s.count}</span>
+                </div>
+              </div>
+              <div style="width:60px;font-size:11px;color:var(--text3);text-align:right;">${fmtK(s.val)}</div>
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--text2);">${active.length} active projects</span>
+          <span style="color:var(--text2);font-weight:500;">${fmtK(active.reduce((a,p)=>a+(Number(p.contract)||0),0))}</span>
+        </div>
+      </div>
+      <div class="an-card">
+        <div class="an-title">PM Breakdown</div>
+        <div class="an-sub">Active projects and portfolio value per PM</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+          ${pms.map(pm=>{
+            const pp=active.filter(p=>p.pm===pm);
+            const val=pp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+            const crit=pp.filter(p=>getSLA(p).status==='crit').length;
+            const blocked=pp.filter(p=>p.blocker).length;
+            const pct=active.length?Math.round(pp.length/active.length*100):0;
+            const instPeriod=vis.filter(p=>p.pm===pm&&inRange(p.installCompleteDate||(p.stage==='complete'?p.stageDate:null),period));
+            return `<div style="padding:10px 12px;background:var(--bg2);border-radius:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-weight:600;font-size:13px;">${pm}</span>
+                <span style="font-size:11px;color:var(--text3);">${pp.length} active · ${fmtK(val)}</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${crit?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:#fcebeb;color:#a32d2d;">${crit} critical</span>`:''}
+                ${blocked?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:#eeedfe;color:#3c3489;">${blocked} blocked</span>`:''}
+                <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:#E1F5EE;color:#085041;">${instPeriod.length} installs ${periodLabels[period].toLowerCase()}</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  pg.innerHTML = periodSelector + row1 + row2 + row3 + row4;
+}
+
+function renderPipelineAnalytics(){
   const vis=visProjects();
   const pg=document.getElementById('an-page');
   if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
@@ -2219,6 +2962,49 @@ function renderAnalytics(){
   pg.innerHTML=row1+row2+row3+row4+row5;
 }
 
+function renderPMAnalytics(){
+  const pg=document.getElementById('an-page');
+  const vis=visProjects();
+  if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
+  const active=vis.filter(p=>p.stage!=='complete');
+  const pms=[...new Set(vis.map(p=>p.pm).filter(Boolean))].sort();
+  const fmt$=n=>'$'+Number(n||0).toLocaleString();
+  const fmtK=n=>n>=1000000?'$'+(n/1000000).toFixed(1)+'M':'$'+Math.round(n/1000)+'k';
+  function pmStat(pm){
+    const pp=vis.filter(p=>p.pm===pm);
+    const val=pp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+    const blocked=pp.filter(p=>p.blocker).length;
+    const crit=pp.filter(p=>!p.blocker&&getSLA(p).status==='crit').length;
+    const risk=pp.filter(p=>!p.blocker&&getSLA(p).status==='risk').length;
+    const warn=pp.filter(p=>!p.blocker&&getSLA(p).status==='warn').length;
+    const ok=pp.filter(p=>!p.blocker&&getSLA(p).status==='ok').length;
+    const avgC=pp.length?Math.round(pp.reduce((a,p)=>a+cycleDays(p),0)/pp.length):0;
+    return {count:pp.length,val,blocked,crit,risk,warn,ok,avgCycle:avgC,healthy:pp.length?Math.round(ok/pp.length*100):0};
+  }
+  const pmCards=pms.map(pm=>{
+    const stats=pmStat(pm);
+    return `<div class="an-card">
+      <div class="pm-head"><span class="pm-name-lg">${pm}</span><span class="pm-sub">${stats.count} projects &nbsp;·&nbsp; ${fmtK(stats.val)}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Avg cycle time</span><span class="pm-stat-val">${stats.avgCycle}d</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">On track</span><span class="pm-stat-val" style="color:var(--green);">${stats.ok}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">At risk</span><span class="pm-stat-val" style="color:var(--amber);">${stats.risk}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Critical</span><span class="pm-stat-val" style="color:#A32D2D;">${stats.crit}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Blocked</span><span class="pm-stat-val" style="color:var(--purple);">${stats.blocked}</span></div>
+      <div class="pm-health" style="margin-top:10px;">
+        ${stats.ok?`<div class="pm-seg" style="flex:${stats.ok};background:#1D9E75;"></div>`:''}
+        ${stats.warn?`<div class="pm-seg" style="flex:${stats.warn};background:#BA7517;"></div>`:''}
+        ${stats.risk?`<div class="pm-seg" style="flex:${stats.risk};background:#CF5A1A;"></div>`:''}
+        ${stats.crit?`<div class="pm-seg" style="flex:${stats.crit};background:#E24B4A;"></div>`:''}
+        ${stats.blocked?`<div class="pm-seg" style="flex:${stats.blocked};background:#534AB7;"></div>`:''}
+      </div>
+      <div style="margin-top:10px;">
+        <button style="font-size:11px;padding:4px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="openPMRebalance()">Rebalance</button>
+      </div>
+    </div>`;
+  }).join('');
+  pg.innerHTML=`<div class="pm-grid">${pmCards}</div>`;
+}
+
 // ── PANEL ─────────────────────────────────────────────────
 function renderPanel(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
@@ -2229,21 +3015,71 @@ function renderPanel(pid){
   document.getElementById('dp-name').textContent=p.name;
   const ageWarn=getAgeWarning(p);
   document.getElementById('dp-meta').innerHTML=`${p.id} · ${p.city} · ${s?s.label:p.stage} · ${sla.days}d in stage · ${cycle}d total · ${p.pm}${ageWarn?` <span class="age-warn-badge ${ageWarn.level}">⚠ ${ageWarn.label}</span>`:''}`;
+  // Helper: only render a row if value exists
+  const frow=(label,val,opts)=>{
+    if(!val&&val!==0) return '';
+    const style=opts&&opts.small?'font-size:10px;':'';
+    return `<div class="frow"><span class="flabel">${label}</span><span class="fval" style="${style}">${val}</span></div>`;
+  };
+  const fdate=d=>{
+    if(!d) return '';
+    try{
+      let s=d;
+      // Convert MM/DD/YYYY to ISO if needed
+      const mdy=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if(mdy) s=`${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
+      const dt=new Date(s.includes('T')||s.includes('-')?s:s+'T00:00:00');
+      if(isNaN(dt.getTime())) return '';
+      return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    }catch(e){return '';}
+  };
+
+  // Funding data for this project
+  const funding = projectFunding[pid] || null;
+
   document.getElementById('dp-left').innerHTML=`
     <div class="sec"><div class="sec-title">Contact</div>
-      ${p.address?`<div class="frow"><span class="flabel">Address</span><span class="fval" style="font-size:10px;">${p.address}</span></div>`:''}
-      <div class="frow"><span class="flabel">Phone</span><span class="fval">${p.phone}</span></div>
-      <div class="frow"><span class="flabel">Email</span><span class="fval" style="font-size:10px;">${p.email}</span></div>
+      ${frow('Address', p.address, {small:true})}
+      ${frow('Phone', p.phone)}
+      ${frow('Email', p.email, {small:true})}
     </div>
     <div class="sec"><div class="sec-title">Contract</div>
-      <div class="frow"><span class="flabel">Amount</span><span class="fval">${fmt$(p.contract)}</span></div>
-      <div class="frow"><span class="flabel">System</span><span class="fval">${p.systemkw} kW</span></div>
-      <div class="frow"><span class="flabel">Financier</span><span class="fval">${p.financier}</span></div>
-      <div class="frow"><span class="flabel">Disposition</span><span class="fval">${p.disposition}</span></div>
+      ${frow('Amount', fmt$(p.contract))}
+      ${frow('System', p.systemkw ? p.systemkw+' kW' : null)}
+      ${frow('Financier', p.financier)}
+      ${frow('Financing type', p.financingType)}
+      ${frow('Down payment', p.downPayment ? '$'+Number(p.downPayment).toLocaleString() : null)}
+      ${frow('TPO escalator', p.tpoEscalator)}
+      ${frow('Adv pmt schedule', p.financierAdvPmt)}
+      ${frow('Disposition', p.disposition)}
+    </div>
+    <div class="sec"><div class="sec-title">Equipment</div>
+      ${frow('Module', p.module ? (p.module+(p.moduleQty?' × '+p.moduleQty:'')) : null)}
+      ${frow('Inverter', p.inverter ? (p.inverter+(p.inverterQty?' × '+p.inverterQty:'')) : null)}
+      ${frow('Battery', p.battery ? (p.battery+(p.batteryQty?' × '+p.batteryQty:'')) : null)}
+      ${frow('Optimizer', p.optimizer ? (p.optimizer+(p.optimizerQty?' × '+p.optimizerQty:'')) : null)}
+    </div>
+    <div class="sec"><div class="sec-title">Site & Electrical</div>
+      ${frow('Meter location', p.meterLocation)}
+      ${frow('Panel location', p.panelLocation)}
+      ${frow('Voltage', p.voltage)}
+      ${frow('MSP bus rating', p.mspBusRating)}
+      ${frow('MPU', p.mpu)}
+      ${frow('Shutdown', p.shutdown)}
+      ${frow('Perf meter', p.performanceMeter)}
+      ${frow('Interconnect breaker', p.interconnectionBreaker)}
+      ${frow('Main breaker', p.mainBreaker)}
+      ${frow('HOA', p.hoa)}
+      ${frow('ESID', p.esid)}
     </div>
     <div class="sec"><div class="sec-title">Permitting</div>
-      <div class="frow"><span class="flabel">AHJ</span><span class="fval">${p.ahj}</span></div>
-      <div class="frow"><span class="flabel">Utility</span><span class="fval">${p.utility}</span></div>
+      ${frow('AHJ', p.ahj)}
+      ${frow('Utility', p.utility)}
+      ${frow('Permit #', p.permitNumber)}
+      ${frow('Utility app #', p.utilityAppNumber)}
+      ${frow('Permit fee', p.permitFee ? '$'+Number(p.permitFee).toLocaleString() : null)}
+      ${frow('City permit', fdate(p.cityPermitDate))}
+      ${frow('Utility permit', fdate(p.utilityPermitDate))}
     </div>
     <div class="sec"><div class="sec-title">Team</div>
       <div class="frow"><span class="flabel">PM</span><span class="fval" style="display:flex;align-items:center;gap:6px;">${p.pm}
@@ -2253,9 +3089,43 @@ function renderPanel(pid){
           <option value="Jen"${p.pm==='Jen'?' disabled':''}>Jen</option>
         </select>
       </span></div>
-      <div class="frow"><span class="flabel">Advisor</span><span class="fval">${p.advisor}</span></div>
-      <div class="frow"><span class="flabel">Consultant</span><span class="fval">${p.consultant}</span></div>
+      ${frow('Advisor', p.advisor)}
+      ${frow('Consultant', p.consultant)}
+      ${frow('Consultant email', p.consultantEmail, {small:true})}
+      ${frow('Site surveyor', p.siteSurveyor)}
     </div>
+    <div class="sec"><div class="sec-title">Milestones</div>
+      ${frow('Sale date', fdate(p.saleDate))}
+      ${frow('NTP', fdate(p.ntpDate))}
+      ${frow('Survey scheduled', fdate(p.surveyScheduledDate))}
+      ${frow('Survey complete', fdate(p.surveyDate))}
+      ${frow('Install scheduled', fdate(p.installScheduledDate))}
+      ${frow('Install complete', fdate(p.installCompleteDate))}
+      ${frow('City inspection', fdate(p.cityInspectionDate))}
+      ${frow('Utility inspection', fdate(p.utilityInspectionDate))}
+      ${frow('PTO', fdate(p.ptoDate))}
+      ${frow('In service', fdate(p.inServiceDate))}
+    </div>
+    ${funding ? `<div class="sec"><div class="sec-title">Funding</div>
+      ${funding.m1Amount ? `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:4px 0 2px;">M1</div>
+        ${frow('Amount', '$'+Number(funding.m1Amount).toLocaleString())}
+        ${frow('Funded', fdate(funding.m1FundedDate))}
+        ${frow('Chargeback', funding.m1Cb ? '$'+Number(funding.m1Cb).toLocaleString() : null)}
+        ${frow('CB credit', funding.m1CbCredit ? '$'+Number(funding.m1CbCredit).toLocaleString() : null)}` : ''}
+      ${funding.m2Amount ? `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:6px 0 2px;">M2</div>
+        ${frow('Amount', '$'+Number(funding.m2Amount).toLocaleString())}
+        ${frow('Funded', fdate(funding.m2FundedDate))}
+        ${frow('Chargeback', funding.m2Cb ? '$'+Number(funding.m2Cb).toLocaleString() : null)}
+        ${frow('CB credit', funding.m2CbCredit ? '$'+Number(funding.m2CbCredit).toLocaleString() : null)}` : ''}
+      ${funding.m3Amount||funding.m3Projected ? `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:6px 0 2px;">M3</div>
+        ${frow('Amount', funding.m3Amount ? '$'+Number(funding.m3Amount).toLocaleString() : null)}
+        ${frow('Projected', funding.m3Projected ? '$'+Number(funding.m3Projected).toLocaleString() : null)}
+        ${frow('Funded', fdate(funding.m3FundedDate))}` : ''}
+      ${funding.nonfundedCode1||funding.nonfundedCode2||funding.nonfundedCode3 ? `
+        ${frow('Nonfunded 1', funding.nonfundedCode1)}
+        ${frow('Nonfunded 2', funding.nonfundedCode2)}
+        ${frow('Nonfunded 3', funding.nonfundedCode3)}` : ''}
+    </div>` : ''}
     <div class="sec"><div class="sec-title">Timing</div>
       <div class="frow"><span class="flabel">Days in stage</span><span class="fval">${sla.days}d ${slaBadge(sla.status,sla.days)}</span></div>
       <div class="frow"><span class="flabel">Total cycle</span><span class="fval">${cycle}d</span></div>
@@ -2347,7 +3217,9 @@ function renderPanel(pid){
     <div class="ptab-pane active" id="ptabpane-tasks-${pid}">${taskHTML}</div>
     <div class="ptab-pane" id="ptabpane-notes-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;">${filesDiv}</div>
-    <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>`;
+    <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>
+    <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>
+    <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>`;
 
   // Inject notes into notes pane (needs live DOM)
   const notesPane=document.getElementById(`ptabpane-notes-${pid}`);
@@ -2512,8 +3384,8 @@ function confirmCompletion(){
       (checkedItems.length?'✓ '+checkedItems.join('\n✓ '):'');
     if(!notes[pid]) notes[pid]=[];
     const who=currentUser.name||currentPM||'Team';
-    notes[pid].push({text:noteText,time:today.toLocaleDateString(),pm:who});
-    post({action:'addNote',projectId:pid,text:noteText,time:today.toLocaleDateString(),pm:who});
+    notes[pid].push({text:noteText,time:new Date().toISOString(),pm:who});
+    post({action:'addNote',projectId:pid,text:noteText,time:new Date().toISOString(),pm:who});
   }
 
   closeCompletionModal();
@@ -2536,7 +3408,7 @@ function saveBlocker(pid){
 function addNote(pid){
   const p=projects.find(x=>x.id===pid);const inp=document.getElementById('note-input');
   if(!p||!inp||!inp.value.trim()) return;
-  const note={text:inp.value.trim(),time:today.toLocaleDateString(),pm:currentPM==='all'?'Team':currentPM};
+  const note={text:inp.value.trim(),time:new Date().toISOString(),pm:currentPM==='all'?'Team':currentPM};
   if(!notes[pid]) notes[pid]=[];
   notes[pid].push(note);renderPanel(pid);showToast('Note saved');
   markDetailStale(pid); // force re-fetch next open so other PMs see this note
@@ -2571,18 +3443,25 @@ async function openPanel(pid){
     const dp=document.getElementById('dp-right');
     if(dp) dp.insertAdjacentHTML('afterbegin',`<div id="detail-loading-${pid}" style="font-size:11px;color:var(--text3);padding:8px 12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading tasks...</div>`);
     try {
-      const res=await fetch(`${API}?action=getDetail&id=${encodeURIComponent(pid)}`);
-      const data=await res.json();
-
-      // RACE GUARD: only merge if the user is still on the same project
-      // If selectedId changed while we were awaiting, discard silently
-      if(selectedId!==fetchToken){
-        console.log(`Detail fetch for ${fetchToken} discarded — user moved to ${selectedId}`);
-        return;
-      }
-
-      if(data.taskState) Object.assign(taskState,data.taskState);
-      if(data.notes)     Object.assign(notes,data.notes);
+      const res1=sb.from('task_state').select('*').eq('project_id',pid);
+      const res2=sb.from('notes').select('*').eq('project_id',pid).order('id',{ascending:true});
+      const [{data:tsData,error:te},{data:notesData,error:ne}]=await Promise.all([res1,res2]);
+      if(te||ne) throw new Error((te||ne).message);
+      const mergedTs={};
+      (tsData||[]).forEach(r=>{
+        const c=snakeToCamel(r);
+        if(!mergedTs[c.projectId]) mergedTs[c.projectId]={};
+        mergedTs[c.projectId][c.taskId]={status:c.status,completedDate:c.completedDate||''};
+      });
+      const mergedNotes={};
+      (notesData||[]).forEach(r=>{
+        const c=snakeToCamel(r);
+        if(!mergedNotes[c.projectId]) mergedNotes[c.projectId]=[];
+        mergedNotes[c.projectId].push({text:c.text,time:c.time||'',pm:c.pm||''});
+      });
+      if(selectedId!==fetchToken){ return; }
+      Object.assign(taskState,mergedTs);
+      Object.assign(notes,mergedNotes);
       markDetailFresh(pid);
     } catch(e) {
       console.warn('Detail fetch failed',e);
@@ -2605,7 +3484,7 @@ function toggleSection(el){
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
 function setView(v,btn){
   currentView=v;
-  ['command','queue','pipeline','analytics','audit','schedule','service'].forEach(id=>{
+  ['command','queue','pipeline','analytics','audit','schedule','service','funding','help'].forEach(id=>{
     const el=document.getElementById('view-'+id);
     if(el) el.style.display=(id===v)?'block':'none';
   });
@@ -2638,8 +3517,10 @@ function hasMention(pid){
 }
 function fmtTimestamp(raw){
   if(!raw) return '';
-  // if it looks like a JS Date string (contains GMT or UTC), reformat it
-  if(raw.includes('GMT')||raw.includes('UTC')||raw.includes('Central')){
+  // Handle ISO 8601 (2026-03-14T19:45:00.000Z), GMT, UTC, and Central strings
+  const looksLikeDate = raw.includes('T') || raw.includes('GMT') ||
+                        raw.includes('UTC') || raw.includes('Central');
+  if(looksLikeDate){
     try{
       const d=new Date(raw);
       if(!isNaN(d)){
@@ -2663,6 +3544,8 @@ function render(){
   else if(currentView==='audit') renderAudit();
   else if(currentView==='schedule') renderSchedule();
   else if(currentView==='service') renderService();
+  else if(currentView==='funding') renderFunding();
+  else if(currentView==='help') renderHelp();
 }
 // ── GOOGLE AUTH ──────────────────────────────────────────
 let currentUser={name:'',email:'',picture:''};
@@ -2672,18 +3555,23 @@ function parseJwt(token){
 }
 
 function doManualLogin(){
-  const inp=document.getElementById('login-name-input');
-  const name=(inp?inp.value.trim():'');
-  if(!name){if(inp){inp.style.borderColor='var(--red)';inp.focus();}return;}
-  currentUser={name,fullName:name,email:'',picture:''};
-  sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
-  showUserChip();
-  document.getElementById('login-screen').style.display='none';
-  loadData();
+  // Manual login disabled — use Google Sign-In above.
+  google.accounts.id.prompt();
 }
 window.doManualLogin=doManualLogin;
 function manualSignIn(){doManualLogin();}
-function onGoogleSignIn(response){
+async function onGoogleSignIn(response){
+  // 1. Establish a Supabase session from the Google ID token
+  const {error:authErr} = await sb.auth.signInWithIdToken({
+    provider: 'google',
+    token:    response.credential,
+  });
+  if(authErr){
+    console.error('Supabase auth error',authErr);
+    showToast('Sign-in failed: '+authErr.message);
+    return;
+  }
+  // 2. Parse display info from the JWT (same as before)
   const payload=parseJwt(response.credential);
   const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
   currentUser={
@@ -2692,7 +3580,6 @@ function onGoogleSignIn(response){
     email:payload.email||'',
     picture:payload.picture||'',
   };
-  // Store in sessionStorage so refresh keeps you logged in
   sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
   showUserChip();
   document.getElementById('login-screen').style.display='none';
@@ -2713,23 +3600,41 @@ function showUserChip(){
   chip.style.display='flex';
 }
 
-function signOut(){
+async function signOut(){
   sessionStorage.removeItem('crm_user');
   currentUser={name:'',email:'',picture:''};
   document.getElementById('user-chip').style.display='none';
   document.getElementById('login-screen').style.display='flex';
+  if(_realtimeChannel){ sb.removeChannel(_realtimeChannel); _realtimeChannel=null; }
+  await sb.auth.signOut();
 }
 
-// Check session on load
-(function(){
+// Check for an existing Supabase session on page load.
+// If one exists, restore currentUser and go straight to the app.
+(async function(){
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session) return; // login screen remains visible
+
+  // Restore display name from sessionStorage (avoids a round-trip)
   const saved=sessionStorage.getItem('crm_user');
   if(saved){
-    try{
-      currentUser=JSON.parse(saved);
-      showUserChip();
-      document.getElementById('login-screen').style.display='none';
-      // loadData() called below after DOM ready
-    }catch(e){}
+    try{ currentUser=JSON.parse(saved); }catch(e){}
+  }
+  // Fall back to Supabase session metadata if sessionStorage was cleared
+  if(!currentUser.name && session.user){
+    const u=session.user;
+    currentUser={
+      name:     u.user_metadata?.full_name||u.email||'',
+      fullName: u.user_metadata?.full_name||u.email||'',
+      email:    u.email||'',
+      picture:  u.user_metadata?.avatar_url||'',
+    };
+    sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
+  }
+  if(currentUser.name){
+    showUserChip();
+    document.getElementById('login-screen').style.display='none';
+    loadData();
   }
 })();
 
@@ -2881,23 +3786,43 @@ function duplicateProject(pid){
 }
 
 function openNewProject(){
-  document.querySelector('#np-overlay [style*="font-size:16px"]').textContent='New Project';
+  _editMode=false;_editPid=null;
+  document.getElementById('np-title').textContent='New Project';
+  document.getElementById('np-subtitle').textContent='All fields required unless marked optional';
   document.getElementById('np-submit').textContent='Create Project';
   document.getElementById('np-overlay').style.display='block';
   document.getElementById('np-saledate').value=today.toISOString().slice(0,10);
   document.getElementById('np-error').style.display='none';
-  // reset stage select to evaluation
   document.getElementById('np-stage').value='evaluation';
+  npShowEditTabs(false);
+}
+
+function npSwitchTab(tab){
+  ['basic','equipment','site','milestones'].forEach(t=>{
+    document.getElementById('np-tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('np-pane-'+t).classList.toggle('active',t===tab);
+  });
+}
+
+function npShowEditTabs(show){
+  ['equipment','site','milestones'].forEach(t=>{
+    document.getElementById('np-tab-'+t).style.display=show?'':'none';
+  });
+  // Switch back to basic when hiding tabs
+  if(!show) npSwitchTab('basic');
 }
 
 function openEditProject(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
   _editMode=true;_editPid=pid;
-  document.querySelector('#np-overlay [style*="font-size:16px"]').textContent='Edit Project — '+p.id;
+  document.getElementById('np-title').textContent='Edit Project — '+p.id;
+  document.getElementById('np-subtitle').textContent='Changes save immediately on all tabs.';
   document.getElementById('np-submit').textContent='Save Changes';
   document.getElementById('np-error').style.display='none';
+  npShowEditTabs(true);
+  npSwitchTab('basic');
 
-  // populate fields
+  // Tab 1: Basic
   document.getElementById('np-name').value=p.name||'';
   document.getElementById('np-city').value=p.city||'';
   document.getElementById('np-address').value=p.address||'';
@@ -2914,13 +3839,81 @@ function openEditProject(pid){
   document.getElementById('np-utility').value=p.utility||'';
   document.getElementById('np-advisor').value=p.advisor||'';
   document.getElementById('np-consultant').value=p.consultant||'';
+
+  // Tab 2: Equipment
+  document.getElementById('np-module').value=p.module||'';
+  document.getElementById('np-module-qty').value=p.moduleQty||'';
+  document.getElementById('np-inverter').value=p.inverter||'';
+  document.getElementById('np-inverter-qty').value=p.inverterQty||'';
+  document.getElementById('np-battery').value=p.battery||'';
+  document.getElementById('np-battery-qty').value=p.batteryQty||'';
+  document.getElementById('np-optimizer').value=p.optimizer||'';
+  document.getElementById('np-optimizer-qty').value=p.optimizerQty||'';
+  document.getElementById('np-financing-type').value=p.financingType||'';
+  document.getElementById('np-down-payment').value=p.downPayment||'';
+  document.getElementById('np-tpo-escalator').value=p.tpoEscalator||'';
+  document.getElementById('np-financier-adv-pmt').value=p.financierAdvPmt||'';
+
+  // Tab 3: Site & Permitting
+  document.getElementById('np-meter-location').value=p.meterLocation||'';
+  document.getElementById('np-panel-location').value=p.panelLocation||'';
+  document.getElementById('np-voltage').value=p.voltage||'';
+  document.getElementById('np-msp-bus-rating').value=p.mspBusRating||'';
+  document.getElementById('np-mpu').value=p.mpu||'';
+  document.getElementById('np-shutdown').value=p.shutdown||'';
+  document.getElementById('np-performance-meter').value=p.performanceMeter||'';
+  document.getElementById('np-interconnection-breaker').value=p.interconnectionBreaker||'';
+  document.getElementById('np-main-breaker').value=p.mainBreaker||'';
+  document.getElementById('np-hoa').value=p.hoa||'';
+  document.getElementById('np-esid').value=p.esid||'';
+  document.getElementById('np-permit-number').value=p.permitNumber||'';
+  document.getElementById('np-utility-app-number').value=p.utilityAppNumber||'';
+  document.getElementById('np-permit-fee').value=p.permitFee||'';
+  document.getElementById('np-city-permit-date').value=(p.cityPermitDate||'').slice(0,10);
+  document.getElementById('np-utility-permit-date').value=(p.utilityPermitDate||'').slice(0,10);
+  document.getElementById('np-site-surveyor').value=p.siteSurveyor||'';
+  document.getElementById('np-consultant-email').value=p.consultantEmail||'';
+
+  // Tab 4: Milestones & Funding
+  document.getElementById('np-ntp-date').value=(p.ntpDate||'').slice(0,10);
+  document.getElementById('np-survey-scheduled-date').value=(p.surveyScheduledDate||'').slice(0,10);
+  document.getElementById('np-survey-date').value=(p.surveyDate||'').slice(0,10);
+  document.getElementById('np-install-scheduled-date').value=(p.installScheduledDate||'').slice(0,10);
+  document.getElementById('np-install-complete-date').value=(p.installCompleteDate||'').slice(0,10);
+  document.getElementById('np-city-inspection-date').value=(p.cityInspectionDate||'').slice(0,10);
+  document.getElementById('np-utility-inspection-date').value=(p.utilityInspectionDate||'').slice(0,10);
+  document.getElementById('np-pto-date').value=(p.ptoDate||'').slice(0,10);
+  document.getElementById('np-in-service-date').value=(p.inServiceDate||'').slice(0,10);
+
+  // Funding from projectFunding table
+  const f=projectFunding[pid]||{};
+  document.getElementById('np-m1-amount').value=f.m1Amount||'';
+  document.getElementById('np-m1-funded-date').value=(f.m1FundedDate||'').slice(0,10);
+  document.getElementById('np-m1-cb').value=f.m1Cb||'';
+  document.getElementById('np-m1-cb-credit').value=f.m1CbCredit||'';
+  document.getElementById('np-m2-amount').value=f.m2Amount||'';
+  document.getElementById('np-m2-funded-date').value=(f.m2FundedDate||'').slice(0,10);
+  document.getElementById('np-m2-cb').value=f.m2Cb||'';
+  document.getElementById('np-m2-cb-credit').value=f.m2CbCredit||'';
+  document.getElementById('np-m3-amount').value=f.m3Amount||'';
+  document.getElementById('np-m3-funded-date').value=(f.m3FundedDate||'').slice(0,10);
+  document.getElementById('np-m3-projected').value=f.m3Projected||'';
+  document.getElementById('np-nonfunded-code-1').value=f.nonfundedCode1||'';
+  document.getElementById('np-nonfunded-code-2').value=f.nonfundedCode2||'';
+  document.getElementById('np-nonfunded-code-3').value=f.nonfundedCode3||'';
+
   document.getElementById('np-overlay').style.display='block';
 }
 
 function closeNewProject(){
   document.getElementById('np-overlay').style.display='none';
-  ['np-name','np-city','np-address','np-phone','np-email','np-contract','np-systemkw','np-financier','np-ahj','np-utility','np-advisor','np-consultant'].forEach(id=>{
-    document.getElementById(id).value='';
+  npShowEditTabs(false);
+  document.getElementById('np-title').textContent='New Project';
+  document.getElementById('np-subtitle').textContent='All fields required unless marked optional';
+  // Clear all inputs in the modal
+  document.getElementById('np-overlay').querySelectorAll('input,select,textarea').forEach(el=>{
+    if(el.type==='checkbox'||el.type==='radio') return;
+    el.value='';
   });
   _editMode=false;_editPid=null;
 }
@@ -2959,7 +3952,7 @@ async function submitNewProject(){
     disposition:get('np-disposition'),contract:Number(get('np-contract')),
     systemkw:Number(get('np-systemkw')),ahj:get('np-ahj'),utility:get('np-utility'),
     advisor:get('np-advisor'),consultant:get('np-consultant'),
-    financier:get('np-financier'),blocker:'',priority:'med',
+    financier:get('np-financier'),blocker:'',
   };
   projects.unshift(newProject);
   projectMap[String(newProject.id)]=newProject; // keep map in sync
@@ -2968,8 +3961,10 @@ async function submitNewProject(){
   stageHistory[newProject.id]=[{stage:stageLabel,entered:dateStr}];
   notes[newProject.id]=[];
   closeNewProject();render();showToast('Project created — '+newProject.name);openPanel(newProject.id);
-  try{await fetch(API,{method:'POST',body:JSON.stringify({action:'addProject',project:newProject})});}
-  catch(e){showToast('Saved locally — sync failed');}
+  // Insert project row, then write initial stage history entry separately
+  // (no need to call moveStage which would redundantly update stage+stageDate)
+  await post({action:'addProject',project:newProject});
+  await sbRun(sb.from('stage_history').insert({project_id:newProject.id,stage:stageLabel,entered:dateStr}));
   btn.textContent='Create Project';btn.disabled=false;
 }
 
@@ -2987,27 +3982,81 @@ async function submitEditProject(){
   const btn=document.getElementById('np-submit');
   btn.textContent='Saving...';btn.disabled=true;
 
-  // fields that can be edited
+  const str=v=>v||null;
+  const num=v=>v?Number(v)||null:null;
+  const dt=v=>(v||'').slice(0,10)||null;
+
+  // All editable fields across all tabs
   const editable={
+    // Basic
     name:get('np-name'),city:get('np-city'),address:get('np-address'),
-    phone:get('np-phone'),email:get('np-email'),saleDate:get('np-saledate'),pm:get('np-pm'),
-    disposition:get('np-disposition'),contract:Number(get('np-contract'))||p.contract,
-    systemkw:Number(get('np-systemkw'))||p.systemkw,financier:get('np-financier'),
+    phone:get('np-phone'),email:get('np-email'),saleDate:dt(get('np-saledate')),pm:get('np-pm'),
+    disposition:get('np-disposition'),contract:num(get('np-contract'))||p.contract,
+    systemkw:num(get('np-systemkw'))||p.systemkw,financier:get('np-financier'),
     ahj:get('np-ahj'),utility:get('np-utility'),advisor:get('np-advisor'),
     consultant:get('np-consultant'),
+    // Equipment
+    module:str(get('np-module')),moduleQty:str(get('np-module-qty')),
+    inverter:str(get('np-inverter')),inverterQty:str(get('np-inverter-qty')),
+    battery:str(get('np-battery')),batteryQty:str(get('np-battery-qty')),
+    optimizer:str(get('np-optimizer')),optimizerQty:str(get('np-optimizer-qty')),
+    financingType:str(get('np-financing-type')),downPayment:str(get('np-down-payment')),
+    tpoEscalator:str(get('np-tpo-escalator')),financierAdvPmt:str(get('np-financier-adv-pmt')),
+    // Site & Permitting
+    meterLocation:str(get('np-meter-location')),panelLocation:str(get('np-panel-location')),
+    voltage:str(get('np-voltage')),mspBusRating:str(get('np-msp-bus-rating')),
+    mpu:str(get('np-mpu')),shutdown:str(get('np-shutdown')),
+    performanceMeter:str(get('np-performance-meter')),
+    interconnectionBreaker:str(get('np-interconnection-breaker')),
+    mainBreaker:str(get('np-main-breaker')),hoa:str(get('np-hoa')),esid:str(get('np-esid')),
+    permitNumber:str(get('np-permit-number')),utilityAppNumber:str(get('np-utility-app-number')),
+    permitFee:str(get('np-permit-fee')),
+    cityPermitDate:dt(get('np-city-permit-date')),
+    utilityPermitDate:dt(get('np-utility-permit-date')),
+    siteSurveyor:str(get('np-site-surveyor')),consultantEmail:str(get('np-consultant-email')),
+    // Milestones
+    ntpDate:dt(get('np-ntp-date')),
+    surveyScheduledDate:dt(get('np-survey-scheduled-date')),
+    surveyDate:dt(get('np-survey-date')),
+    installScheduledDate:dt(get('np-install-scheduled-date')),
+    installCompleteDate:dt(get('np-install-complete-date')),
+    cityInspectionDate:dt(get('np-city-inspection-date')),
+    utilityInspectionDate:dt(get('np-utility-inspection-date')),
+    ptoDate:dt(get('np-pto-date')),
+    inServiceDate:dt(get('np-in-service-date')),
   };
 
-  // optimistic update in memory
+  // Funding rows (separate table)
+  const fundingRow={
+    projectId:p.id,
+    m1Amount:str(get('np-m1-amount')),m1FundedDate:dt(get('np-m1-funded-date')),
+    m1Cb:str(get('np-m1-cb')),m1CbCredit:str(get('np-m1-cb-credit')),
+    m2Amount:str(get('np-m2-amount')),m2FundedDate:dt(get('np-m2-funded-date')),
+    m2Cb:str(get('np-m2-cb')),m2CbCredit:str(get('np-m2-cb-credit')),
+    m3Amount:str(get('np-m3-amount')),m3FundedDate:dt(get('np-m3-funded-date')),
+    m3Projected:str(get('np-m3-projected')),
+    nonfundedCode1:str(get('np-nonfunded-code-1')),
+    nonfundedCode2:str(get('np-nonfunded-code-2')),
+    nonfundedCode3:str(get('np-nonfunded-code-3')),
+  };
+  const hasFunding=Object.entries(fundingRow).some(([k,v])=>k!=='projectId'&&v);
+
+  // Optimistic update in memory
   Object.assign(p,editable);
+  if(hasFunding){
+    projectFunding[p.id]=projectFunding[p.id]||{};
+    Object.assign(projectFunding[p.id],fundingRow);
+  }
   closeNewProject();
   render();
   if(selectedId===_editPid) renderPanel(_editPid);
   showToast('Project updated');
 
-  // persist each changed field
-  try{
-    await fetch(API,{method:'POST',body:JSON.stringify({action:'updateProject',projectId:p.id,fields:editable})});
-  }catch(e){showToast('Saved locally — sync failed');}
+  // Persist to Supabase
+  await post({action:'updateProject',projectId:p.id,fields:editable});
+  if(hasFunding){
+    await sbRun(sb.from('project_funding').upsert(camelToSnake(fundingRow),{onConflict:'project_id'}));
+  }
   btn.textContent='Save Changes';btn.disabled=false;
 }
 
@@ -3028,11 +4077,12 @@ function setPanelTab(tab){
   document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
   const btn=document.getElementById('ptab-'+tab);if(btn) btn.classList.add('active');
   const pid=selectedId;if(!pid) return;
-  ['tasks','notes','files','schedule'].forEach(t=>{
+  ['tasks','notes','files','schedule','bom'].forEach(t=>{
     const pane=document.getElementById(`ptabpane-${t}-${pid}`);
     if(pane) pane.style.display=t===tab?'block':'none';
   });
   if(tab==='schedule') renderPanelSchedule(pid);
+  if(tab==='bom') renderPanelBOM(pid);
 }
 function renderPanelSchedule(pid){
   const pane=document.getElementById(`ptabpane-schedule-${pid}`);
@@ -3109,12 +4159,14 @@ async function saveFolderUrl(pid){
   try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');stored[pid]=url;localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
   renderFilesSection(pid);
   showToast('Drive folder linked');
+  post({action:'saveFolder',projectId:pid,folderUrl:url});
 }
 function clearFolderUrl(pid){
   if(!confirm('Remove the Drive folder link for this project?')) return;
   delete projectFolders[pid];
   try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');delete stored[pid];localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
   renderFilesSection(pid);
+  post({action:'deleteFolder',projectId:pid});
 }
 async function loadProjectFiles(pid){}
 // ── TASK AUDIT ────────────────────────────────────────────
@@ -3328,8 +4380,8 @@ function syncMasterCrewRoster(){
       const newCrew={...master,active:'true'};
       if(legacy) CREW_ROLES.forEach(r=>{if(legacy[r]) newCrew[r]=legacy[r];});
       crews.push(newCrew);
-      // Only write to sheet if truly new — addCrewRow now checks for duplicates
-      post({action:'addCrew',crewId:master.id,name:master.name,warehouse:master.warehouse});
+      // Note: don't auto-write to Supabase here — crew data was migrated.
+      // Add crews manually via the Schedule → Manage Crews UI if needed.
     } else {
       // Lock name and warehouse to master definition, preserve roles
       existing.name=master.name;
@@ -4194,6 +5246,930 @@ function executePMMove(){
   render();
 }
 
+
+// ── FUNDING MODULE ────────────────────────────────────────
+const NONFUND_CODES=[{"master": "Cancelled", "code": "CANCELLED", "desc": "account is cancelled", "party": "NA"}, {"master": "Contract Error", "code": "ACH", "desc": "ACH form has not been completed by customer", "party": "Sales Ops"}, {"master": "Contract Error", "code": "ADD", "desc": "Address is incorrect on IA or in lender portal", "party": "Sales Ops"}, {"master": "Contract Error", "code": "ADDER", "desc": "An adder is listed on the IA but not Dividend OR we cannot confirm the adder happened.", "party": "Sales Ops"}, {"master": "Contract Error", "code": "CLW", "desc": "Conditional Lien Waiver needs to be signed by customer in Everbright for PPA", "party": "Sales Ops"}, {"master": "Contract Error", "code": "CXLP", "desc": "Loan cancelled in lender portal", "party": "Sales Ops"}, {"master": "Contract Error", "code": "HCB", "desc": "Need High cost breakdown from the Rep", "party": "Sales Ops"}, {"master": "Contract Error", "code": "HOA", "desc": "Lender is requiring HOA approval Doc", "party": "Sales Ops"}, {"master": "Contract Error", "code": "IA", "desc": "Installation Agreement doesn't match lender portal", "party": "Sales Ops"}, {"master": "Contract Error", "code": "ITP", "desc": "Infinity tranfer project needing to be transfer to TriSMART", "party": "Sales Ops"}, {"master": "Contract Error", "code": "IPA", "desc": "Installed panel amount does not match contract", "party": "Sales Ops"}, {"master": "Contract Error", "code": "KW", "desc": "Installed smaller system than promised", "party": "Sales Ops"}, {"master": "Contract Error", "code": "LD", "desc": "Customer needs to sign Lender docs", "party": "Sales Ops"}, {"master": "Contract Error", "code": "NTP", "desc": "Pending NTP in Lender portal", "party": "Sales Ops"}, {"master": "Contract Error", "code": "PD", "desc": "Contract prices do not match", "party": "Sales Ops"}, {"master": "Contract Error", "code": "PT", "desc": "Panel type in lender portal does not match install", "party": "Sales Ops"}, {"master": "Contract Error", "code": "RR", "desc": "Need to confirm Re-roof on lender contract", "party": "Sales Ops"}, {"master": "Contract Error", "code": "RESIGN", "desc": "legal contact signer has changed and project needs a resign", "party": "Sales Ops"}, {"master": "Contract Error", "code": "STP", "desc": "Account has stipulations. Not fundable until stips are cleared", "party": "Sales Ops"}, {"master": "Contract Error", "code": "UB", "desc": "Lender requires Utility Bill", "party": "Sales Ops"}, {"master": "Contract Error", "code": "WQU", "desc": "Account quoted with wrong utility", "party": "Sales Ops"}, {"master": "Contract Error", "code": "WU", "desc": "Loan executed with a utility that is not approved", "party": "Sales Ops"}, {"master": "Contract Error", "code": "HCO", "desc": "Homeowner Change Order needs signature", "party": "Sales Ops"}, {"master": "Contract Error", "code": "ICO", "desc": "Installer Change Order needing to be signed by Helpdesk", "party": "Sales Ops"}, {"master": "Contract Error", "code": "NCCO", "desc": "Homeowner needs to sign No Cost Change Order", "party": "Sales Ops"}, {"master": "Contract Error", "code": "WCN", "desc": "Needs to complete welcome call with Lender", "party": "Sales Ops"}, {"master": "Customer Escalation", "code": "CRS", "desc": "Customer refusing to sign Documents", "party": "Customer Service"}, {"master": "Customer Escalation", "code": "CRW", "desc": "Customer refusing work", "party": "Customer Service"}, {"master": "Customer Escalation", "code": "HOLD", "desc": "Account on hold", "party": "Customer Service"}, {"master": "Customer Escalation", "code": "LEGAL", "desc": "Escalated to legal- customer refuses to pay", "party": "LEGAL"}, {"master": "Customer Escalation", "code": "NF", "desc": "Net funded (Customer escalation or Delayed PTO)", "party": "Project Management"}, {"master": "Customer Service", "code": "TT", "desc": "Needs Tree trimming for PPA", "party": "Customer Service"}, {"master": "Damages", "code": "DM", "desc": "Customer has damages and won't pay", "party": "Customer Service"}, {"master": "Electrical Completion", "code": "ELE", "desc": "Electrical completion more than 3 months out", "party": "Project Management"}, {"master": "Electrical Completion", "code": "ELC", "desc": "Requires Electrical completion to Fund", "party": "Field Ops"}, {"master": "Electrical Completion", "code": "S-CS", "desc": "Solrite- Conditionally submitted", "party": "Field Ops"}, {"master": "Engineering", "code": "ASR", "desc": "Shade study below threshold", "party": "Design"}, {"master": "Engineering", "code": "ENG", "desc": "Need new engineering", "party": "Design"}, {"master": "Engineering", "code": "LYD", "desc": "Panel layout in live project does not match install layout", "party": "Design"}, {"master": "Engineering", "code": "S28W", "desc": "Module Model is wrong in lender portal- needs to live project updated", "party": "Design"}, {"master": "Engineering", "code": "MOD", "desc": "Model in portal is incorrect.", "party": "Design"}, {"master": "Engineering", "code": "SS", "desc": "Everbright rejected the Shade Study due to Aurora not matching their quote", "party": "Design"}, {"master": "Equipment Issues", "code": "HDK", "desc": "Needs hold down kit", "party": "Field Ops"}, {"master": "Final", "code": "FIN-ALL", "desc": "Lender Needs PTO and Inspection doc for Final Payment", "party": "Project Management"}, {"master": "Final", "code": "FIN-PTO", "desc": "Lender Needs PTO  for Final Payment", "party": "Project Management"}, {"master": "FINAL-PM", "code": "FIN-IPD", "desc": "Lender Needs inspection passed document for Final Payment", "party": "Project Management"}, {"master": "FINAL-PM", "code": "IPD-P", "desc": "Inspection has passed and proof needs to be uploaded to Financier", "party": "Project Management"}, {"master": "FINAL-PM", "code": "IPD-MP", "desc": "Inspection has passed and the permit is missing to prove address.", "party": "Project Management"}, {"master": "FINAL-PM", "code": "IPD-I", "desc": "POPI has been rejected by Financier and needs either address or date.", "party": "Project Management"}, {"master": "FINAL-PM", "code": "PTO-P", "desc": "PTO has been issued and needs to be uploaded to financier", "party": "Project Management"}, {"master": "FINAL-PM", "code": "PTO-I", "desc": "PTO letter has been rejected by Financier and needs either address or date.", "party": "Project Management"}, {"master": "FINAL-PM", "code": "PTO-A", "desc": "Needs PTO application submitted to financier", "party": "Project Management"}, {"master": "FINAL-PM", "code": "ICA", "desc": "Needs Interconnection Agreement signed by utility and customer", "party": "Project Management"}, {"master": "FINAL-PM", "code": "Permit", "desc": "Missing approved Permit application", "party": "Project Management"}, {"master": "Installation Issues", "code": "DC", "desc": "was not installed with domestic content.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "EES", "desc": "Lender requires separate Envoy systems for add-on panels", "party": "Field Ops"}, {"master": "Installation Issues", "code": "ACW", "desc": "AC Combiner can not be installed with conduit through the top. Side and bottom only.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "BDE", "desc": "Battery installation Issue", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MSR", "desc": "Monitoring Specification rejected: Duracell configuration is incomplete", "party": "Field Ops"}, {"master": "Installation Issues", "code": "BR", "desc": "Breaker installed is not an Eaton Breaker. Needs to be replaced", "party": "Field Ops"}, {"master": "Installation Issues", "code": "BT", "desc": "Needs Battery installed", "party": "Field Ops"}, {"master": "Installation Issues", "code": "CM", "desc": "Missing CELL MODEM installation", "party": "Field Ops"}, {"master": "Installation Issues", "code": "CT", "desc": "CTs not properly installed or Missing", "party": "Field Ops"}, {"master": "Installation Issues", "code": "ELCO", "desc": "Need Electrical corrections", "party": "Field Ops"}, {"master": "Installation Issues", "code": "ENL", "desc": "Incomplete Commissioning", "party": "Field Ops"}, {"master": "Installation Issues", "code": "FR", "desc": "Flat roof, pending tilt leg installation", "party": "Field Ops"}, {"master": "Installation Issues", "code": "LST", "desc": "Needs Line Side Tap", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MC", "desc": "Needs Midclamps swapped", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MIBS", "desc": "redesign system to have a max of 19 inverters per battery by shedding.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MNM", "desc": "Microinverters not matching", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MNSI", "desc": "Microinverters not scanned in, amount of micros do not match what was installed.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MNR", "desc": "Microinverter(s) not reporting", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MPU", "desc": "Needs MPU installed", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MRA-OFF", "desc": "System is not reporting but is in service", "party": "Field Ops"}, {"master": "Installation Issues", "code": "NMPMT", "desc": "Needs more panels to meet tolerance", "party": "Field Ops"}, {"master": "Installation Issues", "code": "FLSH", "desc": "Needs Flashing corrected.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "MSM", "desc": "MICROINVERTER SERIAL map does not match install", "party": "Field Ops"}, {"master": "Installation Issues", "code": "TILT", "desc": "Tilt is below 5°", "party": "Field Ops"}, {"master": "Installation Issues", "code": "RNP", "desc": "Racking is not installed properly", "party": "Field Ops"}, {"master": "Installation Issues", "code": "ST", "desc": "Needs Solar Stacks replaced with AVL equipment", "party": "Field Ops"}, {"master": "Installation Issues", "code": "L2L", "desc": "Needs main breaker on sub panel", "party": "Field Ops"}, {"master": "Installation Issues", "code": "IEJ", "desc": "Installation of expanding joints on underground pipe needed for city", "party": "Field Ops"}, {"master": "Installation Issues", "code": "ABBW", "desc": "Contactor not properly wired through control port.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "RMA", "desc": "Equipment needs replaced", "party": "Field Ops"}, {"master": "Installation Issues", "code": "PCO", "desc": "Panel Count does not match plans", "party": "Field Ops"}, {"master": "Installation Issues", "code": "B12", "desc": "Please provide access to battery portal", "party": "Field Ops"}, {"master": "Installation Issues", "code": "B14", "desc": "Please make sure red L2 wires are on top for the breakers on the busbar in the gateway", "party": "Field Ops"}, {"master": "Installation Issues", "code": "B15", "desc": "Please show commissioning screenshots", "party": "Field Ops"}, {"master": "Installation Issues", "code": "B34", "desc": "J1 jumper is improperly spliced on multi-battery installation", "party": "Field Ops"}, {"master": "Installation Issues", "code": "B35", "desc": "PC-PRO-WL photos needed including the HOST & CLIENT labels and install wiring", "party": "Field Ops"}, {"master": "Installation Issues", "code": "RGM", "desc": "RGM BOX opened, showing the ethernet wiring, meter turned on, showing green lights in both CTs.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "DTU", "desc": "DTU needed for single sonnen battery installation", "party": "Field Ops"}, {"master": "Installation Issues", "code": "ATS", "desc": "Missing ATS internals", "party": "Field Ops"}, {"master": "Installation Issues", "code": "S20W", "desc": "Fuses inside AC disconnect do not match.", "party": "Field Ops"}, {"master": "Installation Issues", "code": "BSI", "desc": "Battery Showing Issue", "party": "Field Ops"}, {"master": "Installation Issues", "code": "WP", "desc": "Panel installed is not approved under Lender AVL", "party": "Field Ops"}, {"master": "Installation Issues", "code": "BLW", "desc": "Battery location is not acceptable w guidelines", "party": "Field Ops"}, {"master": "Monitoring", "code": "ABI", "desc": "Array Builder incomplete", "party": "Monitoring"}, {"master": "Monitoring", "code": "GWI", "desc": "Gateway issue", "party": "Monitoring"}, {"master": "Monitoring", "code": "SPO", "desc": "System needs to be powered on/ Has PTO", "party": "Monitoring"}, {"master": "Monitoring", "code": "ABDNM", "desc": "Array Builder does not match layout", "party": "Monitoring"}, {"master": "Monitoring", "code": "NEG", "desc": "There is negative consumption data showing in the Graph Tab and there should not be.", "party": "Monitoring"}, {"master": "Monitoring", "code": "SNS", "desc": "Enlighten Site needs to be sperated.", "party": "Monitoring"}, {"master": "Monitoring", "code": "CTLO", "desc": "Consumption Meter needs to be set to Load Only", "party": "Monitoring"}, {"master": "Monitoring", "code": "CTLS", "desc": "Consumption Meter needs to be set to Load with Solar Production", "party": "Monitoring"}, {"master": "Monitoring", "code": "CTM", "desc": "CT Measurement Issues- FINAL", "party": "Monitoring"}, {"master": "Monitoring", "code": "SPI", "desc": "System Production Issue", "party": "Monitoring"}, {"master": "Monitoring", "code": "ECT", "desc": "Enable CTs (Both/Production/Consumption", "party": "Monitoring"}, {"master": "Monitoring", "code": "MI", "desc": "Monitoring Issue in portal (Alerts present)", "party": "Monitoring"}, {"master": "Monitoring", "code": "SEW", "desc": "Missing Solar Edge Warranty", "party": ""}, {"master": "Monitoring", "code": "MP", "desc": "Missing access in Portal", "party": "Monitoring"}, {"master": "Photos", "code": "ABB", "desc": "Missing photo showing ABB Contactor with rating visible", "party": "Field Ops"}, {"master": "Photos", "code": "ALL", "desc": "Missing ALL photos", "party": "Field Ops"}, {"master": "Photos", "code": "B1", "desc": "Missing ALL BATTERY PHOTOS", "party": "Field Ops"}, {"master": "Photos", "code": "B2", "desc": "Missing Battery Layout photos with clearances", "party": "Field Ops"}, {"master": "Photos", "code": "B2F", "desc": "Missing Battery Layout photos showing the feet located at the bottom of the battery", "party": "Field Ops"}, {"master": "Photos", "code": "B2C", "desc": "Battery Layout photos doesn't properly show all Clearances", "party": "Field Ops"}, {"master": "Photos", "code": "B3", "desc": "Missing Backup and non-backup loads panels", "party": "Field Ops"}, {"master": "Photos", "code": "B4", "desc": "Missing Consumption and Production CTs", "party": "Field Ops"}, {"master": "Photos", "code": "B5", "desc": "Missing Generation panel or internal panelboard", "party": "Field Ops"}, {"master": "Photos", "code": "B6", "desc": "Missing Powerwall Connections", "party": "Field Ops"}, {"master": "Photos", "code": "B7", "desc": "Missing/illegible Serial Number for Battery", "party": "Field Ops"}, {"master": "Photos", "code": "B8", "desc": "Missing Serial Number for Gateway", "party": "Field Ops"}, {"master": "Photos", "code": "B9", "desc": "Tesla portal reporting no Powerwall communications", "party": "Field Ops"}, {"master": "Photos", "code": "B10", "desc": "Missing Critical Load Panel, with loads labelled and its main OCPD", "party": "Field Ops"}, {"master": "Photos", "code": "B11", "desc": "Missing the tesla wizard screenshots of the wifi/cellular connection and the X for no battery grid charging", "party": "Field Ops"}, {"master": "Photos", "code": "B13", "desc": "Please show the tesla powerwall cabinet with the resistor and the drain wire grounded installed in the same cabinet", "party": "Field Ops"}, {"master": "Photos", "code": "B16", "desc": "Missing images of the relays/transformers", "party": "Field Ops"}, {"master": "Photos", "code": "B17", "desc": "Missing photo of the contactor model number", "party": "Field Ops"}, {"master": "Photos", "code": "B18", "desc": "Missing or blurry System controller (gateway) photo", "party": "Field Ops"}, {"master": "Photos", "code": "B19", "desc": "Missing photo of Noise Filter", "party": "Field Ops"}, {"master": "Photos", "code": "B20", "desc": "Missing BMS connections", "party": "Field Ops"}, {"master": "Photos", "code": "B21", "desc": "Missing/incomplete Grid, Microgrid, & DC connections", "party": "Field Ops"}, {"master": "Photos", "code": "B22", "desc": "Missing/incomplete Utility Profile config screenshot", "party": "Field Ops"}, {"master": "Photos", "code": "B23", "desc": "Missing/incomplete Battery registration screenshots", "party": "Field Ops"}, {"master": "Photos", "code": "B24", "desc": "Missing mounting plate photo", "party": "Field Ops"}, {"master": "Photos", "code": "B25", "desc": "Missing/incomplete CT configuration screenshots", "party": "Field Ops"}, {"master": "Photos", "code": "B26", "desc": "Missing photo of DTU placement.", "party": "Field Ops"}, {"master": "Photos", "code": "B27", "desc": "Missing photo of shutdown switch.", "party": "Field Ops"}, {"master": "Photos", "code": "B28", "desc": "Wifi Extender label clearly showing the model", "party": "Field Ops"}, {"master": "Photos", "code": "B29", "desc": "Missing TP Link Location Photo", "party": "Field Ops"}, {"master": "Photos", "code": "B30", "desc": "Missing SolarEdge Backup Interface sticker label", "party": "Field Ops"}, {"master": "Photos", "code": "B31", "desc": "Missing SolarEdge Backup Interface wiring photo", "party": "Field Ops"}, {"master": "Photos", "code": "B32", "desc": "Need photo of \"Subpanel\" connected to labeled existing breaker in loads panel", "party": "Field Ops"}, {"master": "Photos", "code": "B33", "desc": "AC Hub sticker", "party": "Field Ops"}, {"master": "Photos", "code": "S1", "desc": "No ARRAY photos uploaded", "party": "Field Ops"}, {"master": "Photos", "code": "S2", "desc": "Incomplete ARRAY photos", "party": "Field Ops"}, {"master": "Photos", "code": "S3", "desc": "Missing MODULE ATTACHMENT photo", "party": "Field Ops"}, {"master": "Photos", "code": "S4", "desc": "Incomplete TILT Photos", "party": "Field Ops"}, {"master": "Photos", "code": "S5", "desc": "Illegible TILT photos", "party": "Field Ops"}, {"master": "Photos", "code": "S6", "desc": "Missing ROOF UNDERNEATH ARRAY photo", "party": "Field Ops"}, {"master": "Photos", "code": "S7", "desc": "ROOF UNDERNEATH ARRAY photo shows poor wire management", "party": "Field Ops"}, {"master": "Photos", "code": "S8", "desc": "Missing FLASHING photo", "party": "Field Ops"}, {"master": "Photos", "code": "S9", "desc": "Missing STRUCTURAL photo", "party": "Field Ops"}, {"master": "Photos", "code": "S10", "desc": "Missing ROOF J-BOX/CONDUIT ENTRANCE photo", "party": "Field Ops"}, {"master": "Photos", "code": "S11", "desc": "Missing CONDUIT RUN photo", "party": "Field Ops"}, {"master": "Photos", "code": "S12", "desc": "Missing CONDUIT PENETRATION photo", "party": "Field Ops"}, {"master": "Photos", "code": "S13", "desc": "Missing HOME RUN CONDUIT photo", "party": "Field Ops"}, {"master": "Photos", "code": "S14", "desc": "Missing AC COMBINER PANEL photo (With wiring exposed)", "party": "Field Ops"}, {"master": "Photos", "code": "S15", "desc": "Missing/Illegible AC COMBINER PANEL photo", "party": "Field Ops"}, {"master": "Photos", "code": "S16", "desc": "Missing MICROINVERTERS photo", "party": "Field Ops"}, {"master": "Photos", "code": "S17", "desc": "Missing MICROINVERTER SERIAL # map photos", "party": "Field Ops"}, {"master": "Photos", "code": "S18", "desc": "Illegible MICROINVERTER SERIAL # map photos", "party": "Field Ops"}, {"master": "Photos", "code": "S19", "desc": "Missing AC DISCONNECT photos", "party": "Field Ops"}, {"master": "Photos", "code": "S20", "desc": "Illegible FUSE RATING INSIDE AC DISCONNECT", "party": "Field Ops"}, {"master": "Photos", "code": "S21", "desc": "Missing ENVOY SERIAL # photo", "party": "Field Ops"}, {"master": "Photos", "code": "S22", "desc": "Illegible ENVOY SERIAL # photo", "party": "Field Ops"}, {"master": "Photos", "code": "S23", "desc": "Missing INTERCONNECTION photos", "party": "Field Ops"}, {"master": "Photos", "code": "S24", "desc": "Missing UP CLOSE OF MAIN BREAKER photo", "party": "Field Ops"}, {"master": "Photos", "code": "S25", "desc": "Missing UP CLOSE OF BACKFEED BREAKER photo", "party": "Field Ops"}, {"master": "Photos", "code": "S26", "desc": "Missing BUS BAR RATING STICKER photo", "party": "Field Ops"}, {"master": "Photos", "code": "S28", "desc": "Missing/illegible Back of Panel Photo", "party": "Field Ops"}, {"master": "Photos", "code": "S29", "desc": "Missing trenching and concrete footing with depth measurements satisfying NEC 300", "party": "Field Ops"}, {"master": "Photos", "code": "S30", "desc": "Missing house street number photo", "party": "Field Ops"}, {"master": "Photos", "code": "S31", "desc": "Missing photo of the EGC bonded to rails or mounting structure.", "party": "Field Ops"}, {"master": "Photos", "code": "S32", "desc": "Missing Skeleton Racking photos", "party": "Field Ops"}, {"master": "Photos", "code": "S33", "desc": "Missing photo of deadfront on MSP and labeled showing filler plates installed", "party": "Field Ops"}, {"master": "Photos", "code": "S34", "desc": "Missing photo of main service panel without deadfront to confirm CTs installed", "party": "Field Ops"}, {"master": "Photos", "code": "S35", "desc": "Missing Electrical Wall photo", "party": "Field Ops"}, {"master": "Photos", "code": "S36", "desc": "Missing AC Disconnect front panel photo", "party": "Field Ops"}, {"master": "Photos", "code": "S37", "desc": "photo of Microinverter mounted to the panel", "party": "Field Ops"}, {"master": "Photos", "code": "S38", "desc": "missing AHJ Required Grounding", "party": "Field Ops"}, {"master": "Photos", "code": "S39", "desc": "Phase Verification in String Inverter (Circuit Testing)", "party": "Field Ops"}, {"master": "Photos", "code": "S40", "desc": "Missing Array String Map", "party": "Field Ops"}, {"master": "Photos", "code": "S41", "desc": "Missing photo of Jbox Sealant", "party": "Field Ops"}, {"master": "Photos", "code": "S42", "desc": "Missing inside of exterior mounted Main breaker enclosure", "party": "Field Ops"}, {"master": "Photos", "code": "S43", "desc": "Missing inside of non-back up loads panel", "party": "Field Ops"}, {"master": "Photos", "code": "S44", "desc": "Missing Ground-based Inverter label photo", "party": "Field Ops"}, {"master": "Photos", "code": "S45", "desc": "Missing Commissioning screenshots", "party": "Field Ops"}, {"master": "Photos", "code": "S46", "desc": "Missing photo of the SIDE of the optimizer showing serial # & sku label", "party": "Field Ops"}];
+
+const FUND_STATUS_LABEL = {
+  not_eligible: 'Not Eligible',
+  eligible:     'Eligible',
+  submitted:    'Submitted',
+  funded:       'Funded',
+  nonfunded:    'Nonfunded',
+};
+const FUND_STATUS_CLS = {
+  not_eligible: 'background:var(--bg2);color:var(--text3)',
+  eligible:     'background:#eeedfe;color:#3c3489',
+  submitted:    'background:#e6f1fb;color:#0c447c',
+  funded:       'background:#E1F5EE;color:#085041',
+  nonfunded:    'background:#fcebeb;color:#a32d2d',
+};
+
+let fundingFilter = 'eligible'; // all | eligible | submitted | funded | nonfunded
+let fundingMilestone = 'all';   // all | m2 | m3
+let fundingSearch = '';
+let fundingModalPid = null;
+let fundingModalMilestone = null;
+
+// Derive funding status for a project/milestone from task state + project_funding
+function getFundingStatus(pid, milestone) {
+  const f = projectFunding[pid];
+  if (f && f[milestone + 'Status']) return f[milestone + 'Status'];
+  // Auto-derive eligibility from task completion
+  if (milestone === 'm2') {
+    const installDone = ts(pid, 'install_done') === 'Complete';
+    return installDone ? 'eligible' : 'not_eligible';
+  }
+  if (milestone === 'm3') {
+    const pto = ts(pid, 'pto') === 'Complete';
+    return pto ? 'eligible' : 'not_eligible';
+  }
+  return 'not_eligible';
+}
+
+function getFundingRow(pid, milestone) {
+  const f = projectFunding[pid] || {};
+  return {
+    status:        getFundingStatus(pid, milestone),
+    amount:        f[milestone + 'Amount'] || '',
+    fundedDate:    f[milestone + 'FundedDate'] || '',
+    submittedDate: f[milestone + 'SubmittedDate'] || '',
+    notes:         f[milestone + 'Notes'] || '',
+    nfCode1:       f['nonfundedCode1'] || '',
+    nfCode2:       f['nonfundedCode2'] || '',
+    nfCode3:       f['nonfundedCode3'] || '',
+  };
+}
+
+function renderFunding() {
+  const el = document.getElementById('funding-page');
+  if (!el) return;
+
+  // Build the list of projects to show
+  const milestones = fundingMilestone === 'all' ? ['m2','m3'] : [fundingMilestone];
+  let rows = [];
+
+  projects.forEach(p => {
+    if (p.stage === 'cancelled') return;
+    milestones.forEach(ms => {
+      const row = getFundingRow(p.id, ms);
+      if (fundingFilter !== 'all' && row.status !== fundingFilter) return;
+      if (fundingSearch) {
+        const q = fundingSearch.toLowerCase();
+        if (!(p.name||'').toLowerCase().includes(q) &&
+            !(p.id||'').toLowerCase().includes(q) &&
+            !(p.city||'').toLowerCase().includes(q)) return;
+      }
+      rows.push({p, ms, row});
+    });
+  });
+
+  // Sort: nonfunded first, then eligible, then submitted, then funded, then not_eligible
+  const sortOrder = {nonfunded:0, eligible:1, submitted:2, funded:3, not_eligible:4};
+  rows.sort((a,b) => {
+    const sd = (sortOrder[a.row.status]||9) - (sortOrder[b.row.status]||9);
+    if (sd !== 0) return sd;
+    return (Number(b.p.contract)||0) - (Number(a.p.contract)||0);
+  });
+
+  // Counts for filter bar
+  const counts = {all:0, eligible:0, submitted:0, funded:0, nonfunded:0};
+  projects.forEach(p => {
+    ['m2','m3'].forEach(ms => {
+      const s = getFundingStatus(p.id, ms);
+      counts.all++;
+      if (counts[s] !== undefined) counts[s]++;
+    });
+  });
+
+  // Totals
+  const totalFunded   = projects.reduce((a,p) => {
+    const f = projectFunding[p.id]||{};
+    return a + (Number(f.m2Amount)||0) + (Number(f.m3Amount)||0);
+  }, 0);
+  const totalEligible = projects.filter(p => getFundingStatus(p.id,'m2')==='eligible'||getFundingStatus(p.id,'m3')==='eligible').length;
+  const totalSubmitted= projects.filter(p => getFundingStatus(p.id,'m2')==='submitted'||getFundingStatus(p.id,'m3')==='submitted').length;
+  const totalNF       = projects.filter(p => getFundingStatus(p.id,'m2')==='nonfunded'||getFundingStatus(p.id,'m3')==='nonfunded').length;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Total funded</div>
+        <div class="metric-value mv-green">$${Math.round(totalFunded/1000)}k</div>
+      </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Ready to submit</div>
+        <div class="metric-value" style="color:#534AB7;">${totalEligible}</div>
+      </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Submitted</div>
+        <div class="metric-value" style="color:#0C447C;">${totalSubmitted}</div>
+      </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Nonfunded</div>
+        <div class="metric-value mv-red">${totalNF}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${['all','eligible','submitted','funded','nonfunded'].map(f => `
+          <button class="sch-filter-btn ${fundingFilter===f?'active':''}" onclick="fundingFilter='${f}';renderFunding()">
+            ${FUND_STATUS_LABEL[f]||'All'} <span style="font-size:9px;opacity:.7;">${counts[f]||0}</span>
+          </button>`).join('')}
+      </div>
+      <div style="display:flex;gap:4px;">
+        ${['all','m2','m3'].map(m => `
+          <button class="sch-filter-btn ${fundingMilestone===m?'active':''}" onclick="fundingMilestone='${m}';renderFunding()">
+            ${m==='all'?'All milestones':m.toUpperCase()}
+          </button>`).join('')}
+      </div>
+      <input class="search-input" type="text" placeholder="Search projects..."
+        value="${fundingSearch}"
+        oninput="fundingSearch=this.value;renderFunding()"
+        style="width:180px;margin-left:auto;">
+    </div>
+
+    ${!rows.length ? `<div style="padding:40px;text-align:center;color:var(--text3);">No projects match this filter.</div>` : `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Project</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">City</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">PM</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Milestone</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Status</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Contract</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Funded</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Submitted</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">NF Codes</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(({p, ms, row}, i) => {
+          const nfCodes = [row.nfCode1, row.nfCode2, row.nfCode3].filter(Boolean);
+          const nfHtml = nfCodes.map(c => {
+            const def = NONFUND_CODES.find(x => x.code === c);
+            return `<span title="${def?def.desc:''}" style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fcebeb;color:#a32d2d;margin-right:2px;">${c}</span>`;
+          }).join('');
+          return `<tr style="background:${i%2===0?'var(--bg)':'var(--bg2)'};border-bottom:0.5px solid var(--border);cursor:pointer;"
+            onclick="openFundingModal('${p.id}','${ms}')">
+            <td style="padding:9px 12px;">
+              <div style="font-weight:500;">${p.name}</div>
+              <div style="font-size:10px;color:var(--text3);">${p.id}</div>
+            </td>
+            <td style="padding:9px 12px;color:var(--text2);">${p.city||'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${p.pm||'—'}</td>
+            <td style="padding:9px 12px;">
+              <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--bg2);color:var(--text2);">${ms.toUpperCase()}</span>
+            </td>
+            <td style="padding:9px 12px;">
+              <span style="font-size:10px;padding:2px 8px;border-radius:10px;${FUND_STATUS_CLS[row.status]||''};">${FUND_STATUS_LABEL[row.status]||row.status}</span>
+            </td>
+            <td style="padding:9px 12px;color:var(--text2);">${p.contract?'$'+Number(p.contract).toLocaleString():'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${row.amount?'$'+Number(row.amount).toLocaleString():'—'}</td>
+            <td style="padding:9px 12px;color:var(--text3);font-size:11px;">${row.submittedDate?new Date(row.submittedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td>
+            <td style="padding:9px 12px;">${nfHtml||'—'}</td>
+            <td style="padding:9px 12px;" onclick="event.stopPropagation()">
+              ${row.status === 'eligible' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;" onclick="quickFundAction('${p.id}','${ms}','submitted')">Mark Submitted</button>` : ''}
+              ${row.status === 'submitted' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;background:var(--green);color:#fff;border:none;" onclick="openFundingModal('${p.id}','${ms}')">Record Funded</button>` : ''}
+              ${row.status === 'nonfunded' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;" onclick="openFundingModal('${p.id}','${ms}')">Manage Codes</button>` : ''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`}
+  `;
+}
+
+// Quick status change without opening modal (e.g. Mark Submitted)
+async function quickFundAction(pid, milestone, newStatus) {
+  const today = new Date().toISOString().slice(0,10);
+  const f = projectFunding[pid] || {};
+  const update = {projectId: pid};
+  update[milestone + 'Status'] = newStatus;
+  if (newStatus === 'submitted') update[milestone + 'SubmittedDate'] = today;
+
+  if (!projectFunding[pid]) projectFunding[pid] = {};
+  Object.assign(projectFunding[pid], update);
+  renderFunding();
+  showToast(milestone.toUpperCase() + ' marked ' + newStatus);
+
+  // Persist
+  await sbRun(sb.from('project_funding').upsert(camelToSnake(update), {onConflict:'project_id'}));
+  // Log event
+  await sbRun(sb.from('funding_events').insert({
+    project_id: pid,
+    milestone,
+    event_type: newStatus,
+    date: today,
+    created_by: currentUser.name||'Team',
+  }));
+}
+
+// Full funding modal — for recording funded amounts, nonfunded codes, notes
+function openFundingModal(pid, milestone) {
+  fundingModalPid = pid;
+  fundingModalMilestone = milestone;
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const row = getFundingRow(pid, milestone);
+  const f = projectFunding[pid] || {};
+  const events = (fundingEvents[pid]||[]).filter(e => e.milestone === milestone);
+
+  const el = document.getElementById('funding-modal-content');
+  const title = document.getElementById('funding-modal-title');
+  if (!el || !title) return;
+
+  title.textContent = p.name + ' — ' + milestone.toUpperCase() + ' Funding';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div>
+        <div class="np-label">Status</div>
+        <select class="np-input" id="fm-status">
+          ${['not_eligible','eligible','submitted','funded','nonfunded'].map(s =>
+            `<option value="${s}" ${row.status===s?'selected':''}>${FUND_STATUS_LABEL[s]}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div>
+        <div class="np-label">Funded Amount ($)</div>
+        <input class="np-input" id="fm-amount" type="number" value="${row.amount||''}" placeholder="0">
+      </div>
+      <div>
+        <div class="np-label">Submitted Date</div>
+        <input class="np-input" id="fm-submitted-date" type="date" value="${row.submittedDate||''}">
+      </div>
+      <div>
+        <div class="np-label">Funded Date</div>
+        <input class="np-input" id="fm-funded-date" type="date" value="${row.fundedDate||''}">
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="np-label">Nonfunded Codes</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        ${[1,2,3].map(n => `
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Code ${n}</div>
+            <select class="np-input" id="fm-nf-${n}" style="font-size:11px;">
+              <option value="">— None —</option>
+              ${NONFUND_CODES.map(c => `<option value="${c.code}" ${(f['nonfundedCode'+n]||'')==c.code?'selected':''}>${c.code} — ${c.desc.slice(0,30)}</option>`).join('')}
+            </select>
+          </div>`).join('')}
+      </div>
+      ${[1,2,3].map(n => {
+        const code = f['nonfundedCode'+n];
+        const def = code ? NONFUND_CODES.find(x => x.code === code) : null;
+        return def ? `<div id="nf-desc-${n}" style="font-size:10px;color:var(--text3);margin-top:4px;padding:4px 8px;background:var(--bg2);border-radius:4px;">${def.master} · ${def.desc} · Responsible: ${def.party}</div>` : `<div id="nf-desc-${n}"></div>`;
+      }).join('')}
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="np-label">Notes</div>
+      <textarea class="np-input" id="fm-notes" rows="2" style="resize:vertical;" placeholder="Add a note...">${row.notes||''}</textarea>
+    </div>
+
+    ${events.length ? `
+    <div>
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Event History</div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${events.slice(0,8).map(e => `
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 8px;background:var(--bg2);border-radius:4px;">
+            <span style="color:var(--text3);">${e.date||e.createdAt?.slice(0,10)||''}</span>
+            <span style="padding:1px 6px;border-radius:8px;${FUND_STATUS_CLS[e.eventType]||'background:var(--bg2)'};font-size:9px;">${FUND_STATUS_LABEL[e.eventType]||e.eventType}</span>
+            <span style="color:var(--text2);flex:1;">${e.notes||''}</span>
+            <span style="color:var(--text3);">${e.createdBy||''}</span>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+  `;
+
+  // Wire up NF code selects to show description
+  [1,2,3].forEach(n => {
+    const sel = document.getElementById('fm-nf-'+n);
+    if (sel) sel.onchange = () => {
+      const def = NONFUND_CODES.find(x => x.code === sel.value);
+      const desc = document.getElementById('nf-desc-'+n);
+      if (desc) desc.textContent = def ? def.master+' · '+def.desc+' · Responsible: '+def.party : '';
+    };
+  });
+
+  document.getElementById('funding-modal').style.display='flex';
+}
+
+async function saveFundingModal() {
+  const pid = fundingModalPid;
+  const milestone = fundingModalMilestone;
+  if (!pid || !milestone) return;
+
+  const get = id => document.getElementById(id)?.value||'';
+  const status        = get('fm-status');
+  const amount        = get('fm-amount');
+  const submittedDate = get('fm-submitted-date');
+  const fundedDate    = get('fm-funded-date');
+  const notes         = get('fm-notes');
+  const nf1           = get('fm-nf-1');
+  const nf2           = get('fm-nf-2');
+  const nf3           = get('fm-nf-3');
+
+  const update = {
+    projectId: pid,
+    [milestone+'Status']:        status,
+    [milestone+'Amount']:        amount||null,
+    [milestone+'SubmittedDate']: submittedDate||null,
+    [milestone+'FundedDate']:    fundedDate||null,
+    [milestone+'Notes']:         notes||null,
+    nonfundedCode1: nf1||null,
+    nonfundedCode2: nf2||null,
+    nonfundedCode3: nf3||null,
+  };
+
+  // Optimistic update
+  if (!projectFunding[pid]) projectFunding[pid] = {};
+  Object.assign(projectFunding[pid], update);
+  closeFundingModal();
+  renderFunding();
+  showToast('Funding updated');
+
+  // Persist
+  await sbRun(sb.from('project_funding').upsert(camelToSnake(update), {onConflict:'project_id'}));
+
+  // Log event
+  const oldStatus = getFundingStatus(pid, milestone);
+  if (status !== oldStatus || notes) {
+    await sbRun(sb.from('funding_events').insert({
+      project_id:  pid,
+      milestone,
+      event_type:  status,
+      amount:      amount||null,
+      date:        fundedDate||submittedDate||new Date().toISOString().slice(0,10),
+      notes:       notes||null,
+      nf_code_1:   nf1||null,
+      nf_code_2:   nf2||null,
+      nf_code_3:   nf3||null,
+      created_by:  currentUser.name||'Team',
+    }));
+  }
+}
+
+function closeFundingModal() {
+  document.getElementById('funding-modal').style.display='none';
+  fundingModalPid = null;
+  fundingModalMilestone = null;
+}
+
+
+
+// ── HELP MODULE ───────────────────────────────────────────
+let helpTab = 'pms';
+let helpQuery = '';
+
+const HELP_CONTENT = {
+  pms: {
+    label: 'For PMs',
+    sections: [
+      {
+        title: 'Daily workflow',
+        cards: [
+          {
+            h: 'Command Center — your home base',
+            p: 'The Command Center shows everything that needs your attention right now. Blocked projects, critical SLA breaches, overdue tasks, and upcoming schedule are all surfaced here. Start here every morning.',
+          },
+          {
+            h: 'My Queue — your personal task list',
+            p: 'My Queue shows only your active projects with tasks that need action. Each card shows the tasks currently Ready to Start or In Progress. Work top to bottom — overdue tasks appear in red.',
+          },
+          {
+            h: 'Opening a project panel',
+            p: 'Click any project row to open its detail panel on the right. The panel loads task state and notes from the server — a brief spinner is normal. The panel stays open as you scroll.',
+          },
+        ]
+      },
+      {
+        title: 'Tasks',
+        cards: [
+          {
+            h: 'How tasks unlock',
+            p: 'Tasks unlock automatically when their prerequisites are complete. A task showing "Not Ready" is waiting on something else — hover the task name to see what. You cannot change a locked task.',
+            ul: ['Complete prerequisite tasks first', 'The dependent task will unlock to "Ready to Start" automatically', 'You will see this reflected immediately in your queue'],
+          },
+          {
+            h: 'Task statuses',
+            p: 'Each task moves through these statuses:',
+            ul: ['Ready to Start — prerequisites done, waiting to begin', 'Scheduled — date assigned, not yet started', 'In Progress — actively being worked', 'Pending Resolution — blocked, waiting on external action', 'Revision Required — needs rework', 'Complete — done'],
+          },
+          {
+            h: 'Required vs optional tasks',
+            p: 'Tasks marked "opt" are optional and do not block stage advances. Required tasks must all be Complete before you can move to the next stage.',
+          },
+          {
+            h: 'Setting due dates',
+            p: 'Click the date field under any task name to set a due date. Overdue tasks appear in red across Command Center, My Queue, and the daily digest email. Clear a due date with the × button.',
+          },
+        ]
+      },
+      {
+        title: 'Moving stages',
+        cards: [
+          {
+            h: 'Advancing a project to the next stage',
+            p: 'In the project panel left column, scroll to "Move stage". Select the next stage and click Move. If any required tasks are incomplete, the system will block the move and list what is missing.',
+          },
+          {
+            h: 'Completing a project',
+            p: 'Moving to Completion opens a closeout checklist — PTO received, final inspection passed, docs delivered, monitoring active. Fill in the completion date and any closing notes. This triggers a completion notification to Greg and Heidi.',
+          },
+        ]
+      },
+      {
+        title: 'Notes & communication',
+        cards: [
+          {
+            h: 'Adding notes',
+            p: 'Open a project panel → Notes tab. Type your note and press Enter or click Send. Notes are timestamped and attributed to you. All team members see notes in real time.',
+          },
+          {
+            h: '@mentioning someone',
+            p: 'Type @ in a note to trigger the mention dropdown. Select a team member. They receive an email notification with the project context. Mentions appear highlighted in the chat.',
+          },
+          {
+            h: 'Blockers',
+            p: 'Use the Blocker field in the project panel to flag a project that cannot progress. Describe the blocker clearly — it shows on the Command Center and in the daily digest. Clear it by deleting the text and saving.',
+          },
+        ]
+      },
+      {
+        title: 'Editing projects',
+        cards: [
+          {
+            h: 'Editing project details',
+            p: 'Click the Edit button in the project panel header. The edit modal has 4 tabs: Basic (core info), Equipment (modules, inverters, batteries), Site & Permitting (electrical specs, permit numbers), and Milestones & Funding (key dates, M1/M2/M3).',
+          },
+          {
+            h: 'Reassigning a PM',
+            p: 'In the project panel, use the Reassign dropdown next to the PM name. Or use the PM Rebalance tool in Analytics → Rebalance to move multiple projects at once.',
+          },
+        ]
+      },
+    ]
+  },
+  funding: {
+    label: 'For Funding',
+    sections: [
+      {
+        title: 'The Funding tab',
+        cards: [
+          {
+            h: 'What the Funding tab shows',
+            p: 'The Funding tab shows every project and milestone (M2, M3) that needs action. The default filter is "Eligible" — projects where the trigger task has been completed and the milestone is ready to submit.',
+          },
+          {
+            h: 'M2 and M3 triggers',
+            p: 'M2 becomes eligible when the "Installation Complete" task is marked Complete by the PM. M3 becomes eligible when "Permission to Operate" is marked Complete. These update automatically — no manual trigger needed.',
+          },
+          {
+            h: 'Workflow for a funding milestone',
+            ul: ['Filter to Eligible — these are ready to submit to Edge', 'Click "Mark Submitted" on the row, or open the row to set a submitted date', 'After Edge processes it, open the row and record the funded amount + date', 'If Edge returns it nonfunded, open the row and assign the nonfunded code(s)'],
+          },
+        ]
+      },
+      {
+        title: 'Nonfunded codes',
+        cards: [
+          {
+            h: 'What nonfunded codes mean',
+            p: 'Edge returns a code when they cannot fund a milestone. Each code has a description and a responsible party (Field Ops, Sales Ops, Project Management, etc.). The code tells you exactly what needs to be fixed before resubmitting.',
+          },
+          {
+            h: 'Assigning nonfunded codes',
+            p: 'Open the funding row → set status to Nonfunded → select up to 3 codes from the dropdown. The description and responsible party appear automatically. Add a note if needed, then save. The codes appear on the row in the funding table.',
+          },
+          {
+            h: 'Event history',
+            p: 'Every status change is logged in the event history at the bottom of the funding modal — who changed it, when, and what notes were added. This is your audit trail for Edge disputes.',
+          },
+        ]
+      },
+    ]
+  },
+  leadership: {
+    label: 'For Leadership',
+    sections: [
+      {
+        title: 'Analytics',
+        cards: [
+          {
+            h: 'Portfolio health overview',
+            p: 'Analytics shows the full pipeline: active revenue, revenue at risk, average cycle time, and a stage-by-stage breakdown. The SLA health bar shows what percentage of projects are on track vs at risk vs critical.',
+          },
+          {
+            h: 'SLA status explained',
+            p: 'Each stage has three thresholds — target, risk, and critical — measured in days since the project entered that stage.',
+            ul: ['On track (green) — within target days', 'Past target (amber) — past SLA but not yet at risk threshold', 'At risk (orange) — approaching critical', 'Critical (red) — past the critical threshold', 'Blocked (purple) — flagged with a blocker by PM'],
+          },
+          {
+            h: 'Stage bottlenecks',
+            p: 'The bottleneck chart shows average days spent in each stage vs the SLA target. Bars extending past the vertical line are over target. This tells you where the pipeline is slowing.',
+          },
+          {
+            h: 'Revenue forecast',
+            p: 'The forecast estimates when active projects will reach PTO based on current stage and median days remaining. Groups projects into 14-day, 15-30 day, and 31-60 day windows.',
+          },
+          {
+            h: 'PM rebalance',
+            p: 'In Analytics, click Rebalance to see each PM workload side by side. Select projects from one PM and move them to another in bulk. Useful for redistributing when someone takes PTO or a PM is overloaded.',
+          },
+        ]
+      },
+      {
+        title: 'Pipeline board',
+        cards: [
+          {
+            h: 'Pipeline view',
+            p: 'The Pipeline board shows all active projects in columns by stage. Scroll horizontally to see all stages. Click any project card to open the detail panel. Filter by PM using the dropdown at the top right.',
+          },
+        ]
+      },
+      {
+        title: 'Export',
+        cards: [
+          {
+            h: 'Exporting project data',
+            p: 'Click ↓ Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. Use TSV to paste directly into a new Google Sheet with Ctrl+Shift+V.',
+          },
+        ]
+      },
+    ]
+  },
+  everyone: {
+    label: 'For Everyone',
+    sections: [
+      {
+        title: 'Navigation',
+        cards: [
+          {
+            h: 'Keyboard shortcuts',
+            ul: ['1 — Command Center', '2 — My Queue', '3 — Pipeline', '4 — Analytics', '5 — Task Audit', '6 — Schedule', '7 — Service Calls', '8 — Funding', '9 — Help', '/ — Focus search', 'N — New project', 'Esc — Close panel or modal'],
+          },
+          {
+            h: 'Search',
+            p: 'Press / or click the search bar to search across all projects by name, ID, city, financier, AHJ, utility, advisor, or consultant. Results appear instantly. Click a result to open the project panel.',
+          },
+          {
+            h: 'Data freshness',
+            p: 'The green dot and timestamp in the top bar shows when data was last loaded. Click it to force a refresh. The dot turns red if the live connection drops.',
+          },
+          {
+            h: 'Real-time updates',
+            p: 'Changes made by other team members appear on your screen automatically — no refresh needed. Task status changes, new notes, and stage moves all propagate in real time.',
+          },
+        ]
+      },
+      {
+        title: 'Schedule',
+        cards: [
+          {
+            h: 'Schedule view',
+            p: 'The Schedule tab shows a weekly grid with all crews and their assigned jobs. Switch between Grid and Agenda views. Filter by warehouse, job type, PM, or city.',
+          },
+          {
+            h: 'Scheduling a job',
+            p: 'Click any cell in the grid or click + Schedule Job. Select the project, crew, job type, date, and time. If the crew already has a job that day, a conflict warning appears.',
+          },
+        ]
+      },
+      {
+        title: 'Service Calls',
+        cards: [
+          {
+            h: 'Creating a service call',
+            p: 'Click + New Service Call in the Service tab. Fill in customer info, issue type, priority, and assign a crew if known. Service calls track through Open → Scheduled → In Progress → Closed.',
+          },
+        ]
+      },
+    ]
+  },
+};
+
+function openHelp(section) {
+  helpTab = section || helpTab || 'pms';
+  setView('help', document.getElementById('btn-help'));
+}
+
+function renderHelp() {
+  const el = document.getElementById('help-page');
+  if (!el) return;
+
+  const tabs = Object.entries(HELP_CONTENT).map(([key, val]) =>
+    `<button class="help-tab ${helpTab===key?'active':''}" onclick="helpTab='${key}';renderHelp()">${val.label}</button>`
+  ).join('');
+
+  const tab = HELP_CONTENT[helpTab];
+  if (!tab) return;
+
+  // Filter content by search query
+  const q = helpQuery.toLowerCase();
+  const sectionsHtml = tab.sections.map(section => {
+    const cards = section.cards.filter(c => {
+      if (!q) return true;
+      return (c.h+' '+(c.p||'')+' '+(c.ul||[]).join(' ')).toLowerCase().includes(q);
+    });
+    if (!cards.length) return '';
+    return `<div class="help-section">
+      <h2>${section.title}</h2>
+      ${cards.map(c => `<div class="help-card">
+        <h3>${c.h}</h3>
+        ${c.p ? `<p>${c.p}</p>` : ''}
+        ${c.ul ? `<ul>${c.ul.map(i => `<li>${i}</li>`).join('')}</ul>` : ''}
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="help-hero">
+      <h1>MicroGRID CRM — Help</h1>
+      <p>Everything you need to know to work in the platform. Updated as features are added.</p>
+      <input class="help-search" type="text" placeholder="Search help..."
+        value="${helpQuery}"
+        oninput="helpQuery=this.value;renderHelp()">
+    </div>
+    <div class="help-tabs">${tabs}</div>
+    ${sectionsHtml || '<div style="padding:40px;text-align:center;color:var(--text3);">No results for "'+helpQuery+'"</div>'}
+  `;
+}
+
+
+// ── BOM MODULE ────────────────────────────────────────────
+
+function calcBOM(p, inputs) {
+  const modules    = Number(p.moduleQty) || 0;
+  const batteries  = Number(p.batteryQty) || 0;
+  const inverters  = Number(p.inverterQty) || 1;
+  const arrays     = Number(inputs.arrayCount) || 1;
+  const rows       = Number(inputs.rowCount) || 1;
+  const attach     = Number(inputs.attachmentCount) || Math.round(modules * 2.4);
+  const ov         = inputs.overrides || {};
+
+  function qty(key, formula) {
+    return ov[key] !== undefined ? Number(ov[key]) : formula;
+  }
+
+  const rsd        = Math.ceil(modules / 2);
+  const endClamps  = Math.round(attach * 0.375);
+  const midClamps  = (modules - rows) * 2 - 4;
+
+  return [
+    // ── MODULES & INVERTERS ──────────────────────────────
+    {cat:'PV Equipment', key:'modules',       label:'Solar PV Modules',             pn: p.module||'', qty: qty('modules', modules),             unit:'EACH', note:'From project data'},
+    {cat:'PV Equipment', key:'inverters',     label:'Inverters',                    pn: p.inverter||'', qty: qty('inverters', inverters),        unit:'EACH', note:'From project data'},
+    {cat:'PV Equipment', key:'batteries',     label:'Batteries',                    pn: p.battery||'', qty: qty('batteries', batteries),         unit:'EACH', note:'From project data'},
+    // ── RAPID SHUTDOWN ───────────────────────────────────
+    {cat:'Rapid Shutdown', key:'rsd',         label:'Rapid Shutdown Device (RSD)',  pn:'APSMART RSD-D-20', qty: qty('rsd', rsd),                 unit:'EACH', note:'1 RSD per 2 panels'},
+    {cat:'Rapid Shutdown', key:'mlpe_mounts', label:'MLPE Mounts',                  pn:'',             qty: qty('mlpe_mounts', rsd + 4),         unit:'EACH', note:'RSDs + 4 spare'},
+    // ── SOLAR WIRING / ACCESSORIES ───────────────────────
+    {cat:'Solar Wiring',  key:'soladecks',    label:'Soladecks',                    pn:'',             qty: qty('soladecks', arrays),            unit:'EACH', note:'1 per array'},
+    {cat:'Solar Wiring',  key:'trunk_cables', label:'Trunk Cables',                 pn:'',             qty: qty('trunk_cables', modules + arrays*2 + 4), unit:'EACH', note:'Panels + arrays×2 + 4 spare'},
+    {cat:'Solar Wiring',  key:'terminators',  label:'Terminators',                  pn:'',             qty: qty('terminators', arrays*2 + 1),    unit:'EACH', note:'2 per array + 1'},
+    {cat:'Solar Wiring',  key:'seals',        label:'Seals',                        pn:'',             qty: qty('seals', arrays*2 + 1),           unit:'EACH', note:'2 per array + 1'},
+    // ── DISCONNECTS ──────────────────────────────────────
+    {cat:'Disconnects',   key:'disc_30a',     label:'30A/2P Non-Fusible Disconnect',pn:'CHD DG221URB', qty: qty('disc_30a', 1),                  unit:'EACH', note:'As needed'},
+    {cat:'Disconnects',   key:'disc_200a',    label:'200A/2P Non-Fusible Disconnect',pn:'CHD DG224URK',qty: qty('disc_200a', 1),                 unit:'EACH', note:'As needed'},
+    // ── ELECTRICAL ───────────────────────────────────────
+    {cat:'Electrical',    key:'ground_lugs',  label:'Ground Lugs',                  pn:'',             qty: qty('ground_lugs', arrays),          unit:'EACH', note:'1 per continuous array (EcoFasten)'},
+    {cat:'Electrical',    key:'roof_sealant', label:'Roof Sealant',                 pn:'',             qty: qty('roof_sealant', modules<20?6:modules<=40?9:10), unit:'TUBES', note:'<20 panels=6, 20-40=9, >40=10'},
+    {cat:'Electrical',    key:'strain_relief',label:'1/2" Strain Relief',           pn:'',             qty: qty('strain_relief', arrays + 1),    unit:'EACH', note:'1 per array + 1 spare'},
+    {cat:'Electrical',    key:'cts',          label:'CTs (Splitters)',              pn:'',             qty: qty('cts', 2),                        unit:'EACH', note:'Always 2'},
+    {cat:'Electrical',    key:'emt',          label:'3/4" EMT Conduit',             pn:'',             qty: qty('emt', 11),                       unit:'STICKS', note:'Standard'},
+    {cat:'Electrical',    key:'connectors',   label:'3/4" EMT Connectors',          pn:'',             qty: qty('connectors', 6),                 unit:'EACH', note:'Standard'},
+    {cat:'Electrical',    key:'couplings',    label:'3/4" EMT Couplings',           pn:'',             qty: qty('couplings', 6),                  unit:'EACH', note:'Standard'},
+    {cat:'Electrical',    key:'zip_ties',     label:'Zip Ties',                     pn:'',             qty: qty('zip_ties', 1),                   unit:'BUNDLE', note:'Standard'},
+    {cat:'Electrical',    key:'water',        label:'Water',                        pn:'',             qty: qty('water', 1),                      unit:'CASE', note:'Standard'},
+    {cat:'Electrical',    key:'bare_copper6', label:'#6 Bare Copper Wire',          pn:'',             qty: qty('bare_copper6', 22),              unit:'FT', note:'Avg per install'},
+    {cat:'Electrical',    key:'green6',       label:'Green #6 THHN Wire',           pn:'',             qty: qty('green6', 99),                    unit:'FT', note:'Avg per install'},
+    {cat:'Electrical',    key:'black10',      label:'Black #10 Copper Wire',        pn:'',             qty: qty('black10', 83),                   unit:'FT', note:'Avg per install'},
+    {cat:'Electrical',    key:'red10',        label:'Red #10 Copper Wire',          pn:'',             qty: qty('red10', 83),                     unit:'FT', note:'Avg per install'},
+    // ── ECOFLOW ACCESSORIES ──────────────────────────────
+    {cat:'EcoFlow',       key:'smart_panel',  label:'EcoFlow Smart Electrical Panel',pn:'',            qty: qty('smart_panel', 1),               unit:'EACH', note:'As needed'},
+    {cat:'EcoFlow',       key:'efa_ct',       label:'EcoFlow OCEAN Pro CT',         pn:'ECO5018004001',qty: qty('efa_ct', 2),                    unit:'EACH', note:'As needed'},
+    {cat:'EcoFlow',       key:'handle_bar',   label:'EcoFlow OCEAN Pro Handle Bar', pn:'ECO5018004005',qty: qty('handle_bar', 1),               unit:'EACH', note:'As needed'},
+    {cat:'EcoFlow',       key:'epo',          label:'Emergency Power Off Device',   pn:'CE4T-10R-02',  qty: qty('epo', 1),                      unit:'EACH', note:'As needed'},
+    // ── RACKING (ECOFASTEN CLICKFIT) ─────────────────────
+    {cat:'Racking',       key:'smart_foot',   label:'CF Smart Foot AL MLL',         pn:'2012036',      qty: qty('smart_foot', attach),           unit:'EACH', note:'From design — exact count'},
+    {cat:'Racking',       key:'rail_clicker', label:'CF Rail Clicker AL MLL',       pn:'2012039',      qty: qty('rail_clicker', attach),         unit:'EACH', note:'Same as smart foot count'},
+    {cat:'Racking',       key:'rails',        label:'Rails CF LTE US 165.4"',       pn:'2012034',      qty: qty('rails', 0),                     unit:'EACH', note:'From design — enter count'},
+    {cat:'Racking',       key:'rail_splice',  label:'Rail Splice SS',               pn:'2012013',      qty: qty('rail_splice', 0),               unit:'EACH', note:'From design — enter count'},
+    {cat:'Racking',       key:'mid_clamps',   label:'Mid Clamps 30-40mm',           pn:'2099045',      qty: qty('mid_clamps', Math.max(0,midClamps)), unit:'EACH', note:'2 between each panel in a row'},
+    {cat:'Racking',       key:'end_clamps',   label:'End Clamps 30-40mm',           pn:'2099046',      qty: qty('end_clamps', endClamps),        unit:'EACH', note:'Based on attachment count'},
+    {cat:'Racking',       key:'mlpe_mount',   label:'CF MLPE Mount SS',             pn:'2012019',      qty: qty('mlpe_mount', modules + 5),      unit:'EACH', note:'Modules + 5'},
+    {cat:'Racking',       key:'wire_clip',    label:'CF Wire Mgmt Clip',            pn:'2012020',      qty: qty('wire_clip', modules + 5),       unit:'EACH', note:'Modules + 5'},
+    {cat:'Racking',       key:'end_cap',      label:'CF End Cap PLS BLK',           pn:'2012029',      qty: qty('end_cap', endClamps),           unit:'EACH', note:'Same as end clamp count'},
+    {cat:'Racking',       key:'screw_14x3',   label:'Screw 14x3 W/WB',             pn:'3016018',      qty: qty('screw_14x3', attach * 3),       unit:'EACH', note:'3 per attachment'},
+    {cat:'Racking',       key:'module_jumper',label:'CF Module Jumper SS 8"',       pn:'4011011',      qty: qty('module_jumper', arrays * 2),    unit:'EACH', note:'2 per array'},
+  ];
+}
+
+function renderPanelBOM(pid) {
+  const pane = document.getElementById(`ptabpane-bom-${pid}`);
+  if (!pane) return;
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+
+  const saved = projectBoms[pid] || {};
+  const inputs = {
+    arrayCount:       saved.arrayCount       || p.arrayCount       || '',
+    rowCount:         saved.rowCount         || p.rowCount         || '',
+    attachmentCount:  saved.attachmentCount  || p.attachmentCount  || '',
+    orientation:      saved.orientation      || 'portrait',
+    overrides:        saved.overrides        || {},
+  };
+
+  pane.innerHTML = renderBOMContent(pid, p, inputs);
+}
+
+function renderBOMContent(pid, p, inputs) {
+  const items = calcBOM(p, inputs);
+  const cats = [...new Set(items.map(i => i.cat))];
+
+  const tableRows = cats.map(cat => {
+    const catItems = items.filter(i => i.cat === cat);
+    return `
+      <tr style="background:var(--bg2);">
+        <td colspan="5" style="padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">${cat}</td>
+      </tr>
+      ${catItems.map(item => `
+      <tr class="bom-row" data-key="${item.key}">
+        <td style="padding:6px 12px;font-size:11px;font-weight:500;">${item.label}</td>
+        <td style="padding:6px 12px;font-size:10px;color:var(--text3);">${item.pn}</td>
+        <td style="padding:6px 8px;text-align:center;">
+          <input type="number" class="bom-qty-input" data-key="${item.key}"
+            value="${item.qty}"
+            style="width:60px;text-align:center;padding:3px 6px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--bg);"
+            onchange="setBOMOverride('${pid}','${item.key}',this.value)">
+        </td>
+        <td style="padding:6px 8px;font-size:10px;color:var(--text2);text-align:center;">${item.unit}</td>
+        <td style="padding:6px 8px;font-size:10px;color:var(--text3);">${item.note}</td>
+      </tr>`).join('')}`;
+  }).join('');
+
+  return `
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;">Bill of Materials</div>
+          <div style="font-size:10px;color:var(--text3);">Auto-calculated from project data · override any quantity</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="action-btn" style="margin:0;font-size:10px;" onclick="saveBOM('${pid}')">Save BOM</button>
+          <button class="action-btn" style="margin:0;font-size:10px;" onclick="downloadBOMCSV('${pid}')">↓ CSV</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Arrays</div>
+          <input type="number" class="np-input" id="bom-arrays-${pid}" value="${inputs.arrayCount}"
+            style="font-size:11px;padding:4px 8px;"
+            placeholder="e.g. 3"
+            onchange="refreshBOM('${pid}')">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Strings / Rows</div>
+          <input type="number" class="np-input" id="bom-rows-${pid}" value="${inputs.rowCount}"
+            style="font-size:11px;padding:4px 8px;"
+            placeholder="e.g. 5"
+            onchange="refreshBOM('${pid}')">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Attachments (Smart Feet)</div>
+          <input type="number" class="np-input" id="bom-attach-${pid}" value="${inputs.attachmentCount}"
+            style="font-size:11px;padding:4px 8px;"
+            placeholder="from planset"
+            onchange="refreshBOM('${pid}')">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Orientation</div>
+          <select class="np-input" id="bom-orient-${pid}" style="font-size:11px;padding:4px 8px;" onchange="refreshBOM('${pid}')">
+            <option value="portrait" ${inputs.orientation==='portrait'?'selected':''}>Portrait</option>
+            <option value="landscape" ${inputs.orientation==='landscape'?'selected':''}>Landscape</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+          <th style="padding:7px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--text2);">Item</th>
+          <th style="padding:7px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--text2);">Part Number</th>
+          <th style="padding:7px 8px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);">Qty</th>
+          <th style="padding:7px 8px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);">Unit</th>
+          <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:500;color:var(--text2);">Formula</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    </div>`;
+}
+
+// Store per-project overrides in memory for the current session
+const _bomInputs = {};
+
+function refreshBOM(pid) {
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const saved = projectBoms[pid] || {};
+  const inputs = {
+    arrayCount:      document.getElementById(`bom-arrays-${pid}`)?.value || saved.arrayCount || '',
+    rowCount:        document.getElementById(`bom-rows-${pid}`)?.value   || saved.rowCount   || '',
+    attachmentCount: document.getElementById(`bom-attach-${pid}`)?.value || saved.attachmentCount || '',
+    orientation:     document.getElementById(`bom-orient-${pid}`)?.value || 'portrait',
+    overrides:       saved.overrides || {},
+  };
+  _bomInputs[pid] = inputs;
+  const pane = document.getElementById(`ptabpane-bom-${pid}`);
+  if (pane) pane.innerHTML = renderBOMContent(pid, p, inputs);
+}
+
+function setBOMOverride(pid, key, val) {
+  if (!_bomInputs[pid]) _bomInputs[pid] = { overrides: {} };
+  if (!_bomInputs[pid].overrides) _bomInputs[pid].overrides = {};
+  _bomInputs[pid].overrides[key] = Number(val);
+  // Update projectBoms in memory too
+  if (!projectBoms[pid]) projectBoms[pid] = {};
+  if (!projectBoms[pid].overrides) projectBoms[pid].overrides = {};
+  projectBoms[pid].overrides[key] = Number(val);
+}
+
+async function saveBOM(pid) {
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const inputs = _bomInputs[pid] || {};
+  const saved = projectBoms[pid] || {};
+
+  const row = {
+    project_id:       pid,
+    version:          (saved.version || 0) + 1,
+    array_count:      Number(inputs.arrayCount) || null,
+    row_count:        Number(inputs.rowCount)   || null,
+    attachment_count: Number(inputs.attachmentCount) || null,
+    orientation:      inputs.orientation || 'portrait',
+    overrides:        inputs.overrides   || {},
+    created_by:       currentUser.name  || 'Team',
+  };
+
+  // If existing BOM, upsert by project_id (keep latest)
+  let err;
+  if (saved.id) {
+    ({error:err} = await sb.from('project_boms').update({
+      version:          row.version,
+      array_count:      row.array_count,
+      row_count:        row.row_count,
+      attachment_count: row.attachment_count,
+      orientation:      row.orientation,
+      overrides:        row.overrides,
+      updated_at:       new Date().toISOString(),
+    }).eq('id', saved.id));
+  } else {
+    const {data, error} = await sb.from('project_boms').insert(row).select().single();
+    err = error;
+    if (data) {
+      projectBoms[pid] = snakeToCamel(data);
+    }
+  }
+
+  if (err) { showToast('Error saving BOM: ' + err.message); return; }
+  showToast('BOM saved');
+}
+
+function downloadBOMCSV(pid) {
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const inputs = _bomInputs[pid] || projectBoms[pid] || {};
+  const items = calcBOM(p, inputs);
+
+  const header = ['Item','Part Number','Qty','Unit','Formula'];
+  const rows = items.map(i => [
+    i.label, i.pn, i.qty, i.unit, i.note
+  ]);
+
+  const csv = [header, ...rows].map(r =>
+    r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')
+  ).join('\n');
+
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `BOM_${pid}_${p.name.replace(/\s+/g,'_')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
 // ── KEYBOARD SHORTCUTS ───────────────────────────────────
 document.addEventListener('keydown',function(e){
   // Skip if typing in an input/textarea
@@ -4219,7 +6195,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='n'||e.key==='N'){ openNewProject(); return; }
 
   // 1-6 — switch views
-  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule','7':'service'};
+  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule','7':'service','8':'funding','9':'help'};
   if(viewMap[e.key]){
     const v=viewMap[e.key];
     setView(v,document.getElementById('btn-'+v));
@@ -4228,8 +6204,22 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-// Only load data if already logged in from session
-if(currentUser.name) loadData();
+// Session restore and initial load handled by the async IIFE above.
 </script>
+
+<!-- FUNDING MODAL -->
+<div id="funding-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;margin:20px;padding:24px 28px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:500;" id="funding-modal-title">Funding</div>
+      <button onclick="closeFundingModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&#x2715;</button>
+    </div>
+    <div id="funding-modal-content"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <button onclick="closeFundingModal()" style="font-size:12px;padding:7px 16px;border-radius:8px;border:0.5px solid rgba(0,0,0,0.18);background:#fff;cursor:pointer;">Cancel</button>
+      <button onclick="saveFundingModal()" style="font-size:12px;padding:7px 18px;border-radius:8px;border:none;background:var(--green);color:#fff;font-weight:500;cursor:pointer;">Save</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
