@@ -2543,7 +2543,18 @@ function renderPanel(pid){
     const style=opts&&opts.small?'font-size:10px;':'';
     return `<div class="frow"><span class="flabel">${label}</span><span class="fval" style="${style}">${val}</span></div>`;
   };
-  const fdate=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+  const fdate=d=>{
+    if(!d) return '';
+    try{
+      let s=d;
+      // Convert MM/DD/YYYY to ISO if needed
+      const mdy=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if(mdy) s=`${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
+      const dt=new Date(s.includes('T')||s.includes('-')?s:s+'T00:00:00');
+      if(isNaN(dt.getTime())) return '';
+      return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    }catch(e){return '';}
+  };
 
   // Funding data for this project
   const funding = projectFunding[pid] || null;
