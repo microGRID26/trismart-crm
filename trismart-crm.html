@@ -1310,7 +1310,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={};
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -1465,6 +1465,7 @@ async function loadData(){
       {data:schedData,   error:e6},
       {data:svcData,     error:e7},
       {data:svcNoteData, error:e8},
+      {data:fundData,    error:e9},
     ] = await Promise.all([
       sb.from('projects').select('*').limit(5000),
       sb.from('stage_history').select('*').limit(10000),
@@ -1474,9 +1475,10 @@ async function loadData(){
       sb.from('schedule').select('*').limit(5000),
       sb.from('service_calls').select('*').limit(2000),
       sb.from('service_call_notes').select('*').limit(5000),
+      sb.from('project_funding').select('*').limit(5000),
     ]);
 
-    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8].find(Boolean);
+    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9].find(Boolean);
     if (firstErr) throw new Error(firstErr.message);
 
     setLoadingBar(70);
@@ -1517,6 +1519,13 @@ async function loadData(){
         if(!projectFolders[pid]||!projectFolders[pid].folderUrl) projectFolders[pid]={folderUrl:url,folderId:''};
       });
     }catch(e){}
+
+    // Project funding — keyed by projectId
+    projectFunding = {};
+    (fundData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      projectFunding[c.projectId]=c;
+    });
 
     // Crews
     crews = (crewData||[]).map(snakeToCamel).map(c=>({...c, id:c.id}));
@@ -2528,21 +2537,60 @@ function renderPanel(pid){
   document.getElementById('dp-name').textContent=p.name;
   const ageWarn=getAgeWarning(p);
   document.getElementById('dp-meta').innerHTML=`${p.id} · ${p.city} · ${s?s.label:p.stage} · ${sla.days}d in stage · ${cycle}d total · ${p.pm}${ageWarn?` <span class="age-warn-badge ${ageWarn.level}">⚠ ${ageWarn.label}</span>`:''}`;
+  // Helper: only render a row if value exists
+  const frow=(label,val,opts)=>{
+    if(!val&&val!==0) return '';
+    const style=opts&&opts.small?'font-size:10px;':'';
+    return `<div class="frow"><span class="flabel">${label}</span><span class="fval" style="${style}">${val}</span></div>`;
+  };
+  const fdate=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+
+  // Funding data for this project
+  const funding = projectFunding[pid] || null;
+
   document.getElementById('dp-left').innerHTML=`
     <div class="sec"><div class="sec-title">Contact</div>
-      ${p.address?`<div class="frow"><span class="flabel">Address</span><span class="fval" style="font-size:10px;">${p.address}</span></div>`:''}
-      <div class="frow"><span class="flabel">Phone</span><span class="fval">${p.phone}</span></div>
-      <div class="frow"><span class="flabel">Email</span><span class="fval" style="font-size:10px;">${p.email}</span></div>
+      ${frow('Address', p.address, {small:true})}
+      ${frow('Phone', p.phone)}
+      ${frow('Email', p.email, {small:true})}
     </div>
     <div class="sec"><div class="sec-title">Contract</div>
-      <div class="frow"><span class="flabel">Amount</span><span class="fval">${fmt$(p.contract)}</span></div>
-      <div class="frow"><span class="flabel">System</span><span class="fval">${p.systemkw} kW</span></div>
-      <div class="frow"><span class="flabel">Financier</span><span class="fval">${p.financier}</span></div>
-      <div class="frow"><span class="flabel">Disposition</span><span class="fval">${p.disposition}</span></div>
+      ${frow('Amount', fmt$(p.contract))}
+      ${frow('System', p.systemkw ? p.systemkw+' kW' : null)}
+      ${frow('Financier', p.financier)}
+      ${frow('Financing type', p.financingType)}
+      ${frow('Down payment', p.downPayment ? '$'+Number(p.downPayment).toLocaleString() : null)}
+      ${frow('TPO escalator', p.tpoEscalator)}
+      ${frow('Adv pmt schedule', p.financierAdvPmt)}
+      ${frow('Disposition', p.disposition)}
+    </div>
+    <div class="sec"><div class="sec-title">Equipment</div>
+      ${frow('Module', p.module ? (p.module+(p.moduleQty?' × '+p.moduleQty:'')) : null)}
+      ${frow('Inverter', p.inverter ? (p.inverter+(p.inverterQty?' × '+p.inverterQty:'')) : null)}
+      ${frow('Battery', p.battery ? (p.battery+(p.batteryQty?' × '+p.batteryQty:'')) : null)}
+      ${frow('Optimizer', p.optimizer ? (p.optimizer+(p.optimizerQty?' × '+p.optimizerQty:'')) : null)}
+    </div>
+    <div class="sec"><div class="sec-title">Site & Electrical</div>
+      ${frow('Meter location', p.meterLocation)}
+      ${frow('Panel location', p.panelLocation)}
+      ${frow('Voltage', p.voltage)}
+      ${frow('MSP bus rating', p.mspBusRating)}
+      ${frow('MPU', p.mpu)}
+      ${frow('Shutdown', p.shutdown)}
+      ${frow('Perf meter', p.performanceMeter)}
+      ${frow('Interconnect breaker', p.interconnectionBreaker)}
+      ${frow('Main breaker', p.mainBreaker)}
+      ${frow('HOA', p.hoa)}
+      ${frow('ESID', p.esid)}
     </div>
     <div class="sec"><div class="sec-title">Permitting</div>
-      <div class="frow"><span class="flabel">AHJ</span><span class="fval">${p.ahj}</span></div>
-      <div class="frow"><span class="flabel">Utility</span><span class="fval">${p.utility}</span></div>
+      ${frow('AHJ', p.ahj)}
+      ${frow('Utility', p.utility)}
+      ${frow('Permit #', p.permitNumber)}
+      ${frow('Utility app #', p.utilityAppNumber)}
+      ${frow('Permit fee', p.permitFee ? '$'+Number(p.permitFee).toLocaleString() : null)}
+      ${frow('City permit', fdate(p.cityPermitDate))}
+      ${frow('Utility permit', fdate(p.utilityPermitDate))}
     </div>
     <div class="sec"><div class="sec-title">Team</div>
       <div class="frow"><span class="flabel">PM</span><span class="fval" style="display:flex;align-items:center;gap:6px;">${p.pm}
@@ -2552,9 +2600,43 @@ function renderPanel(pid){
           <option value="Jen"${p.pm==='Jen'?' disabled':''}>Jen</option>
         </select>
       </span></div>
-      <div class="frow"><span class="flabel">Advisor</span><span class="fval">${p.advisor}</span></div>
-      <div class="frow"><span class="flabel">Consultant</span><span class="fval">${p.consultant}</span></div>
+      ${frow('Advisor', p.advisor)}
+      ${frow('Consultant', p.consultant)}
+      ${frow('Consultant email', p.consultantEmail, {small:true})}
+      ${frow('Site surveyor', p.siteSurveyor)}
     </div>
+    <div class="sec"><div class="sec-title">Milestones</div>
+      ${frow('Sale date', fdate(p.saleDate))}
+      ${frow('NTP', fdate(p.ntpDate))}
+      ${frow('Survey scheduled', fdate(p.surveyScheduledDate))}
+      ${frow('Survey complete', fdate(p.surveyDate))}
+      ${frow('Install scheduled', fdate(p.installScheduledDate))}
+      ${frow('Install complete', fdate(p.installCompleteDate))}
+      ${frow('City inspection', fdate(p.cityInspectionDate))}
+      ${frow('Utility inspection', fdate(p.utilityInspectionDate))}
+      ${frow('PTO', fdate(p.ptoDate))}
+      ${frow('In service', fdate(p.inServiceDate))}
+    </div>
+    ${funding ? `<div class="sec"><div class="sec-title">Funding</div>
+      ${funding.m1Amount ? `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:4px 0 2px;">M1</div>
+        ${frow('Amount', '$'+Number(funding.m1Amount).toLocaleString())}
+        ${frow('Funded', fdate(funding.m1FundedDate))}
+        ${frow('Chargeback', funding.m1Cb ? '$'+Number(funding.m1Cb).toLocaleString() : null)}
+        ${frow('CB credit', funding.m1CbCredit ? '$'+Number(funding.m1CbCredit).toLocaleString() : null)}` : ''}
+      ${funding.m2Amount ? `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:6px 0 2px;">M2</div>
+        ${frow('Amount', '$'+Number(funding.m2Amount).toLocaleString())}
+        ${frow('Funded', fdate(funding.m2FundedDate))}
+        ${frow('Chargeback', funding.m2Cb ? '$'+Number(funding.m2Cb).toLocaleString() : null)}
+        ${frow('CB credit', funding.m2CbCredit ? '$'+Number(funding.m2CbCredit).toLocaleString() : null)}` : ''}
+      ${funding.m3Amount||funding.m3Projected ? `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:6px 0 2px;">M3</div>
+        ${frow('Amount', funding.m3Amount ? '$'+Number(funding.m3Amount).toLocaleString() : null)}
+        ${frow('Projected', funding.m3Projected ? '$'+Number(funding.m3Projected).toLocaleString() : null)}
+        ${frow('Funded', fdate(funding.m3FundedDate))}` : ''}
+      ${funding.nonfundedCode1||funding.nonfundedCode2||funding.nonfundedCode3 ? `
+        ${frow('Nonfunded 1', funding.nonfundedCode1)}
+        ${frow('Nonfunded 2', funding.nonfundedCode2)}
+        ${frow('Nonfunded 3', funding.nonfundedCode3)}` : ''}
+    </div>` : ''}
     <div class="sec"><div class="sec-title">Timing</div>
       <div class="frow"><span class="flabel">Days in stage</span><span class="fval">${sla.days}d ${slaBadge(sla.status,sla.days)}</span></div>
       <div class="frow"><span class="flabel">Total cycle</span><span class="fval">${cycle}d</span></div>
