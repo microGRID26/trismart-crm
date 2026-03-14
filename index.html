@@ -297,6 +297,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .pmr-btn-move{padding:9px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;}
 .pmr-btn-move:disabled{background:var(--border2);color:var(--text3);cursor:not-allowed;}
 
+/* ASSIGN MODAL PROJECT SEARCH */
+.am-search-wrap{position:relative;}
+.am-search-input{width:100%;font-size:13px;padding:7px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);box-sizing:border-box;}
+.am-search-input:focus{outline:none;border-color:var(--green);}
+.am-search-drop{position:absolute;top:100%;left:0;right:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-height:200px;overflow-y:auto;z-index:10;display:none;}
+.am-search-opt{padding:7px 10px;cursor:pointer;font-size:12px;}
+.am-search-opt:hover,.am-search-opt.active{background:var(--bg2);}
+.am-search-opt-name{font-weight:500;color:var(--text);}
+.am-search-opt-meta{font-size:10px;color:var(--text3);margin-top:1px;}
+.am-selected-project{background:rgba(29,158,117,0.08);border:0.5px solid var(--green);border-radius:var(--radius);padding:6px 10px;font-size:12px;display:flex;align-items:center;justify-content:space-between;}
+
+/* PIPELINE CARD SCHEDULE BTN */
+.kcard-sched-btn{position:absolute;bottom:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--bg);border:0.5px solid var(--border2);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s;font-size:11px;color:var(--text3);}
+.kcard:hover .kcard-sched-btn{opacity:1;}
+.kcard-sched-btn:hover{background:var(--green);color:#fff;border-color:var(--green);}
+.kcard{position:relative;}
+
 /* COMPLETION MODAL */
 .completion-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
 .completion-card{background:var(--bg);border-radius:16px;width:100%;max-width:500px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
@@ -934,10 +951,23 @@ select.np-input{cursor:pointer;}
     <div class="assign-body">
       <div class="assign-field">
         <label>Project</label>
-        <select id="am-project" onchange="updateAmProjectInfo()"></select>
+        <div class="am-search-wrap" id="am-project-wrap">
+          <input type="text" class="am-search-input" id="am-project-search"
+            placeholder="Search by name, ID, city..."
+            oninput="amSearchProjects(this.value)"
+            onfocus="amSearchProjects(this.value)"
+            onkeydown="amSearchKeydown(event)"
+            autocomplete="off">
+          <div class="am-search-drop" id="am-search-drop"></div>
+          <input type="hidden" id="am-project-id">
+        </div>
+        <div id="am-selected-project" class="am-selected-project" style="display:none;margin-top:4px;">
+          <span id="am-selected-name"></span>
+          <span style="cursor:pointer;color:var(--text3);font-size:11px;" onclick="amClearProject()">✕ Change</span>
+        </div>
       </div>
       <!-- Project info strip — populates on project select -->
-      <div id="am-project-info" style="display:none;background:var(--bg2);border-radius:var(--radius);padding:8px 12px;font-size:11px;color:var(--text2);display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;"></div>
+      <div id="am-project-info" style="display:none;background:var(--bg2);border-radius:var(--radius);padding:8px 12px;font-size:11px;color:var(--text2);margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;"></div>
       <div class="assign-field">
         <label>Job type</label>
         <select id="am-type">
@@ -1250,6 +1280,8 @@ const TASKS={
 };
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={};
+let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
+let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
 let schedule=[];    // [{id,projectId,crewId,jobType,date,time,status,notes,pm}]
 let serviceCalls=[]; // service call tickets
@@ -1392,6 +1424,9 @@ async function loadData(){
     crews=data.crews||[];schedule=data.schedule||[];serviceCalls=data.serviceCalls||[];
     // Sync master roster — always ensure these crews exist
     syncMasterCrewRoster();
+    // Rebuild crew map after sync
+    crewMap={};
+    crews.forEach(c=>{ crewMap[c.id]=c; });
     // Merge any locally stored folder URLs
     try{
       const local=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');
@@ -1400,6 +1435,11 @@ async function loadData(){
       });
     }catch(e){}
     dataLoadedAt=Date.now();
+    // Rebuild O(1) lookup maps
+    projectMap={};
+    projects.forEach(p=>{ projectMap[String(p.id)]=p; });
+    crewMap={};
+    crews.forEach(c=>{ crewMap[c.id]=c; });
     updateFreshnessUI();
     if(freshnessTimer) clearInterval(freshnessTimer);
     freshnessTimer=setInterval(updateFreshnessUI,60000);
@@ -1496,8 +1536,8 @@ function renderCmdScheduleWidget(){
         const label=isToday?'Today':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
         const jobChips=jobs.length
           ? jobs.slice(0,3).map(j=>{
-              const p=projects.find(x=>String(x.id)===String(j.projectId));
-              const crew=crews.find(c=>c.id===j.crewId);
+              const p=projectMap[String(j.projectId)];
+              const crew=crewMap[j.crewId];
               return `<div style="font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:3px;background:${JT_COLOR[j.jobType]||'var(--bg)'};color:${JT_TEXT[j.jobType]||'var(--text)'};">${p?p.name.split(' ').slice(0,2).join(' '):j.projectId} · ${crew?crew.name:j.crewId}</div>`;
             }).join('')+(jobs.length>3?`<div style="font-size:10px;color:var(--text3);">+${jobs.length-3} more</div>`:'')
           : '<div style="font-size:10px;color:var(--text3);">No jobs</div>';
@@ -1854,6 +1894,7 @@ function renderPipeline(){
         ${p.financier||p.ahj?`<div style="font-size:9px;color:var(--text3);margin-bottom:2px;">${[p.financier,p.ahj].filter(Boolean).join(' · ')}</div>`:''}
         <div class="kcard-foot">${slaBadge(sla.status,sla.days)}<span class="badge b-pm">${p.pm}</span>${p.blocker?'<span class="badge b-blocked">Blocked</span>':''}${mentionBadge}</div>
         <div class="age-bar"><div class="age-fill" style="width:${sla.pct}%;background:${ageColor(sla.status)};"></div></div>
+        <div class="kcard-sched-btn" onclick="event.stopPropagation();openAssignModal(null,null,null,'${p.id}','install')" title="Schedule job">📅</div>
       </div>`;
     });
   });
@@ -2811,6 +2852,7 @@ async function submitNewProject(){
     financier:get('np-financier'),blocker:'',priority:'med',
   };
   projects.unshift(newProject);
+  projectMap[String(newProject.id)]=newProject; // keep map in sync
   taskState[newProject.id]={};
   Object.values(TASKS).flat().forEach(t=>{taskState[newProject.id][t.id]={status:t.pre.length===0?'Ready To Start':'Not Ready',completedDate:''};});
   stageHistory[newProject.id]=[{stage:stageLabel,entered:dateStr}];
@@ -2892,7 +2934,7 @@ function renderPanelSchedule(pid){
   const todayIso=isoDate(today);
 
   function jobRow(j,idx){
-    const crew=crews.find(c=>c.id===j.crewId)||{name:j.crewId,warehouse:''};
+    const crew=crewMap[j.crewId]||{name:j.crewId,warehouse:''};
     const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
     const isPast=j.date<todayIso;
     const isToday=j.date===todayIso;
@@ -3225,13 +3267,27 @@ function renderSchedule(){
   const cities=[...new Set([...schedPids].map(pid=>{const p=projects.find(x=>String(x.id)===pid);return p?p.city:'';}).filter(Boolean))].sort();
 
   // Master job filter
+  // Build O(1) lookup map once: key = crewId+'|'+date -> sorted jobs array
+  // This replaces O(n * crews * days) schedule.filter() calls with a single O(n) pass
+  const schedMap={};
+  schedule.forEach(s=>{
+    if(!s.crewId||!s.date) return;
+    const key=s.crewId+'|'+s.date;
+    if(!schedMap[key]) schedMap[key]=[];
+    schedMap[key].push(s);
+  });
+  // Sort each bucket by time once
+  Object.values(schedMap).forEach(arr=>arr.sort((a,b)=>(a.time||'99:99')>(b.time||'99:99')?1:-1));
+
   function jobsFor(crewId,dateIso){
-    return schedule.filter(s=>{
-      if(s.crewId!==crewId||s.date!==dateIso) return false;
+    const all=schedMap[crewId+'|'+dateIso]||[];
+    // Apply active filters
+    if(schedJobFilter==='all'&&schedPMFilter==='all'&&!schedCityFilter) return all;
+    return all.filter(s=>{
       if(schedJobFilter!=='all'&&s.jobType!==schedJobFilter) return false;
       if(schedPMFilter!=='all'&&(s.pm||'')!==schedPMFilter) return false;
       if(schedCityFilter){
-        const p=projects.find(x=>String(x.id)===String(s.projectId));
+        const p=projectMap[String(s.projectId)];
         if(!p||(p.city||'').toLowerCase().indexOf(schedCityFilter.toLowerCase())<0) return false;
       }
       return true;
@@ -3247,10 +3303,21 @@ function renderSchedule(){
   const totalWeek=weekJobCount.reduce((a,b)=>a+b,0);
   const weekLabel=`${days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${days[5].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
 
+  function fmtTime(t){
+    if(!t) return '';
+    const [h,m]=t.split(':').map(Number);
+    if(isNaN(h)) return '';
+    const ampm=h>=12?'pm':'am';
+    const hr=h%12||12;
+    return m?`${hr}:${String(m).padStart(2,'0')}${ampm}`:`${hr}${ampm}`;
+  }
+
   function jobChip(j,crew,iso,stopProp=true){
-    const p=projects.find(x=>String(x.id)===String(j.projectId));
+    const p=projectMap[String(j.projectId)];
     const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
+    const timeStr=fmtTime(j.time);
     return `<div class="sch-job ${jt.cls}${j.status==='cancelled'?' cancelled':''}" onclick="${stopProp?'event.stopPropagation();':''}openAssignModal('${crew.id}','${iso}','${j.id}')">
+      ${timeStr?`<span style="font-size:9px;font-weight:700;opacity:.9;">${timeStr}</span>`:''}
       <span class="sch-job-name">${p?p.name:j.projectId}</span>
       <span class="sch-job-type">${jt.label}${crew&&schedWarehouseFilter==='all'&&crew.warehouse?` · ${crew.warehouse}`:''}</span>
       ${p?`<span style="font-size:9px;opacity:.7;">${p.city||''}</span>`:''}
@@ -3318,7 +3385,7 @@ function renderSchedule(){
               <th style="padding:5px 12px;text-align:left;font-size:10px;color:var(--text3);font-weight:500;">Notes</th>
             </tr>
             ${dayJobs.map(({j,crew},idx)=>{
-              const p=projects.find(x=>String(x.id)===String(j.projectId));
+              const p=projectMap[String(j.projectId)];
               const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
               return `<tr style="background:${idx%2===0?'var(--bg)':'var(--bg2)'};cursor:pointer;" onclick="openAssignModal('${crew.id}','${iso}','${j.id}')">
                 <td style="padding:7px 12px;border-bottom:0.5px solid var(--border);">
@@ -3460,8 +3527,78 @@ function saveCrewName(id){saveCrewRow(id);}
 // ── ASSIGN MODAL ─────────────────────────────────────────
 let assignEditId=null;
 
+// ── ASSIGN MODAL PROJECT SEARCH ──────────────────────────
+let amSearchIdx=-1;
+
+function amSearchProjects(q){
+  const drop=document.getElementById('am-search-drop');
+  if(!drop) return;
+  const pid=document.getElementById('am-project-id').value;
+  // If already selected, don't re-open dropdown
+  if(pid&&!q) return;
+
+  const terms=(q||'').toLowerCase().split(' ').filter(Boolean);
+  const matches=terms.length
+    ? projects.filter(p=>{
+        const hay=(p.name+' '+p.id+' '+p.city+' '+(p.pm||'')).toLowerCase();
+        return terms.every(t=>hay.includes(t));
+      }).slice(0,20)
+    : projects.filter(p=>p.stage!=='complete').slice(0,20);
+
+  if(!matches.length){
+    drop.innerHTML='<div class="am-search-opt" style="color:var(--text3);">No matches</div>';
+    drop.style.display='';
+    return;
+  }
+  drop.innerHTML=matches.map((p,i)=>{
+    const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);
+    return `<div class="am-search-opt${i===amSearchIdx?' active':''}" onmousedown="amSelectProject('${p.id}')">
+      <div class="am-search-opt-name">${p.name}</div>
+      <div class="am-search-opt-meta">${p.id} · ${p.city||''} · ${s?s.label:p.stage} · ${p.pm}</div>
+    </div>`;
+  }).join('');
+  drop.style.display='';
+  amSearchIdx=-1;
+}
+
+function amSearchKeydown(e){
+  const drop=document.getElementById('am-search-drop');
+  const opts=drop?drop.querySelectorAll('.am-search-opt'):[];
+  if(e.key==='ArrowDown'){e.preventDefault();amSearchIdx=Math.min(amSearchIdx+1,opts.length-1);opts.forEach((o,i)=>o.classList.toggle('active',i===amSearchIdx));}
+  else if(e.key==='ArrowUp'){e.preventDefault();amSearchIdx=Math.max(amSearchIdx-1,0);opts.forEach((o,i)=>o.classList.toggle('active',i===amSearchIdx));}
+  else if(e.key==='Enter'&&amSearchIdx>=0){e.preventDefault();const pid=projects.filter(p=>{
+    const q=document.getElementById('am-project-search').value.toLowerCase();
+    return (p.name+' '+p.id+' '+p.city).toLowerCase().includes(q);
+  })[amSearchIdx]?.id;if(pid) amSelectProject(pid);}
+  else if(e.key==='Escape'){if(drop) drop.style.display='none';}
+}
+
+function amSelectProject(pid){
+  const p=projects.find(x=>x.id===pid);if(!p) return;
+  document.getElementById('am-project-id').value=pid;
+  document.getElementById('am-project-search').value='';
+  const drop=document.getElementById('am-search-drop');
+  if(drop) drop.style.display='none';
+  const sel=document.getElementById('am-selected-project');
+  const nm=document.getElementById('am-selected-name');
+  if(sel) sel.style.display='flex';
+  if(nm) nm.textContent=`${p.name} (${p.id})`;
+  document.getElementById('am-project-search').style.display='none';
+  updateAmProjectInfo();
+}
+
+function amClearProject(){
+  document.getElementById('am-project-id').value='';
+  const sel=document.getElementById('am-selected-project');
+  if(sel) sel.style.display='none';
+  const inp=document.getElementById('am-project-search');
+  if(inp){inp.style.display='';inp.value='';inp.focus();}
+  const info=document.getElementById('am-project-info');
+  if(info) info.style.display='none';
+}
+
 function updateAmProjectInfo(){
-  const pid=document.getElementById('am-project').value;
+  const pid=document.getElementById('am-project-id').value;
   const p=projects.find(x=>String(x.id)===String(pid));
   const el=document.getElementById('am-project-info');
   if(!el) return;
@@ -3484,11 +3621,31 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   const existing=schedId?schedule.find(s=>s.id===schedId):null;
   assignEditId=schedId||null;
 
-  // Populate project dropdown
-  const sel=document.getElementById('am-project');
-  sel.innerHTML=projects.map(p=>`<option value="${p.id}" ${String(preProjectId||'')===String(p.id)||(existing&&String(existing.projectId)===String(p.id))?'selected':''}>${p.name} (${p.id})</option>`).join('');
+  // Reset search UI
+  const searchInp=document.getElementById('am-project-search');
+  const selDiv=document.getElementById('am-selected-project');
+  const selName=document.getElementById('am-selected-name');
+  const pidInp=document.getElementById('am-project-id');
+  const drop=document.getElementById('am-search-drop');
+  if(drop) drop.style.display='none';
 
-  // Populate crew dropdown — show warehouse in label
+  // Pre-fill project
+  const fillPid=preProjectId||(existing?existing.projectId:null);
+  if(fillPid){
+    const fp=projects.find(x=>String(x.id)===String(fillPid));
+    if(fp){
+      pidInp.value=fp.id;
+      if(selName) selName.textContent=`${fp.name} (${fp.id})`;
+      if(selDiv) selDiv.style.display='flex';
+      if(searchInp) searchInp.style.display='none';
+    }
+  } else {
+    pidInp.value='';
+    if(selDiv) selDiv.style.display='none';
+    if(searchInp){searchInp.style.display='';searchInp.value='';}
+  }
+
+  // Populate crew dropdown
   const crewSel=document.getElementById('am-crew');
   crewSel.innerHTML=crews.map(c=>`<option value="${c.id}" ${(existing?existing.crewId:crewId)===c.id?'selected':''}>${c.name}${c.warehouse?' · '+c.warehouse:''}</option>`).join('');
 
@@ -3496,9 +3653,8 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   document.getElementById('am-date').value=existing?existing.date:(dateIso||isoDate(today));
   document.getElementById('am-time').value=existing?existing.time||'08:00':'08:00';
   document.getElementById('am-notes').value=existing?existing.notes||'':'';
-  const preProj=preProjectId?projects.find(x=>String(x.id)===String(preProjectId)):null;
   document.getElementById('am-title').textContent=existing?'Edit Scheduled Job':(preProjectId?'Schedule Installation':'Schedule Job');
-  document.getElementById('am-sub').textContent=preProj?preProj.name:'';
+  document.getElementById('am-sub').textContent='';
   document.getElementById('am-delete-btn').style.display=existing?'':'none';
   document.getElementById('am-conflict').style.display='none';
 
@@ -3509,7 +3665,19 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   document.getElementById('assign-overlay').style.display='flex';
   updateAmProjectInfo();
   checkAssignConflict();
+
+  // Auto-focus search if no project pre-selected
+  if(!fillPid&&searchInp) setTimeout(()=>searchInp.focus(),50);
 }
+
+// Close dropdown on outside click
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('am-project-wrap');
+  if(wrap&&!wrap.contains(e.target)){
+    const drop=document.getElementById('am-search-drop');
+    if(drop) drop.style.display='none';
+  }
+});
 
 function checkAssignConflict(){
   const crewId=document.getElementById('am-crew').value;
@@ -3518,7 +3686,7 @@ function checkAssignConflict(){
   if(!crewId||!date){el.style.display='none';return;}
   const conflicts=schedule.filter(s=>s.crewId===crewId&&s.date===date&&s.id!==assignEditId&&s.status!=='cancelled');
   if(conflicts.length){
-    const names=conflicts.map(s=>{const p=projects.find(x=>String(x.id)===String(s.projectId));return p?p.name:s.projectId;}).join(', ');
+    const names=conflicts.map(s=>{const p=projectMap[String(s.projectId)];return p?p.name:s.projectId;}).join(', ');
     el.textContent=`⚠ ${conflicts.length} job${conflicts.length>1?'s':''} already on this crew that day: ${names}`;
     el.style.display='';
   } else {
@@ -3532,7 +3700,7 @@ function closeAssignModal(){
 }
 
 function saveAssignment(){
-  const projectId=document.getElementById('am-project').value;
+  const projectId=document.getElementById('am-project-id').value;
   const crewId=document.getElementById('am-crew').value;
   const jobType=document.getElementById('am-type').value;
   const date=document.getElementById('am-date').value;
@@ -3647,7 +3815,7 @@ function renderService(){
       </tr></thead>
       <tbody>
         ${sorted.map(s=>{
-          const crew=crews.find(c=>c.id===s.crewId);
+          const crew=crewMap[s.crewId];
           const dateStr=s.date?new Date(s.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
           return `<tr onclick="openSvcModal('${s.id}')">
             <td>
@@ -3755,7 +3923,9 @@ function saveSvcCall(){
       status:get('svc-status'),resolution:'',notes:[],pm,created:now,
     };
     serviceCalls.push(entry);
-    post({action:'addServiceCall',...entry});
+    // Don't send notes[] array to backend — it's a client-side field only
+    const {notes:_n,...postEntry}=entry;
+    post({action:'addServiceCall',...postEntry});
     showToast('Service call created');
   }
   closeSvcModal();
