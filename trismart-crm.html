@@ -996,7 +996,14 @@ select.np-input{cursor:pointer;}
     </div>
     <div class="board-wrap"><div class="board" id="board"></div></div>
   </div>
-  <div class="view" id="view-analytics" style="display:none;"><div class="an-page" id="an-page"></div></div>
+  <div class="view" id="view-analytics" style="display:none;">
+    <div style="display:flex;gap:4px;padding:12px 16px 0;border-bottom:1px solid var(--border2);background:var(--bg);position:sticky;top:44px;z-index:5;">
+      <button class="np-tab active" id="an-tab-leadership" onclick="anTab='leadership';renderAnalytics()">Leadership</button>
+      <button class="np-tab" id="an-tab-pipeline" onclick="anTab='pipeline';renderAnalytics()">Pipeline Health</button>
+      <button class="np-tab" id="an-tab-pm" onclick="anTab='pm';renderAnalytics()">PM Performance</button>
+    </div>
+    <div class="an-page" id="an-page" style="padding:16px;"></div>
+  </div>
   <div class="view" id="view-audit" style="display:none;"><div id="audit-page" style="padding:4px 0;"></div></div>
   <div class="view" id="view-schedule" style="display:none;"><div id="schedule-page"></div></div>
   <div class="view" id="view-service"  style="display:none;"><div id="service-page"></div></div>
@@ -1405,7 +1412,7 @@ try{ blockerDates=JSON.parse(localStorage.getItem('ts_blockerDates')||'{}'); }ca
 function ts(pid,tid){const v=(taskState[pid]||{})[tid];return v?(typeof v==='object'?v.status:v):'Not Ready';}
 function tcd(pid,tid){const v=(taskState[pid]||{})[tid];return v&&typeof v==='object'?v.completedDate:'';}
 
-let selectedId=null,currentPM='all',currentView='command';
+let selectedId=null,currentPM='all',currentView='command',anTab='leadership';
 const today=new Date();
 
 function daysAgo(d){if(!d) return 0;const n=new Date(d);if(isNaN(n)) return 0;return Math.max(0,Math.floor((today-n)/(1000*60*60*24)));}
@@ -2375,6 +2382,312 @@ function renderPipeline(){
 
 // ── ANALYTICS (LEADERSHIP) ───────────────────────────────
 function renderAnalytics(){
+  // Sync tab button states
+  ['leadership','pipeline','pm'].forEach(t=>{
+    const btn=document.getElementById('an-tab-'+t);
+    if(btn) btn.classList.toggle('active',t===anTab);
+  });
+
+  if(anTab==='leadership') renderLeadershipDashboard();
+  else if(anTab==='pipeline') renderPipelineAnalytics();
+  else renderPMAnalytics();
+}
+
+function renderLeadershipDashboard(){
+  const pg=document.getElementById('an-page');
+  if(!pg) return;
+  const vis=visProjects();
+  if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
+
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
+
+  // ── Date range helpers ───────────────────────────────────────────────────
+  function rangeStart(period){
+    const d=new Date(now);
+    switch(period){
+      case 'wtd': d.setDate(d.getDate()-d.getDay()); break; // Sunday
+      case 'mtd': d.setDate(1); break;
+      case 'qtd': { const qm=Math.floor(d.getMonth()/3)*3; d.setMonth(qm,1); break; }
+      case 'ytd': d.setMonth(0,1); break;
+      case 'last7': d.setDate(d.getDate()-7); break;
+      case 'last30': d.setDate(d.getDate()-30); break;
+      case 'last90': d.setDate(d.getDate()-90); break;
+      case 'lastweek': { d.setDate(d.getDate()-d.getDay()-7); break; }
+      case 'lastmonth': { d.setMonth(d.getMonth()-1,1); break; }
+    }
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function rangeEnd(period){
+    const d=new Date(now);
+    if(period==='lastweek'){ d.setDate(d.getDate()-d.getDay()-1); }
+    else if(period==='lastmonth'){ d.setDate(0); } // last day of prev month
+    else return null; // open-ended (up to today)
+    d.setHours(23,59,59,999);
+    return d;
+  }
+  function inRange(dateStr, period){
+    if(!dateStr) return false;
+    const d=new Date(dateStr+'T00:00:00');
+    if(isNaN(d)) return false;
+    const s=rangeStart(period);
+    const e=rangeEnd(period);
+    return d>=s && (!e||d<=e);
+  }
+
+  // ── Period selector state ────────────────────────────────────────────────
+  if(!window._ldPeriod) window._ldPeriod='mtd';
+  const period=window._ldPeriod;
+  const periodLabels={wtd:'Week to Date',mtd:'This Month',qtd:'This Quarter',
+    ytd:'This Year',last7:'Last 7 Days',last30:'Last 30 Days',last90:'Last 90 Days',
+    lastweek:'Last Week',lastmonth:'Last Month'};
+
+  // ── Revenue recognized = install_complete_date in range ─────────────────
+  // OR fallback: projects in complete stage with stageDate in range
+  const recognized=vis.filter(p=>{
+    const d=p.installCompleteDate||
+             (p.stage==='complete'?p.stageDate:null);
+    return inRange(d, period);
+  });
+  const recognizedVal=recognized.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // ── Completions ──────────────────────────────────────────────────────────
+  const completions=vis.filter(p=>p.stage==='complete'&&inRange(p.stageDate,period));
+  const completionsVal=completions.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // ── Installs (install_complete_date in range) ─────────────────────────────
+  const installs=vis.filter(p=>inRange(p.installCompleteDate,period));
+
+  // ── M2 funding in range ──────────────────────────────────────────────────
+  const m2Funded=vis.filter(p=>{
+    const f=projectFunding[p.id];
+    return f&&f.m2FundedDate&&inRange(f.m2FundedDate,period);
+  });
+  const m2Val=m2Funded.reduce((a,p)=>{
+    const f=projectFunding[p.id];
+    return a+(Number(f?.m2Amount)||Number(p.contract)*0.65||0);
+  },0);
+
+  // ── M3 funding in range ──────────────────────────────────────────────────
+  const m3Funded=vis.filter(p=>{
+    const f=projectFunding[p.id];
+    return f&&f.m3FundedDate&&inRange(f.m3FundedDate,period);
+  });
+  const m3Val=m3Funded.reduce((a,p)=>{
+    const f=projectFunding[p.id];
+    return a+(Number(f?.m3Amount)||Number(p.contract)*0.35||0);
+  },0);
+
+  // ── Pending funding ──────────────────────────────────────────────────────
+  const m2Eligible=vis.filter(p=>{
+    const s=getFundingStatus(p.id,'m2');
+    return s==='eligible'||s==='submitted';
+  });
+  const m3Eligible=vis.filter(p=>{
+    const s=getFundingStatus(p.id,'m3');
+    return s==='eligible'||s==='submitted';
+  });
+  const pendingM2Val=m2Eligible.reduce((a,p)=>a+(Number(p.contract)||0)*0.65,0);
+  const pendingM3Val=m3Eligible.reduce((a,p)=>a+(Number(p.contract)||0)*0.35,0);
+
+  // ── 90-day pipeline forecast ─────────────────────────────────────────────
+  const active=vis.filter(p=>p.stage!=='complete');
+  const next30=active.filter(p=>(STAGE_DAYS_REMAINING[p.stage]||60)<=30);
+  const next60=active.filter(p=>{const d=STAGE_DAYS_REMAINING[p.stage]||60;return d>30&&d<=60;});
+  const next90=active.filter(p=>{const d=STAGE_DAYS_REMAINING[p.stage]||60;return d>60&&d<=90;});
+  const next30Val=next30.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const next60Val=next60.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const next90Val=next90.reduce((a,p)=>a+(Number(p.contract)||0),0);
+
+  // ── Monthly trend (last 6 months of completions) ─────────────────────────
+  const months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const label=d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const start=new Date(d.getFullYear(),d.getMonth(),1);
+    const end=new Date(d.getFullYear(),d.getMonth()+1,0);
+    const mps=vis.filter(p=>{
+      const cd=p.installCompleteDate||(p.stage==='complete'?p.stageDate:null);
+      if(!cd) return false;
+      const dt=new Date(cd+'T00:00:00');
+      return !isNaN(dt)&&dt>=start&&dt<=end;
+    });
+    months.push({label,count:mps.length,val:mps.reduce((a,p)=>a+(Number(p.contract)||0),0)});
+  }
+  const maxMonthVal=Math.max(...months.map(m=>m.val),1);
+
+  // ── Stage distribution ───────────────────────────────────────────────────
+  const stageDist=STAGES.filter(s=>s.id!=='complete').map(s=>{
+    const ps=active.filter(p=>p.stage===s.id);
+    return {label:s.label,count:ps.length,val:ps.reduce((a,p)=>a+(Number(p.contract)||0),0)};
+  });
+  const maxStageVal=Math.max(...stageDist.map(s=>s.val),1);
+
+  // ── PM breakdown ─────────────────────────────────────────────────────────
+  const pms=[...new Set(vis.map(p=>p.pm).filter(Boolean))].sort();
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  const fmt$=n=>'$'+Number(n||0).toLocaleString();
+  const fmtM=n=>'$'+(n/1000000).toFixed(1)+'M';
+  const fmtK=n=>n>=1000000?fmtM(n):'$'+Math.round(n/1000)+'k';
+
+  const periodSelector=`
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
+      <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-right:4px;">Period:</span>
+      ${Object.entries(periodLabels).map(([k,v])=>`
+        <button class="sch-filter-btn ${period===k?'active':''}" onclick="window._ldPeriod='${k}';renderAnalytics()" style="font-size:10px;padding:3px 8px;">${v}</button>
+      `).join('')}
+    </div>`;
+
+  // Row 1: Key metrics for period
+  const row1=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">Revenue Recognized</div>
+        <div class="an-sub">${periodLabels[period]} · install complete</div>
+        <div style="font-size:28px;font-weight:600;color:var(--green);margin:8px 0 2px;">${fmtK(recognizedVal)}</div>
+        <div style="font-size:11px;color:var(--text3);">${recognized.length} project${recognized.length!==1?'s':''}</div>
+      </div>
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">M2 Funded</div>
+        <div class="an-sub">${periodLabels[period]}</div>
+        <div style="font-size:28px;font-weight:600;color:#0C447C;margin:8px 0 2px;">${fmtK(m2Val)}</div>
+        <div style="font-size:11px;color:var(--text3);">${m2Funded.length} milestone${m2Funded.length!==1?'s':''}</div>
+      </div>
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">M3 Funded</div>
+        <div class="an-sub">${periodLabels[period]}</div>
+        <div style="font-size:28px;font-weight:600;color:#534AB7;margin:8px 0 2px;">${fmtK(m3Val)}</div>
+        <div style="font-size:11px;color:var(--text3);">${m3Funded.length} milestone${m3Funded.length!==1?'s':''}</div>
+      </div>
+      <div class="an-card" style="padding:14px 16px;">
+        <div class="an-title" style="margin-bottom:2px;">Completions</div>
+        <div class="an-sub">${periodLabels[period]}</div>
+        <div style="font-size:28px;font-weight:600;color:var(--text);margin:8px 0 2px;">${completions.length}</div>
+        <div style="font-size:11px;color:var(--text3);">${fmtK(completionsVal)} contract value</div>
+      </div>
+    </div>`;
+
+  // Row 2: Pending funding + 90-day forecast
+  const row2=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div class="an-card">
+        <div class="an-title">Pending Funding</div>
+        <div class="an-sub">Eligible + submitted milestones not yet funded</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+          <div style="padding:12px;background:var(--bg2);border-radius:8px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">M2 Pending</div>
+            <div style="font-size:22px;font-weight:600;color:#0C447C;">${fmtK(pendingM2Val)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${m2Eligible.length} projects</div>
+          </div>
+          <div style="padding:12px;background:var(--bg2);border-radius:8px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">M3 Pending</div>
+            <div style="font-size:22px;font-weight:600;color:#534AB7;">${fmtK(pendingM3Val)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${m3Eligible.length} projects</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--text3);">
+          Total pending: <strong style="color:var(--text);">${fmtK(pendingM2Val+pendingM3Val)}</strong>
+        </div>
+      </div>
+      <div class="an-card">
+        <div class="an-title">90-Day Installation Forecast</div>
+        <div class="an-sub">Active projects by estimated days to installation</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+          ${[
+            {label:'Next 30 days',list:next30,val:next30Val,color:'#1D9E75'},
+            {label:'31–60 days',list:next60,val:next60Val,color:'#4A8ED6'},
+            {label:'61–90 days',list:next90,val:next90Val,color:'#9B8EC4'},
+          ].map(({label,list,val,color})=>`
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:80px;font-size:11px;color:var(--text2);flex-shrink:0;">${label}</div>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:22px;overflow:hidden;">
+                <div style="height:100%;width:${Math.round(val/(next30Val+next60Val+next90Val||1)*100)}%;background:${color};border-radius:4px;display:flex;align-items:center;padding:0 8px;min-width:${list.length?30:0}px;">
+                  ${list.length?`<span style="font-size:10px;font-weight:600;color:#fff;">${list.length}</span>`:''}
+                </div>
+              </div>
+              <div style="width:60px;font-size:11px;color:var(--text3);text-align:right;">${fmtK(val)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // Row 3: Monthly trend chart
+  const row3=`
+    <div class="an-row-1"><div class="an-card">
+      <div class="an-title">Monthly Installation Trend — Last 6 Months</div>
+      <div class="an-sub">Projects completed (install complete) by month with contract value</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:140px;margin-top:16px;padding-bottom:24px;position:relative;border-bottom:1px solid var(--border);">
+        ${months.map(m=>{
+          const barH=Math.max(4,Math.round(m.val/maxMonthVal*120));
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;">
+            <div style="font-size:10px;color:var(--text3);font-weight:500;">${m.count||''}</div>
+            <div style="width:100%;background:${m.count?'var(--green)':'var(--bg3)'};border-radius:4px 4px 0 0;height:${barH}px;transition:height .3s;" title="${m.label}: ${m.count} projects · ${fmtK(m.val)}"></div>
+            <div style="position:absolute;bottom:4px;font-size:10px;color:var(--text3);">${m.label}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--text3);">
+        <span>Total: ${months.reduce((a,m)=>a+m.count,0)} installs · ${fmtK(months.reduce((a,m)=>a+m.val,0))}</span>
+        <span>Avg/month: ${Math.round(months.reduce((a,m)=>a+m.count,0)/6)} installs</span>
+      </div>
+    </div></div>`;
+
+  // Row 4: Active pipeline by stage + PM breakdown side by side
+  const row4=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div class="an-card">
+        <div class="an-title">Active Pipeline by Stage</div>
+        <div class="an-sub">Project count and contract value per stage</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+          ${stageDist.filter(s=>s.count>0).map(s=>`
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:88px;font-size:11px;color:var(--text2);text-align:right;flex-shrink:0;">${s.label}</div>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:20px;overflow:hidden;">
+                <div style="height:100%;width:${Math.round(s.val/maxStageVal*100)}%;background:var(--green);border-radius:4px;display:flex;align-items:center;padding:0 6px;min-width:24px;">
+                  <span style="font-size:10px;font-weight:600;color:#fff;">${s.count}</span>
+                </div>
+              </div>
+              <div style="width:60px;font-size:11px;color:var(--text3);text-align:right;">${fmtK(s.val)}</div>
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--text2);">${active.length} active projects</span>
+          <span style="color:var(--text2);font-weight:500;">${fmtK(active.reduce((a,p)=>a+(Number(p.contract)||0),0))}</span>
+        </div>
+      </div>
+      <div class="an-card">
+        <div class="an-title">PM Breakdown</div>
+        <div class="an-sub">Active projects and portfolio value per PM</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+          ${pms.map(pm=>{
+            const pp=active.filter(p=>p.pm===pm);
+            const val=pp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+            const crit=pp.filter(p=>getSLA(p).status==='crit').length;
+            const blocked=pp.filter(p=>p.blocker).length;
+            const pct=active.length?Math.round(pp.length/active.length*100):0;
+            const instPeriod=vis.filter(p=>p.pm===pm&&inRange(p.installCompleteDate||(p.stage==='complete'?p.stageDate:null),period));
+            return `<div style="padding:10px 12px;background:var(--bg2);border-radius:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-weight:600;font-size:13px;">${pm}</span>
+                <span style="font-size:11px;color:var(--text3);">${pp.length} active · ${fmtK(val)}</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${crit?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:#fcebeb;color:#a32d2d;">${crit} critical</span>`:''}
+                ${blocked?`<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:#eeedfe;color:#3c3489;">${blocked} blocked</span>`:''}
+                <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:#E1F5EE;color:#085041;">${instPeriod.length} installs ${periodLabels[period].toLowerCase()}</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  pg.innerHTML = periodSelector + row1 + row2 + row3 + row4;
+}
+
+function renderPipelineAnalytics(){
   const vis=visProjects();
   const pg=document.getElementById('an-page');
   if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
@@ -2637,6 +2950,51 @@ function renderAnalytics(){
   </div></div>`;
 
   pg.innerHTML=row1+row2+row3+row4+row5;
+}
+  pg.innerHTML=row1+row2+row3+row4+row5;
+}
+
+function renderPMAnalytics(){
+  const pg=document.getElementById('an-page');
+  const vis=visProjects();
+  if(!vis.length){pg.innerHTML='<div class="none-msg" style="padding:40px;">No data.</div>';return;}
+  const active=vis.filter(p=>p.stage!=='complete');
+  const pms=[...new Set(vis.map(p=>p.pm).filter(Boolean))].sort();
+  const fmt$=n=>'$'+Number(n||0).toLocaleString();
+  const fmtK=n=>n>=1000000?'$'+(n/1000000).toFixed(1)+'M':'$'+Math.round(n/1000)+'k';
+  function pmStat(pm){
+    const pp=vis.filter(p=>p.pm===pm);
+    const val=pp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+    const blocked=pp.filter(p=>p.blocker).length;
+    const crit=pp.filter(p=>!p.blocker&&getSLA(p).status==='crit').length;
+    const risk=pp.filter(p=>!p.blocker&&getSLA(p).status==='risk').length;
+    const warn=pp.filter(p=>!p.blocker&&getSLA(p).status==='warn').length;
+    const ok=pp.filter(p=>!p.blocker&&getSLA(p).status==='ok').length;
+    const avgC=pp.length?Math.round(pp.reduce((a,p)=>a+cycleDays(p),0)/pp.length):0;
+    return {count:pp.length,val,blocked,crit,risk,warn,ok,avgCycle:avgC,healthy:pp.length?Math.round(ok/pp.length*100):0};
+  }
+  const pmCards=pms.map(pm=>{
+    const stats=pmStat(pm);
+    return `<div class="an-card">
+      <div class="pm-head"><span class="pm-name-lg">${pm}</span><span class="pm-sub">${stats.count} projects &nbsp;·&nbsp; ${fmtK(stats.val)}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Avg cycle time</span><span class="pm-stat-val">${stats.avgCycle}d</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">On track</span><span class="pm-stat-val" style="color:var(--green);">${stats.ok}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">At risk</span><span class="pm-stat-val" style="color:var(--amber);">${stats.risk}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Critical</span><span class="pm-stat-val" style="color:#A32D2D;">${stats.crit}</span></div>
+      <div class="pm-stat"><span class="pm-stat-label">Blocked</span><span class="pm-stat-val" style="color:var(--purple);">${stats.blocked}</span></div>
+      <div class="pm-health" style="margin-top:10px;">
+        ${stats.ok?`<div class="pm-seg" style="flex:${stats.ok};background:#1D9E75;"></div>`:''}
+        ${stats.warn?`<div class="pm-seg" style="flex:${stats.warn};background:#BA7517;"></div>`:''}
+        ${stats.risk?`<div class="pm-seg" style="flex:${stats.risk};background:#CF5A1A;"></div>`:''}
+        ${stats.crit?`<div class="pm-seg" style="flex:${stats.crit};background:#E24B4A;"></div>`:''}
+        ${stats.blocked?`<div class="pm-seg" style="flex:${stats.blocked};background:#534AB7;"></div>`:''}
+      </div>
+      <div style="margin-top:10px;">
+        <button style="font-size:11px;padding:4px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="openPMRebalance()">Rebalance</button>
+      </div>
+    </div>`;
+  }).join('');
+  pg.innerHTML=`<div class="pm-grid">${pmCards}</div>`;
 }
 
 // ── PANEL ─────────────────────────────────────────────────
