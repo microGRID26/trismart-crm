@@ -189,6 +189,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .stl-stage.current{color:var(--green);}
 .stl-meta{font-size:10px;color:var(--text3);margin-top:1px;}
 .stl-dur{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--bg2);color:var(--text2);margin-left:4px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
 /* ── SCHEDULE ─────────────────────────────────────────── */
 .sch-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
 .sch-week-nav{display:flex;align-items:center;gap:8px;}
@@ -789,6 +791,7 @@ select.np-input{cursor:pointer;}
     <div class="loader" id="cmd-loader"><div class="spinner"></div>Loading projects...</div>
     <div id="cmd-content" style="display:none;">
       <div class="metrics" id="cmd-metrics"></div>
+      <div id="cmd-schedule-widget"></div>
       <div class="section-title" id="st-overdue" onclick="toggleSection(this)">Overdue tasks</div><div class="alert-list" id="list-overdue"></div>
       <div class="section-title" id="st-duetoday" onclick="toggleSection(this)">Due today</div><div class="alert-list" id="list-duetoday"></div>
       <div class="section-title" id="st-blocked" onclick="toggleSection(this)">Blocked</div><div class="alert-list" id="list-blocked"></div>
@@ -850,6 +853,7 @@ select.np-input{cursor:pointer;}
       <button class="ptab active" id="ptab-tasks" onclick="setPanelTab('tasks')">Tasks</button>
       <button class="ptab" id="ptab-notes" onclick="setPanelTab('notes')">Notes</button>
       <button class="ptab" id="ptab-files" onclick="setPanelTab('files')">Files</button>
+      <button class="ptab" id="ptab-schedule" onclick="setPanelTab('schedule')">Schedule</button>
     </div>
     <div class="panel-body">
       <div class="panel-left" id="dp-left"></div>
@@ -862,7 +866,7 @@ select.np-input{cursor:pointer;}
 
 <!-- ASSIGN MODAL -->
 <div class="assign-overlay" id="assign-overlay" style="display:none;">
-  <div class="assign-card">
+  <div class="assign-card" style="max-width:520px;">
     <div class="assign-header">
       <div class="assign-title" id="am-title">Schedule Job</div>
       <div class="assign-sub" id="am-sub"></div>
@@ -870,8 +874,10 @@ select.np-input{cursor:pointer;}
     <div class="assign-body">
       <div class="assign-field">
         <label>Project</label>
-        <select id="am-project"></select>
+        <select id="am-project" onchange="updateAmProjectInfo()"></select>
       </div>
+      <!-- Project info strip — populates on project select -->
+      <div id="am-project-info" style="display:none;background:var(--bg2);border-radius:var(--radius);padding:8px 12px;font-size:11px;color:var(--text2);display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;"></div>
       <div class="assign-field">
         <label>Job type</label>
         <select id="am-type">
@@ -885,9 +891,15 @@ select.np-input{cursor:pointer;}
         <label>Crew</label>
         <select id="am-crew"></select>
       </div>
-      <div class="assign-field">
-        <label>Date</label>
-        <input type="date" id="am-date">
+      <div style="display:flex;gap:8px;">
+        <div class="assign-field" style="flex:1;">
+          <label>Date</label>
+          <input type="date" id="am-date">
+        </div>
+        <div class="assign-field" style="flex:1;">
+          <label>Time</label>
+          <input type="time" id="am-time" value="08:00">
+        </div>
       </div>
       <div class="assign-field">
         <label>Notes (optional)</label>
@@ -1161,6 +1173,7 @@ function updateFreshnessUI(){
 async function reloadData(){
   const lbl=document.getElementById('freshness-label');
   if(lbl) lbl.textContent='Refreshing...';
+  detailLoaded.clear();  // force re-fetch of all project details
   await loadData();
 }
 
@@ -1170,8 +1183,10 @@ async function loadData(){
     const res=await fetch(API);setLoadingBar(70);
     const data=await res.json();
     if(data.error) throw new Error(data.error);
-    projects=data.projects||[];taskState=data.taskState||{};
-    notes=data.notes||{};stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
+    projects=data.projects||[];
+    taskState={};   // loaded per-project on panel open
+    notes={};       // loaded per-project on panel open
+    stageHistory=data.stageHistory||{};taskDueDates=data.taskDueDates||{};projectFolders=data.projectFolders||{};
     crews=data.crews||[];schedule=data.schedule||[];
     // Seed defaults if backend hasn't created the sheet yet
     if(!crews.length){
@@ -1261,6 +1276,45 @@ function searchProjects(val){
 }
 function closeSearch(){document.getElementById('search-results').style.display='none';}
 
+function renderCmdScheduleWidget(){
+  const el=document.getElementById('cmd-schedule-widget');
+  if(!el) return;
+  if(!schedule.length){el.innerHTML='';return;}
+  const todayIso=isoDate(today);
+  // Next 5 days
+  const days=Array.from({length:5},(_,i)=>{
+    const d=new Date(today);d.setDate(d.getDate()+i);return d;
+  });
+  const dayCols=days.map(d=>{
+    const iso=isoDate(d);
+    const jobs=schedule.filter(s=>s.date===iso);
+    return {d,iso,jobs};
+  }).filter(x=>x.jobs.length>0||x.iso===todayIso);
+  if(!dayCols.length){el.innerHTML='';return;}
+  const JT_COLOR={survey:'#DBEAFE',install:'#D1FAE5',inspection:'#FEF3C7',service:'#FCE7F3'};
+  const JT_TEXT={survey:'#1E40AF',install:'#065F46',inspection:'#92400E',service:'#9D174D'};
+  el.innerHTML=`<div style="margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px;">Upcoming Schedule</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${dayCols.map(({d,iso,jobs})=>{
+        const isToday=iso===todayIso;
+        const label=isToday?'Today':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+        const jobChips=jobs.length
+          ? jobs.slice(0,3).map(j=>{
+              const p=projects.find(x=>String(x.id)===String(j.projectId));
+              const crew=crews.find(c=>c.id===j.crewId);
+              return `<div style="font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:3px;background:${JT_COLOR[j.jobType]||'var(--bg)'};color:${JT_TEXT[j.jobType]||'var(--text)'};">${p?p.name.split(' ').slice(0,2).join(' '):j.projectId} · ${crew?crew.name:j.crewId}</div>`;
+            }).join('')+(jobs.length>3?`<div style="font-size:10px;color:var(--text3);">+${jobs.length-3} more</div>`:'')
+          : '<div style="font-size:10px;color:var(--text3);">No jobs</div>';
+        return `<div style="flex:1;min-width:110px;background:var(--bg2);border:0.5px solid ${isToday?'var(--green)':'var(--border)'};border-radius:8px;padding:8px 10px;cursor:pointer;" onclick="setView('schedule',document.getElementById('btn-schedule'));syncMobileNav('schedule')">
+          <div style="font-size:11px;font-weight:600;color:${isToday?'var(--green)':'var(--text2)'};margin-bottom:6px;">${label}</div>
+          ${jobChips}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
 // ── COMMAND CENTER ───────────────────────────────────────
 function renderCommand(){
   const vis=visProjects();
@@ -1286,6 +1340,8 @@ function renderCommand(){
       el.classList.toggle('active-filter',match.includes(`'${cmdFilter}'`)&&cmdFilter!=='all');
     });
   }
+  // Schedule widget
+  renderCmdScheduleWidget();
   function blockerAge(pid){
     const d=blockerDates[pid];if(!d) return null;
     return Math.max(0,Math.floor((today-new Date(d))/(1000*60*60*24)));
@@ -1995,7 +2051,8 @@ function renderPanel(pid){
   document.getElementById('dp-right').innerHTML=`
     <div class="ptab-pane active" id="ptabpane-tasks-${pid}">${taskHTML}</div>
     <div class="ptab-pane" id="ptabpane-notes-${pid}" style="display:none;"></div>
-    <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;">${filesDiv}</div>`;
+    <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;">${filesDiv}</div>
+    <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>`;
 
   // Inject notes into notes pane (needs live DOM)
   const notesPane=document.getElementById(`ptabpane-notes-${pid}`);
@@ -2023,9 +2080,10 @@ function renderPanel(pid){
   const stuckCount=Object.values(TASKS).flat().filter(t=>{
     const s=ts(pid,t.id);return s==='Pending Resolution'||s==='Revision Required';
   }).length;
+  const schedCount=schedule.filter(s=>String(s.projectId)===String(pid)).length;
   document.getElementById('ptab-notes').innerHTML=`Notes${noteCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg2);color:var(--text2);">${noteCount}</span>`:''}`;
   document.getElementById('ptab-tasks').innerHTML=`Tasks${stuckCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#fff0f0;color:#A32D2D;">${stuckCount} stuck</span>`:''}`;
-
+  document.getElementById('ptab-schedule').innerHTML=`Schedule${schedCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg2);color:var(--text2);">${schedCount}</span>`:'+'}`;
   // Reset to tasks tab
   setPanelTab('tasks');
   document.getElementById('detail-panel').classList.add('open');
@@ -2160,9 +2218,35 @@ function addNote(pid){
   notes[pid].push(note);renderPanel(pid);showToast('Note saved');
   post({action:'addNote',projectId:pid,...note});
 }
-function openPanel(pid){
-  selectedId=pid;renderPanel(pid);render();
+// Track which project IDs have had their detail loaded
+const detailLoaded = new Set();
+
+async function openPanel(pid){
+  selectedId=pid;
+  // Render immediately with whatever we have (may be empty task state)
+  renderPanel(pid);render();
   setTimeout(()=>document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+
+  // If detail not yet loaded for this project, fetch it
+  if(!detailLoaded.has(pid)){
+    // Show loading indicator in right panel
+    const dp=document.getElementById('dp-right');
+    if(dp) dp.insertAdjacentHTML('afterbegin',`<div id="detail-loading-${pid}" style="font-size:11px;color:var(--text3);padding:8px 12px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading tasks...</div>`);
+    try {
+      const res=await fetch(`${API}?action=getDetail&id=${encodeURIComponent(pid)}`);
+      const data=await res.json();
+      // Merge into global state
+      if(data.taskState) Object.assign(taskState,data.taskState);
+      if(data.notes)     Object.assign(notes,data.notes);
+      detailLoaded.add(pid);
+    } catch(e) {
+      console.warn('Detail fetch failed',e);
+    }
+    // Remove loading indicator and re-render
+    const loader=document.getElementById(`detail-loading-${pid}`);
+    if(loader) loader.remove();
+    if(selectedId===pid) renderPanel(pid);
+  }
 }
 function toggleSection(el){
   el.classList.toggle('collapsed');
@@ -2562,10 +2646,52 @@ function setPanelTab(tab){
   document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
   const btn=document.getElementById('ptab-'+tab);if(btn) btn.classList.add('active');
   const pid=selectedId;if(!pid) return;
-  ['tasks','notes','files'].forEach(t=>{
+  ['tasks','notes','files','schedule'].forEach(t=>{
     const pane=document.getElementById(`ptabpane-${t}-${pid}`);
     if(pane) pane.style.display=t===tab?'block':'none';
   });
+  if(tab==='schedule') renderPanelSchedule(pid);
+}
+function renderPanelSchedule(pid){
+  const pane=document.getElementById(`ptabpane-schedule-${pid}`);
+  if(!pane) return;
+  const p=projects.find(x=>x.id===pid);
+  const projJobs=schedule.filter(s=>String(s.projectId)===String(pid))
+    .sort((a,b)=>a.date>b.date?1:-1);
+
+  const todayIso=isoDate(today);
+
+  function jobRow(j,idx){
+    const crew=crews.find(c=>c.id===j.crewId)||{name:j.crewId,warehouse:''};
+    const jt=JOB_TYPES[j.jobType]||{label:j.jobType,cls:''};
+    const isPast=j.date<todayIso;
+    const isToday=j.date===todayIso;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${idx%2===0?'var(--bg)':'var(--bg2)'};border-radius:var(--radius);cursor:pointer;flex-wrap:wrap;" onclick="openAssignModal('${j.crewId}','${j.date}','${j.id}')">
+      <span class="sch-job ${jt.cls}" style="padding:2px 8px;border-radius:4px;font-size:10px;flex-shrink:0;">${jt.label}</span>
+      <span style="font-size:13px;font-weight:500;color:${isPast?'var(--text3)':isToday?'var(--green)':'var(--text)'};">
+        ${new Date(j.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+        ${isToday?'<span style="font-size:9px;background:var(--green);color:#fff;padding:1px 5px;border-radius:6px;margin-left:4px;">Today</span>':''}
+      </span>
+      <span style="font-size:12px;color:var(--text2);flex:1;">${crew.name}${crew.warehouse?' · '+crew.warehouse:''}</span>
+      ${j.notes?`<span style="font-size:11px;color:var(--text3);">${j.notes}</span>`:''}
+      <span style="font-size:10px;color:var(--text3);">✎</span>
+    </div>`;
+  }
+
+  const upcoming=projJobs.filter(j=>j.date>=todayIso);
+  const past=projJobs.filter(j=>j.date<todayIso);
+
+  pane.innerHTML=`<div class="sec">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="sec-title" style="margin:0;">Scheduled Jobs</div>
+      <button style="font-size:11px;padding:4px 12px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-weight:500;" onclick="openAssignModal(null,'${todayIso}',null,'${pid}',null)">+ Add Job</button>
+    </div>
+    ${!projJobs.length?`<div style="font-size:12px;color:var(--text3);padding:12px 0;">No jobs scheduled yet. Click + Add Job to dispatch a crew.</div>`:''}
+    ${upcoming.length?`<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--green);margin-bottom:6px;">Upcoming (${upcoming.length})</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">${upcoming.map((j,i)=>jobRow(j,i)).join('')}</div>`:''}
+    ${past.length?`<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Past (${past.length})</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">${past.map((j,i)=>jobRow(j,i)).join('')}</div>`:''}
+  </div>`;
 }
 function renderFilesSection(pid){
   const container=document.getElementById('files-tab-container-'+pid);
@@ -2795,6 +2921,9 @@ document.getElementById('assign-overlay').addEventListener('click',function(e){i
 
 // ── SCHEDULE ─────────────────────────────────────────────
 const JOB_TYPES={survey:{label:'Site Survey',cls:'survey'},install:{label:'Installation',cls:'install'},inspection:{label:'Inspection',cls:'inspection'},service:{label:'Service Call',cls:'service'}};
+const CREW_ROLES=['licenseHolder','electrician','solarLead','batteryLead',
+  'installer1','installer2','batteryTech1','batteryTech2','batteryApprentice','mpuElectrician'];
+
 let schedJobFilter='all';
 let schedWarehouseFilter='all';
 let schedPMFilter='all';
@@ -2994,57 +3123,72 @@ function renderSchedule(){
 
     <div class="sch-crew-mgmt">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px;">Manage Crews</div>
-      ${allCrews.map(c=>{
-        function fi(field,label,placeholder,width){
-          return `<div style="flex:0 0 ${width||'130px'};"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${label}</div>
-            <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;" id="crew-${field}-${c.id}" value="${c[field]||''}" placeholder="${placeholder}"></div>`;
+      ${(()=>{
+        // Build per-role name lists from all crews for datalist suggestions
+        const roleLists={};
+        CREW_ROLES.forEach(r=>{
+          roleLists[r]=[...new Set(allCrews.map(c=>c[r]||'').filter(Boolean))];
+        });
+        // Build datalist HTML (one per role, shared across all crew cards)
+        const datalists=CREW_ROLES.map(r=>
+          `<datalist id="dl-${r}">${roleLists[r].map(n=>`<option value="${n}">`).join('')}</datalist>`
+        ).join('');
+
+        const roleLabels={licenseHolder:'License Holder',electrician:'Electrician',mpuElectrician:'MPU Electrician',
+          solarLead:'Solar Lead',batteryLead:'Battery Lead',installer1:'Installer 1',installer2:'Installer 2',
+          batteryTech1:'Battery Tech 1',batteryTech2:'Battery Tech 2',batteryApprentice:'Battery Apprentice'};
+
+        // fi uses actual property names — no aliases
+        function fi(prop,label,width,listId){
+          return `<div style="flex:0 0 ${width||'130px'};min-width:0;">
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${label}</div>
+            <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;" id="crew-${prop}-${CURID}" value="${CURVAL(prop)}" placeholder="${label}"${listId?` list="${listId}"`:''}>
+          </div>`;
         }
-        return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            ${fi('name','Crew Name','e.g. Crew Alpha','140px')}
-            ${fi('wh','Warehouse','Location','120px')}
-            ${fi('mem','Members (general)','Names...','180px')}
-          </div>
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Assigned Roles</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            ${fi('licenseHolder','License Holder','Name','140px')}
-            ${fi('electrician','Electrician','Name','130px')}
-            ${fi('mpuElectrician','MPU Electrician','Name','140px')}
-            ${fi('solarLead','Solar Lead','Name','120px')}
-            ${fi('batteryLead','Battery Lead','Name','120px')}
-            ${fi('installer1','Installer 1','Name','120px')}
-            ${fi('installer2','Installer 2','Name','120px')}
-            ${fi('batteryTech1','Battery Tech 1','Name','130px')}
-            ${fi('batteryTech2','Battery Tech 2','Name','130px')}
-            ${fi('batteryApprentice','Battery Apprentice','Name','150px')}
-          </div>
-          <button style="font-size:11px;padding:5px 16px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;" onclick="saveCrewRow('${c.id}')">Save ${c.name||'Crew'}</button>
-        </div>`;
-      }).join('')}
+
+        const cards=allCrews.map(c=>{
+          // Inject crew-specific values via closure replacement
+          const localFi=(prop,label,width,listId)=>`<div style="flex:0 0 ${width||'130px'};min-width:0;">
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;">${label}</div>
+            <input class="sch-crew-name-edit" style="width:100%;box-sizing:border-box;" id="crew-${prop}-${c.id}" value="${(c[prop]||'').replace(/"/g,'&quot;')}" placeholder="${label}"${listId?` list="dl-${listId}"`:''}>
+          </div>`;
+
+          return `<div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              ${localFi('name','Crew Name','160px')}
+              ${localFi('warehouse','Warehouse','130px')}
+            </div>
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Assigned Roles</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              ${CREW_ROLES.map(r=>localFi(r,roleLabels[r],'140px',r)).join('')}
+            </div>
+            <button style="font-size:11px;padding:5px 16px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;" onclick="saveCrewRow('${c.id}')">Save ${(c.name||'Crew').replace(/'/g,"\\'")} </button>
+          </div>`;
+        }).join('');
+
+        return datalists+cards;
+      })()}
       <button style="font-size:11px;padding:6px 16px;border-radius:var(--radius);border:0.5px solid var(--green);background:transparent;color:var(--green);cursor:pointer;" onclick="addCrew()">+ Add Crew</button>
     </div>`;
 }
 
-const CREW_ROLES=['licenseHolder','electrician','solarLead','batteryLead',
-  'installer1','installer2','batteryTech1','batteryTech2','batteryApprentice','mpuElectrician'];
-
-function getCrewFieldVal(id,field){
-  const el=document.getElementById(`crew-${field}-${id}`);
-  return el?el.value.trim():'';
-}
-
 function saveCrewRow(id){
-  // Find or create crew in state
   let c=crews.find(x=>x.id===id);
   if(!c){c={id,active:'true'};crews.push(c);}
 
-  c.name        = getCrewFieldVal(id,'name')||c.name||'Crew';
-  c.warehouse   = getCrewFieldVal(id,'wh');
-  c.members     = getCrewFieldVal(id,'mem');
-  CREW_ROLES.forEach(r=>{ c[r]=getCrewFieldVal(id,r); });
+  // Read using EXACT property names matching crew object and DOM ids
+  const readField=prop=>{
+    const el=document.getElementById(`crew-${prop}-${id}`);
+    return el?el.value.trim():'';
+  };
+
+  c.name      = readField('name')||c.name||'Crew';
+  c.warehouse = readField('warehouse');
+  CREW_ROLES.forEach(r=>{ c[r]=readField(r); });
 
   renderSchedule();
-  post({action:'updateCrew',crewId:id,name:c.name,warehouse:c.warehouse,members:c.members,...Object.fromEntries(CREW_ROLES.map(r=>[r,c[r]]))});
+  post({action:'updateCrew',crewId:id,name:c.name,warehouse:c.warehouse,
+    ...Object.fromEntries(CREW_ROLES.map(r=>[r,c[r]]))});
   showToast(`${c.name} saved`);
 }
 function saveCrewName(id){saveCrewRow(id);}
@@ -3061,6 +3205,26 @@ function addCrew(){
 // ── ASSIGN MODAL ─────────────────────────────────────────
 let assignEditId=null;
 
+function updateAmProjectInfo(){
+  const pid=document.getElementById('am-project').value;
+  const p=projects.find(x=>String(x.id)===String(pid));
+  const el=document.getElementById('am-project-info');
+  if(!el) return;
+  if(!p){el.style.display='none';return;}
+  el.style.display='grid';
+  const rows=[
+    ['System','systemkw',v=>v?v+' kW':'—'],
+    ['Financier','financier',v=>v||'—'],
+    ['Consultant','consultant',v=>v||'—'],
+    ['Phone','phone',v=>v||'—'],
+    ['Email','email',v=>v||'—'],
+    ['City','city',v=>v||'—'],
+  ];
+  el.innerHTML=rows.map(([label,field,fmt])=>
+    `<div><span style="color:var(--text3);">${label}: </span><span style="color:var(--text);font-weight:500;">${fmt(p[field])}</span></div>`
+  ).join('');
+}
+
 function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   const existing=schedId?schedule.find(s=>s.id===schedId):null;
   assignEditId=schedId||null;
@@ -3075,6 +3239,7 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
 
   document.getElementById('am-type').value=preJobType||(existing?existing.jobType:(schedJobFilter!=='all'?schedJobFilter:'install'));
   document.getElementById('am-date').value=existing?existing.date:(dateIso||isoDate(today));
+  document.getElementById('am-time').value=existing?existing.time||'08:00':'08:00';
   document.getElementById('am-notes').value=existing?existing.notes||'':'';
   const preProj=preProjectId?projects.find(x=>String(x.id)===String(preProjectId)):null;
   document.getElementById('am-title').textContent=existing?'Edit Scheduled Job':(preProjectId?'Schedule Installation':'Schedule Job');
@@ -3087,6 +3252,7 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   });
 
   document.getElementById('assign-overlay').style.display='flex';
+  updateAmProjectInfo();
   checkAssignConflict();
 }
 
@@ -3115,19 +3281,20 @@ function saveAssignment(){
   const crewId=document.getElementById('am-crew').value;
   const jobType=document.getElementById('am-type').value;
   const date=document.getElementById('am-date').value;
+  const time=document.getElementById('am-time').value||'08:00';
   const notes=document.getElementById('am-notes').value.trim();
   if(!projectId||!crewId||!date){showToast('Fill in all required fields');return;}
 
   if(assignEditId){
     const entry=schedule.find(s=>s.id===assignEditId);
-    if(entry){Object.assign(entry,{projectId,crewId,jobType,date,notes});}
-    post({action:'updateSchedule',id:assignEditId,projectId,crewId,jobType,date,notes});
+    if(entry){Object.assign(entry,{projectId,crewId,jobType,date,time,notes});}
+    post({action:'updateSchedule',id:assignEditId,projectId,crewId,jobType,date,time,notes});
     showToast('Updated');
   } else {
     const id='sch'+Date.now();
     const pm=currentUser.name||currentPM||'Team';
-    schedule.push({id,projectId,crewId,jobType,date,notes,status:'scheduled',pm});
-    post({action:'addSchedule',id,projectId,crewId,jobType,date,notes,pm});
+    schedule.push({id,projectId,crewId,jobType,date,time,notes,status:'scheduled',pm});
+    post({action:'addSchedule',id,projectId,crewId,jobType,date,time,notes,pm});
     showToast('Scheduled');
   }
   closeAssignModal();
