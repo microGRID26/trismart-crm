@@ -676,6 +676,7 @@ select.np-input{cursor:pointer;}
   <button class="nav-btn" id="btn-audit"            onclick="setView('audit',this)">Task audit</button>
   <button class="nav-btn" id="btn-schedule"         onclick="setView('schedule',this)">Schedule</button>
   <button class="nav-btn" id="btn-service"          onclick="setView('service',this)">Service Calls</button>
+  <button class="nav-btn" id="btn-funding"         onclick="setView('funding',this)">Funding</button>
   <div class="search-wrap">
     <input class="search-input" type="text" placeholder="Search projects..." oninput="searchProjects(this.value)" onblur="setTimeout(closeSearch,200)">
     <div class="search-results" id="search-results" style="display:none;"></div>
@@ -962,6 +963,7 @@ select.np-input{cursor:pointer;}
   <div class="view" id="view-audit" style="display:none;"><div id="audit-page" style="padding:4px 0;"></div></div>
   <div class="view" id="view-schedule" style="display:none;"><div id="schedule-page"></div></div>
   <div class="view" id="view-service"  style="display:none;"><div id="service-page"></div></div>
+  <div class="view" id="view-funding"  style="display:none;"><div id="funding-page"></div></div>
 
   <div class="panel-wrap" id="detail-panel">
     <div class="panel-head">
@@ -1352,7 +1354,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={};
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -1508,6 +1510,7 @@ async function loadData(){
       {data:svcData,     error:e7},
       {data:svcNoteData, error:e8},
       {data:fundData,    error:e9},
+      {data:feData,      error:e10},
     ] = await Promise.all([
       sb.from('projects').select('*').limit(5000),
       sb.from('stage_history').select('*').limit(10000),
@@ -1518,9 +1521,10 @@ async function loadData(){
       sb.from('service_calls').select('*').limit(2000),
       sb.from('service_call_notes').select('*').limit(5000),
       sb.from('project_funding').select('*').limit(5000),
+      sb.from('funding_events').select('*').order('created_at',{ascending:false}).limit(10000),
     ]);
 
-    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9].find(Boolean);
+    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10].find(Boolean);
     if (firstErr) throw new Error(firstErr.message);
 
     setLoadingBar(70);
@@ -1567,6 +1571,14 @@ async function loadData(){
     (fundData||[]).forEach(r=>{
       const c=snakeToCamel(r);
       projectFunding[c.projectId]=c;
+    });
+
+    // Funding events — grouped by projectId
+    fundingEvents = {};
+    (feData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!fundingEvents[c.projectId]) fundingEvents[c.projectId]=[];
+      fundingEvents[c.projectId].push(c);
     });
 
     // Crews
@@ -1727,6 +1739,25 @@ function setupRealtime(){
       if(!id) return;
       schedule=schedule.filter(s=>s.id!==id);
       if(currentView==='schedule') renderSchedule();
+    })
+
+    // ── Funding events ───────────────────────────────────────────────
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'funding_events'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!fundingEvents[r.projectId]) fundingEvents[r.projectId]=[];
+      // Skip own writes (optimistically inserted already)
+      const already=fundingEvents[r.projectId].some(x=>x.id===r.id);
+      if(already) return;
+      fundingEvents[r.projectId].unshift(r);
+      if(currentView==='funding') renderFunding();
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'project_funding'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!projectFunding[r.projectId]) projectFunding[r.projectId]={};
+      Object.assign(projectFunding[r.projectId], r);
+      if(currentView==='funding') renderFunding();
     })
 
     .subscribe(status=>{
@@ -3046,7 +3077,7 @@ function toggleSection(el){
 function closePanel(){selectedId=null;document.getElementById('detail-panel').classList.remove('open');render();}
 function setView(v,btn){
   currentView=v;
-  ['command','queue','pipeline','analytics','audit','schedule','service'].forEach(id=>{
+  ['command','queue','pipeline','analytics','audit','schedule','service','funding'].forEach(id=>{
     const el=document.getElementById('view-'+id);
     if(el) el.style.display=(id===v)?'block':'none';
   });
@@ -3106,6 +3137,7 @@ function render(){
   else if(currentView==='audit') renderAudit();
   else if(currentView==='schedule') renderSchedule();
   else if(currentView==='service') renderService();
+  else if(currentView==='funding') renderFunding();
 }
 // ── GOOGLE AUTH ──────────────────────────────────────────
 let currentUser={name:'',email:'',picture:''};
@@ -4805,6 +4837,575 @@ function executePMMove(){
   render();
 }
 
+
+// ── FUNDING MODULE ────────────────────────────────────────
+const NONFUND_CODES=[
+  {master:'Cancelled',code:'CANCELLED',desc:'account is cancelled',party:'NA'},
+  {master:'Contract Error',code:'ACH',desc:'ACH form has not been completed by customer',party:'Sales Ops'},
+  {master:'Contract Error',code:'ADD',desc:'Address is incorrect on IA or in lender portal',party:'Sales Ops'},
+  {master:'Contract Error',code:'ADDER',desc:'An adder is listed on the IA but not Dividend OR we cannot confirm the adder happened.',party:'Sales Ops'},
+  {master:'Contract Error',code:'CLW',desc:'Conditional Lien Waiver needs to be signed by customer in Everbright for PPA',party:'Sales Ops'},
+  {master:'Contract Error',code:'CXLP',desc:'Loan cancelled in lender portal',party:'Sales Ops'},
+  {master:'Contract Error',code:'HCB',desc:'Need High cost breakdown from the Rep',party:'Sales Ops'},
+  {master:'Contract Error',code:'HOA',desc:'Lender is requiring HOA approval Doc',party:'Sales Ops'},
+  {master:'Contract Error',code:'IA',desc:'Installation Agreement doesn\\'t match lender portal',party:'Sales Ops'},
+  {master:'Contract Error',code:'ITP',desc:'Infinity tranfer project needing to be transfer to TriSMART',party:'Sales Ops'},
+  {master:'Contract Error',code:'IPA',desc:'Installed panel amount does not match contract',party:'Sales Ops'},
+  {master:'Contract Error',code:'KW',desc:'Installed smaller system than promised',party:'Sales Ops'},
+  {master:'Contract Error',code:'LD',desc:'Customer needs to sign Lender docs',party:'Sales Ops'},
+  {master:'Contract Error',code:'NTP',desc:'Pending NTP in Lender portal',party:'Sales Ops'},
+  {master:'Contract Error',code:'PD',desc:'Contract prices do not match',party:'Sales Ops'},
+  {master:'Contract Error',code:'PT',desc:'Panel type in lender portal does not match install',party:'Sales Ops'},
+  {master:'Contract Error',code:'RR',desc:'Need to confirm Re-roof on lender contract',party:'Sales Ops'},
+  {master:'Contract Error',code:'RESIGN',desc:'legal contact signer has changed and project needs a resign',party:'Sales Ops'},
+  {master:'Contract Error',code:'STP',desc:'Account has stipulations. Not fundable until stips are cleared',party:'Sales Ops'},
+  {master:'Contract Error',code:'UB',desc:'Lender requires Utility Bill',party:'Sales Ops'},
+  {master:'Contract Error',code:'WQU',desc:'Account quoted with wrong utility',party:'Sales Ops'},
+  {master:'Contract Error',code:'WU',desc:'Loan executed with a utility that is not approved',party:'Sales Ops'},
+  {master:'Contract Error',code:'HCO',desc:'Homeowner Change Order needs signature',party:'Sales Ops'},
+  {master:'Contract Error',code:'ICO',desc:'Installer Change Order needing to be signed by Helpdesk',party:'Sales Ops'},
+  {master:'Contract Error',code:'NCCO',desc:'Homeowner needs to sign No Cost Change Order',party:'Sales Ops'},
+  {master:'Contract Error',code:'WCN',desc:'Needs to complete welcome call with Lender',party:'Sales Ops'},
+  {master:'Customer Escalation',code:'CRS',desc:'Customer refusing to sign Documents',party:'Customer Service'},
+  {master:'Customer Escalation',code:'CRW',desc:'Customer refusing work',party:'Customer Service'},
+  {master:'Customer Escalation',code:'HOLD',desc:'Account on hold',party:'Customer Service'},
+  {master:'Customer Escalation',code:'LEGAL',desc:'Escalated to legal- customer refuses to pay',party:'LEGAL'},
+  {master:'Customer Escalation',code:'NF',desc:'Net funded (Customer escalation or Delayed PTO)',party:'Project Management'},
+  {master:'Customer Service',code:'TT',desc:'Needs Tree trimming for PPA',party:'Customer Service'},
+  {master:'Damages',code:'DM',desc:'Customer has damages and won\\'t pay',party:'Customer Service'},
+  {master:'Electrical Completion',code:'ELE',desc:'Electrical completion more than 3 months out',party:'Project Management'},
+  {master:'Electrical Completion',code:'ELC',desc:'Requires Electrical completion to Fund',party:'Field Ops'},
+  {master:'Electrical Completion',code:'S-CS',desc:'Solrite- Conditionally submitted',party:'Field Ops'},
+  {master:'Engineering',code:'ASR',desc:'Shade study below threshold',party:'Design'},
+  {master:'Engineering',code:'ENG',desc:'Need new engineering',party:'Design'},
+  {master:'Engineering',code:'LYD',desc:'Panel layout in live project does not match install layout',party:'Design'},
+  {master:'Engineering',code:'S28W',desc:'Module Model is wrong in lender portal- needs to live project updated',party:'Design'},
+  {master:'Engineering',code:'MOD',desc:'Model in portal is incorrect.',party:'Design'},
+  {master:'Engineering',code:'SS',desc:'Everbright rejected the Shade Study due to Aurora not matching their quote',party:'Design'},
+  {master:'Equipment Issues',code:'HDK',desc:'Needs hold down kit',party:'Field Ops'},
+  {master:'Final',code:'FIN-ALL',desc:'Lender Needs PTO and Inspection doc for Final Payment',party:'Project Management'},
+  {master:'Final',code:'FIN-PTO',desc:'Lender Needs PTO  for Final Payment',party:'Project Management'},
+  {master:'FINAL-PM',code:'FIN-IPD',desc:'Lender Needs inspection passed document for Final Payment',party:'Project Management'},
+  {master:'FINAL-PM',code:'IPD-P',desc:'Inspection has passed and proof needs to be uploaded to Financier',party:'Project Management'},
+  {master:'FINAL-PM',code:'IPD-MP',desc:'Inspection has passed and the permit is missing to prove address.',party:'Project Management'},
+  {master:'FINAL-PM',code:'IPD-I',desc:'POPI has been rejected by Financier and needs either address or date.',party:'Project Management'},
+  {master:'FINAL-PM',code:'PTO-P',desc:'PTO has been issued and needs to be uploaded to financier',party:'Project Management'},
+  {master:'FINAL-PM',code:'PTO-I',desc:'PTO letter has been rejected by Financier and needs either address or date.',party:'Project Management'},
+  {master:'FINAL-PM',code:'PTO-A',desc:'Needs PTO application submitted to financier',party:'Project Management'},
+  {master:'FINAL-PM',code:'ICA',desc:'Needs Interconnection Agreement signed by utility and customer',party:'Project Management'},
+  {master:'FINAL-PM',code:'Permit',desc:'Missing approved Permit application',party:'Project Management'},
+  {master:'Installation Issues',code:'DC',desc:'was not installed with domestic content.',party:'Field Ops'},
+  {master:'Installation Issues',code:'EES',desc:'Lender requires separate Envoy systems for add-on panels',party:'Field Ops'},
+  {master:'Installation Issues',code:'ACW',desc:'AC Combiner can not be installed with conduit through the top. Side and bottom only.',party:'Field Ops'},
+  {master:'Installation Issues',code:'BDE',desc:'Battery installation Issue',party:'Field Ops'},
+  {master:'Installation Issues',code:'MSR',desc:'Monitoring Specification rejected: Duracell configuration is incomplete',party:'Field Ops'},
+  {master:'Installation Issues',code:'BR',desc:'Breaker installed is not an Eaton Breaker. Needs to be replaced',party:'Field Ops'},
+  {master:'Installation Issues',code:'BT',desc:'Needs Battery installed',party:'Field Ops'},
+  {master:'Installation Issues',code:'CM',desc:'Missing CELL MODEM installation',party:'Field Ops'},
+  {master:'Installation Issues',code:'CT',desc:'CTs not properly installed or Missing',party:'Field Ops'},
+  {master:'Installation Issues',code:'ELCO',desc:'Need Electrical corrections',party:'Field Ops'},
+  {master:'Installation Issues',code:'ENL',desc:'Incomplete Commissioning',party:'Field Ops'},
+  {master:'Installation Issues',code:'FR',desc:'Flat roof, pending tilt leg installation',party:'Field Ops'},
+  {master:'Installation Issues',code:'LST',desc:'Needs Line Side Tap',party:'Field Ops'},
+  {master:'Installation Issues',code:'MC',desc:'Needs Midclamps swapped',party:'Field Ops'},
+  {master:'Installation Issues',code:'MIBS',desc:'redesign system to have a max of 19 inverters per battery by shedding.',party:'Field Ops'},
+  {master:'Installation Issues',code:'MNM',desc:'Microinverters not matching',party:'Field Ops'},
+  {master:'Installation Issues',code:'MNSI',desc:'Microinverters not scanned in, amount of micros do not match what was installed.',party:'Field Ops'},
+  {master:'Installation Issues',code:'MNR',desc:'Microinverter(s) not reporting',party:'Field Ops'},
+  {master:'Installation Issues',code:'MPU',desc:'Needs MPU installed',party:'Field Ops'},
+  {master:'Installation Issues',code:'MRA-OFF',desc:'System is not reporting but is in service',party:'Field Ops'},
+  {master:'Installation Issues',code:'NMPMT',desc:'Needs more panels to meet tolerance',party:'Field Ops'},
+  {master:'Installation Issues',code:'FLSH',desc:'Needs Flashing corrected.',party:'Field Ops'},
+  {master:'Installation Issues',code:'MSM',desc:'MICROINVERTER SERIAL map does not match install',party:'Field Ops'},
+  {master:'Installation Issues',code:'TILT',desc:'Tilt is below 5°',party:'Field Ops'},
+  {master:'Installation Issues',code:'RNP',desc:'Racking is not installed properly',party:'Field Ops'},
+  {master:'Installation Issues',code:'ST',desc:'Needs Solar Stacks replaced with AVL equipment',party:'Field Ops'},
+  {master:'Installation Issues',code:'L2L',desc:'Needs main breaker on sub panel',party:'Field Ops'},
+  {master:'Installation Issues',code:'IEJ',desc:'Installation of expanding joints on underground pipe needed for city',party:'Field Ops'},
+  {master:'Installation Issues',code:'ABBW',desc:'Contactor not properly wired through control port.',party:'Field Ops'},
+  {master:'Installation Issues',code:'RMA',desc:'Equipment needs replaced',party:'Field Ops'},
+  {master:'Installation Issues',code:'PCO',desc:'Panel Count does not match plans',party:'Field Ops'},
+  {master:'Installation Issues',code:'B12',desc:'Please provide access to battery portal',party:'Field Ops'},
+  {master:'Installation Issues',code:'B14',desc:'Please make sure red L2 wires are on top for the breakers on the busbar in the gateway',party:'Field Ops'},
+  {master:'Installation Issues',code:'B15',desc:'Please show commissioning screenshots',party:'Field Ops'},
+  {master:'Installation Issues',code:'B34',desc:'J1 jumper is improperly spliced on multi-battery installation',party:'Field Ops'},
+  {master:'Installation Issues',code:'B35',desc:'PC-PRO-WL photos needed including the HOST & CLIENT labels and install wiring',party:'Field Ops'},
+  {master:'Installation Issues',code:'RGM',desc:'RGM BOX opened, showing the ethernet wiring, meter turned on, showing green lights in both CTs.',party:'Field Ops'},
+  {master:'Installation Issues',code:'DTU',desc:'DTU needed for single sonnen battery installation',party:'Field Ops'},
+  {master:'Installation Issues',code:'ATS',desc:'Missing ATS internals',party:'Field Ops'},
+  {master:'Installation Issues',code:'S20W',desc:'Fuses inside AC disconnect do not match.',party:'Field Ops'},
+  {master:'Installation Issues',code:'BSI',desc:'Battery Showing Issue',party:'Field Ops'},
+  {master:'Installation Issues',code:'WP',desc:'Panel installed is not approved under Lender AVL',party:'Field Ops'},
+  {master:'Installation Issues',code:'BLW',desc:'Battery location is not acceptable w guidelines',party:'Field Ops'},
+  {master:'Monitoring',code:'ABI',desc:'Array Builder incomplete',party:'Monitoring'},
+  {master:'Monitoring',code:'GWI',desc:'Gateway issue',party:'Monitoring'},
+  {master:'Monitoring',code:'SPO',desc:'System needs to be powered on/ Has PTO',party:'Monitoring'},
+  {master:'Monitoring',code:'ABDNM',desc:'Array Builder does not match layout',party:'Monitoring'},
+  {master:'Monitoring',code:'NEG',desc:'There is negative consumption data showing in the Graph Tab and there should not be.',party:'Monitoring'},
+  {master:'Monitoring',code:'SNS',desc:'Enlighten Site needs to be sperated.',party:'Monitoring'},
+  {master:'Monitoring',code:'CTLO',desc:'Consumption Meter needs to be set to Load Only',party:'Monitoring'},
+  {master:'Monitoring',code:'CTLS',desc:'Consumption Meter needs to be set to Load with Solar Production',party:'Monitoring'},
+  {master:'Monitoring',code:'CTM',desc:'CT Measurement Issues- FINAL',party:'Monitoring'},
+  {master:'Monitoring',code:'SPI',desc:'System Production Issue',party:'Monitoring'},
+  {master:'Monitoring',code:'ECT',desc:'Enable CTs (Both/Production/Consumption',party:'Monitoring'},
+  {master:'Monitoring',code:'MI',desc:'Monitoring Issue in portal (Alerts present)',party:'Monitoring'},
+  {master:'Monitoring',code:'SEW',desc:'Missing Solar Edge Warranty',party:''},
+  {master:'Monitoring',code:'MP',desc:'Missing access in Portal',party:'Monitoring'},
+  {master:'Photos',code:'ABB',desc:'Missing photo showing ABB Contactor with rating visible',party:'Field Ops'},
+  {master:'Photos',code:'ALL',desc:'Missing ALL photos',party:'Field Ops'},
+  {master:'Photos',code:'B1',desc:'Missing ALL BATTERY PHOTOS',party:'Field Ops'},
+  {master:'Photos',code:'B2',desc:'Missing Battery Layout photos with clearances',party:'Field Ops'},
+  {master:'Photos',code:'B2F',desc:'Missing Battery Layout photos showing the feet located at the bottom of the battery',party:'Field Ops'},
+  {master:'Photos',code:'B2C',desc:'Battery Layout photos doesn\\'t properly show all Clearances',party:'Field Ops'},
+  {master:'Photos',code:'B3',desc:'Missing Backup and non-backup loads panels',party:'Field Ops'},
+  {master:'Photos',code:'B4',desc:'Missing Consumption and Production CTs',party:'Field Ops'},
+  {master:'Photos',code:'B5',desc:'Missing Generation panel or internal panelboard',party:'Field Ops'},
+  {master:'Photos',code:'B6',desc:'Missing Powerwall Connections',party:'Field Ops'},
+  {master:'Photos',code:'B7',desc:'Missing/illegible Serial Number for Battery',party:'Field Ops'},
+  {master:'Photos',code:'B8',desc:'Missing Serial Number for Gateway',party:'Field Ops'},
+  {master:'Photos',code:'B9',desc:'Tesla portal reporting no Powerwall communications',party:'Field Ops'},
+  {master:'Photos',code:'B10',desc:'Missing Critical Load Panel, with loads labelled and its main OCPD',party:'Field Ops'},
+  {master:'Photos',code:'B11',desc:'Missing the tesla wizard screenshots of the wifi/cellular connection and the X for no battery grid charging',party:'Field Ops'},
+  {master:'Photos',code:'B13',desc:'Please show the tesla powerwall cabinet with the resistor and the drain wire grounded installed in the same cabinet',party:'Field Ops'},
+  {master:'Photos',code:'B16',desc:'Missing images of the relays/transformers',party:'Field Ops'},
+  {master:'Photos',code:'B17',desc:'Missing photo of the contactor model number',party:'Field Ops'},
+  {master:'Photos',code:'B18',desc:'Missing or blurry System controller (gateway) photo',party:'Field Ops'},
+  {master:'Photos',code:'B19',desc:'Missing photo of Noise Filter',party:'Field Ops'},
+  {master:'Photos',code:'B20',desc:'Missing BMS connections',party:'Field Ops'},
+  {master:'Photos',code:'B21',desc:'Missing/incomplete Grid, Microgrid, & DC connections',party:'Field Ops'},
+  {master:'Photos',code:'B22',desc:'Missing/incomplete Utility Profile config screenshot',party:'Field Ops'},
+  {master:'Photos',code:'B23',desc:'Missing/incomplete Battery registration screenshots',party:'Field Ops'},
+  {master:'Photos',code:'B24',desc:'Missing mounting plate photo',party:'Field Ops'},
+  {master:'Photos',code:'B25',desc:'Missing/incomplete CT configuration screenshots',party:'Field Ops'},
+  {master:'Photos',code:'B26',desc:'Missing photo of DTU placement.',party:'Field Ops'},
+  {master:'Photos',code:'B27',desc:'Missing photo of shutdown switch.',party:'Field Ops'},
+  {master:'Photos',code:'B28',desc:'Wifi Extender label clearly showing the model',party:'Field Ops'},
+  {master:'Photos',code:'B29',desc:'Missing TP Link Location Photo',party:'Field Ops'},
+  {master:'Photos',code:'B30',desc:'Missing SolarEdge Backup Interface sticker label',party:'Field Ops'},
+  {master:'Photos',code:'B31',desc:'Missing SolarEdge Backup Interface wiring photo',party:'Field Ops'},
+  {master:'Photos',code:'B32',desc:'Need photo of \"Subpanel\" connected to labeled existing breaker in loads panel',party:'Field Ops'},
+  {master:'Photos',code:'B33',desc:'AC Hub sticker',party:'Field Ops'},
+  {master:'Photos',code:'S1',desc:'No ARRAY photos uploaded',party:'Field Ops'},
+  {master:'Photos',code:'S2',desc:'Incomplete ARRAY photos',party:'Field Ops'},
+  {master:'Photos',code:'S3',desc:'Missing MODULE ATTACHMENT photo',party:'Field Ops'},
+  {master:'Photos',code:'S4',desc:'Incomplete TILT Photos',party:'Field Ops'},
+  {master:'Photos',code:'S5',desc:'Illegible TILT photos',party:'Field Ops'},
+  {master:'Photos',code:'S6',desc:'Missing ROOF UNDERNEATH ARRAY photo',party:'Field Ops'},
+  {master:'Photos',code:'S7',desc:'ROOF UNDERNEATH ARRAY photo shows poor wire management',party:'Field Ops'},
+  {master:'Photos',code:'S8',desc:'Missing FLASHING photo',party:'Field Ops'},
+  {master:'Photos',code:'S9',desc:'Missing STRUCTURAL photo',party:'Field Ops'},
+  {master:'Photos',code:'S10',desc:'Missing ROOF J-BOX/CONDUIT ENTRANCE photo',party:'Field Ops'},
+  {master:'Photos',code:'S11',desc:'Missing CONDUIT RUN photo',party:'Field Ops'},
+  {master:'Photos',code:'S12',desc:'Missing CONDUIT PENETRATION photo',party:'Field Ops'},
+  {master:'Photos',code:'S13',desc:'Missing HOME RUN CONDUIT photo',party:'Field Ops'},
+  {master:'Photos',code:'S14',desc:'Missing AC COMBINER PANEL photo (With wiring exposed)',party:'Field Ops'},
+  {master:'Photos',code:'S15',desc:'Missing/Illegible AC COMBINER PANEL photo',party:'Field Ops'},
+  {master:'Photos',code:'S16',desc:'Missing MICROINVERTERS photo',party:'Field Ops'},
+  {master:'Photos',code:'S17',desc:'Missing MICROINVERTER SERIAL # map photos',party:'Field Ops'},
+  {master:'Photos',code:'S18',desc:'Illegible MICROINVERTER SERIAL # map photos',party:'Field Ops'},
+  {master:'Photos',code:'S19',desc:'Missing AC DISCONNECT photos',party:'Field Ops'},
+  {master:'Photos',code:'S20',desc:'Illegible FUSE RATING INSIDE AC DISCONNECT',party:'Field Ops'},
+  {master:'Photos',code:'S21',desc:'Missing ENVOY SERIAL # photo',party:'Field Ops'},
+  {master:'Photos',code:'S22',desc:'Illegible ENVOY SERIAL # photo',party:'Field Ops'},
+  {master:'Photos',code:'S23',desc:'Missing INTERCONNECTION photos',party:'Field Ops'},
+  {master:'Photos',code:'S24',desc:'Missing UP CLOSE OF MAIN BREAKER photo',party:'Field Ops'},
+  {master:'Photos',code:'S25',desc:'Missing UP CLOSE OF BACKFEED BREAKER photo',party:'Field Ops'},
+  {master:'Photos',code:'S26',desc:'Missing BUS BAR RATING STICKER photo',party:'Field Ops'},
+  {master:'Photos',code:'S28',desc:'Missing/illegible Back of Panel Photo',party:'Field Ops'},
+  {master:'Photos',code:'S29',desc:'Missing trenching and concrete footing with depth measurements satisfying NEC 300',party:'Field Ops'},
+  {master:'Photos',code:'S30',desc:'Missing house street number photo',party:'Field Ops'},
+  {master:'Photos',code:'S31',desc:'Missing photo of the EGC bonded to rails or mounting structure.',party:'Field Ops'},
+  {master:'Photos',code:'S32',desc:'Missing Skeleton Racking photos',party:'Field Ops'},
+  {master:'Photos',code:'S33',desc:'Missing photo of deadfront on MSP and labeled showing filler plates installed',party:'Field Ops'},
+  {master:'Photos',code:'S34',desc:'Missing photo of main service panel without deadfront to confirm CTs installed',party:'Field Ops'},
+  {master:'Photos',code:'S35',desc:'Missing Electrical Wall photo',party:'Field Ops'},
+  {master:'Photos',code:'S36',desc:'Missing AC Disconnect front panel photo',party:'Field Ops'},
+  {master:'Photos',code:'S37',desc:'photo of Microinverter mounted to the panel',party:'Field Ops'},
+  {master:'Photos',code:'S38',desc:'missing AHJ Required Grounding',party:'Field Ops'},
+  {master:'Photos',code:'S39',desc:'Phase Verification in String Inverter (Circuit Testing)',party:'Field Ops'},
+  {master:'Photos',code:'S40',desc:'Missing Array String Map',party:'Field Ops'},
+  {master:'Photos',code:'S41',desc:'Missing photo of Jbox Sealant',party:'Field Ops'},
+  {master:'Photos',code:'S42',desc:'Missing inside of exterior mounted Main breaker enclosure',party:'Field Ops'},
+  {master:'Photos',code:'S43',desc:'Missing inside of non-back up loads panel',party:'Field Ops'},
+  {master:'Photos',code:'S44',desc:'Missing Ground-based Inverter label photo',party:'Field Ops'},
+  {master:'Photos',code:'S45',desc:'Missing Commissioning screenshots',party:'Field Ops'},
+  {master:'Photos',code:'S46',desc:'Missing photo of the SIDE of the optimizer showing serial # & sku label',party:'Field Ops'}
+];
+
+const FUND_STATUS_LABEL = {
+  not_eligible: 'Not Eligible',
+  eligible:     'Eligible',
+  submitted:    'Submitted',
+  funded:       'Funded',
+  nonfunded:    'Nonfunded',
+};
+const FUND_STATUS_CLS = {
+  not_eligible: 'background:var(--bg2);color:var(--text3)',
+  eligible:     'background:#eeedfe;color:#3c3489',
+  submitted:    'background:#e6f1fb;color:#0c447c',
+  funded:       'background:#E1F5EE;color:#085041',
+  nonfunded:    'background:#fcebeb;color:#a32d2d',
+};
+
+let fundingFilter = 'eligible'; // all | eligible | submitted | funded | nonfunded
+let fundingMilestone = 'all';   // all | m2 | m3
+let fundingSearch = '';
+let fundingModalPid = null;
+let fundingModalMilestone = null;
+
+// Derive funding status for a project/milestone from task state + project_funding
+function getFundingStatus(pid, milestone) {
+  const f = projectFunding[pid];
+  if (f && f[milestone + 'Status']) return f[milestone + 'Status'];
+  // Auto-derive eligibility from task completion
+  if (milestone === 'm2') {
+    const installDone = ts(pid, 'install_done') === 'Complete';
+    return installDone ? 'eligible' : 'not_eligible';
+  }
+  if (milestone === 'm3') {
+    const pto = ts(pid, 'pto') === 'Complete';
+    return pto ? 'eligible' : 'not_eligible';
+  }
+  return 'not_eligible';
+}
+
+function getFundingRow(pid, milestone) {
+  const f = projectFunding[pid] || {};
+  return {
+    status:        getFundingStatus(pid, milestone),
+    amount:        f[milestone + 'Amount'] || '',
+    fundedDate:    f[milestone + 'FundedDate'] || '',
+    submittedDate: f[milestone + 'SubmittedDate'] || '',
+    notes:         f[milestone + 'Notes'] || '',
+    nfCode1:       f['nonfundedCode1'] || '',
+    nfCode2:       f['nonfundedCode2'] || '',
+    nfCode3:       f['nonfundedCode3'] || '',
+  };
+}
+
+function renderFunding() {
+  const el = document.getElementById('funding-page');
+  if (!el) return;
+
+  // Build the list of projects to show
+  const milestones = fundingMilestone === 'all' ? ['m2','m3'] : [fundingMilestone];
+  let rows = [];
+
+  projects.forEach(p => {
+    if (p.stage === 'cancelled') return;
+    milestones.forEach(ms => {
+      const row = getFundingRow(p.id, ms);
+      if (fundingFilter !== 'all' && row.status !== fundingFilter) return;
+      if (fundingSearch) {
+        const q = fundingSearch.toLowerCase();
+        if (!(p.name||'').toLowerCase().includes(q) &&
+            !(p.id||'').toLowerCase().includes(q) &&
+            !(p.city||'').toLowerCase().includes(q)) return;
+      }
+      rows.push({p, ms, row});
+    });
+  });
+
+  // Sort: nonfunded first, then eligible, then submitted, then funded, then not_eligible
+  const sortOrder = {nonfunded:0, eligible:1, submitted:2, funded:3, not_eligible:4};
+  rows.sort((a,b) => {
+    const sd = (sortOrder[a.row.status]||9) - (sortOrder[b.row.status]||9);
+    if (sd !== 0) return sd;
+    return (Number(b.p.contract)||0) - (Number(a.p.contract)||0);
+  });
+
+  // Counts for filter bar
+  const counts = {all:0, eligible:0, submitted:0, funded:0, nonfunded:0};
+  projects.forEach(p => {
+    ['m2','m3'].forEach(ms => {
+      const s = getFundingStatus(p.id, ms);
+      counts.all++;
+      if (counts[s] !== undefined) counts[s]++;
+    });
+  });
+
+  // Totals
+  const totalFunded   = projects.reduce((a,p) => {
+    const f = projectFunding[p.id]||{};
+    return a + (Number(f.m2Amount)||0) + (Number(f.m3Amount)||0);
+  }, 0);
+  const totalEligible = projects.filter(p => getFundingStatus(p.id,'m2')==='eligible'||getFundingStatus(p.id,'m3')==='eligible').length;
+  const totalSubmitted= projects.filter(p => getFundingStatus(p.id,'m2')==='submitted'||getFundingStatus(p.id,'m3')==='submitted').length;
+  const totalNF       = projects.filter(p => getFundingStatus(p.id,'m2')==='nonfunded'||getFundingStatus(p.id,'m3')==='nonfunded').length;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Total funded</div>
+        <div class="metric-value mv-green">$${Math.round(totalFunded/1000)}k</div>
+      </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Ready to submit</div>
+        <div class="metric-value" style="color:#534AB7;">${totalEligible}</div>
+      </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Submitted</div>
+        <div class="metric-value" style="color:#0C447C;">${totalSubmitted}</div>
+      </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Nonfunded</div>
+        <div class="metric-value mv-red">${totalNF}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${['all','eligible','submitted','funded','nonfunded'].map(f => `
+          <button class="sch-filter-btn ${fundingFilter===f?'active':''}" onclick="fundingFilter='${f}';renderFunding()">
+            ${FUND_STATUS_LABEL[f]||'All'} <span style="font-size:9px;opacity:.7;">${counts[f]||0}</span>
+          </button>`).join('')}
+      </div>
+      <div style="display:flex;gap:4px;">
+        ${['all','m2','m3'].map(m => `
+          <button class="sch-filter-btn ${fundingMilestone===m?'active':''}" onclick="fundingMilestone='${m}';renderFunding()">
+            ${m==='all'?'All milestones':m.toUpperCase()}
+          </button>`).join('')}
+      </div>
+      <input class="search-input" type="text" placeholder="Search projects..."
+        value="${fundingSearch}"
+        oninput="fundingSearch=this.value;renderFunding()"
+        style="width:180px;margin-left:auto;">
+    </div>
+
+    ${!rows.length ? `<div style="padding:40px;text-align:center;color:var(--text3);">No projects match this filter.</div>` : `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Project</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">City</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">PM</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Milestone</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Status</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Contract</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Funded</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Submitted</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">NF Codes</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(({p, ms, row}, i) => {
+          const nfCodes = [row.nfCode1, row.nfCode2, row.nfCode3].filter(Boolean);
+          const nfHtml = nfCodes.map(c => {
+            const def = NONFUND_CODES.find(x => x.code === c);
+            return `<span title="${def?def.desc:''}" style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fcebeb;color:#a32d2d;margin-right:2px;">${c}</span>`;
+          }).join('');
+          return `<tr style="background:${i%2===0?'var(--bg)':'var(--bg2)'};border-bottom:0.5px solid var(--border);cursor:pointer;"
+            onclick="openFundingModal('${p.id}','${ms}')">
+            <td style="padding:9px 12px;">
+              <div style="font-weight:500;">${p.name}</div>
+              <div style="font-size:10px;color:var(--text3);">${p.id}</div>
+            </td>
+            <td style="padding:9px 12px;color:var(--text2);">${p.city||'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${p.pm||'—'}</td>
+            <td style="padding:9px 12px;">
+              <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--bg2);color:var(--text2);">${ms.toUpperCase()}</span>
+            </td>
+            <td style="padding:9px 12px;">
+              <span style="font-size:10px;padding:2px 8px;border-radius:10px;${FUND_STATUS_CLS[row.status]||''};">${FUND_STATUS_LABEL[row.status]||row.status}</span>
+            </td>
+            <td style="padding:9px 12px;color:var(--text2);">${p.contract?'$'+Number(p.contract).toLocaleString():'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${row.amount?'$'+Number(row.amount).toLocaleString():'—'}</td>
+            <td style="padding:9px 12px;color:var(--text3);font-size:11px;">${row.submittedDate?new Date(row.submittedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td>
+            <td style="padding:9px 12px;">${nfHtml||'—'}</td>
+            <td style="padding:9px 12px;" onclick="event.stopPropagation()">
+              ${row.status === 'eligible' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;" onclick="quickFundAction('${p.id}','${ms}','submitted')">Mark Submitted</button>` : ''}
+              ${row.status === 'submitted' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;background:var(--green);color:#fff;border:none;" onclick="openFundingModal('${p.id}','${ms}')">Record Funded</button>` : ''}
+              ${row.status === 'nonfunded' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;" onclick="openFundingModal('${p.id}','${ms}')">Manage Codes</button>` : ''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`}
+  `;
+}
+
+// Quick status change without opening modal (e.g. Mark Submitted)
+async function quickFundAction(pid, milestone, newStatus) {
+  const today = new Date().toISOString().slice(0,10);
+  const f = projectFunding[pid] || {};
+  const update = {projectId: pid};
+  update[milestone + 'Status'] = newStatus;
+  if (newStatus === 'submitted') update[milestone + 'SubmittedDate'] = today;
+
+  if (!projectFunding[pid]) projectFunding[pid] = {};
+  Object.assign(projectFunding[pid], update);
+  renderFunding();
+  showToast(milestone.toUpperCase() + ' marked ' + newStatus);
+
+  // Persist
+  await sbRun(sb.from('project_funding').upsert(camelToSnake(update), {onConflict:'project_id'}));
+  // Log event
+  await sbRun(sb.from('funding_events').insert({
+    project_id: pid,
+    milestone,
+    event_type: newStatus,
+    date: today,
+    created_by: currentUser.name||'Team',
+  }));
+}
+
+// Full funding modal — for recording funded amounts, nonfunded codes, notes
+function openFundingModal(pid, milestone) {
+  fundingModalPid = pid;
+  fundingModalMilestone = milestone;
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const row = getFundingRow(pid, milestone);
+  const f = projectFunding[pid] || {};
+  const events = (fundingEvents[pid]||[]).filter(e => e.milestone === milestone);
+
+  const el = document.getElementById('funding-modal-content');
+  const title = document.getElementById('funding-modal-title');
+  if (!el || !title) return;
+
+  title.textContent = p.name + ' — ' + milestone.toUpperCase() + ' Funding';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div>
+        <div class="np-label">Status</div>
+        <select class="np-input" id="fm-status">
+          ${['not_eligible','eligible','submitted','funded','nonfunded'].map(s =>
+            `<option value="${s}" ${row.status===s?'selected':''}>${FUND_STATUS_LABEL[s]}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div>
+        <div class="np-label">Funded Amount ($)</div>
+        <input class="np-input" id="fm-amount" type="number" value="${row.amount||''}" placeholder="0">
+      </div>
+      <div>
+        <div class="np-label">Submitted Date</div>
+        <input class="np-input" id="fm-submitted-date" type="date" value="${row.submittedDate||''}">
+      </div>
+      <div>
+        <div class="np-label">Funded Date</div>
+        <input class="np-input" id="fm-funded-date" type="date" value="${row.fundedDate||''}">
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="np-label">Nonfunded Codes</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        ${[1,2,3].map(n => `
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Code ${n}</div>
+            <select class="np-input" id="fm-nf-${n}" style="font-size:11px;">
+              <option value="">— None —</option>
+              ${NONFUND_CODES.map(c => `<option value="${c.code}" ${(f['nonfundedCode'+n]||'')==c.code?'selected':''}>${c.code} — ${c.desc.slice(0,30)}</option>`).join('')}
+            </select>
+          </div>`).join('')}
+      </div>
+      ${[1,2,3].map(n => {
+        const code = f['nonfundedCode'+n];
+        const def = code ? NONFUND_CODES.find(x => x.code === code) : null;
+        return def ? `<div id="nf-desc-${n}" style="font-size:10px;color:var(--text3);margin-top:4px;padding:4px 8px;background:var(--bg2);border-radius:4px;">${def.master} · ${def.desc} · Responsible: ${def.party}</div>` : `<div id="nf-desc-${n}"></div>`;
+      }).join('')}
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="np-label">Notes</div>
+      <textarea class="np-input" id="fm-notes" rows="2" style="resize:vertical;" placeholder="Add a note...">${row.notes||''}</textarea>
+    </div>
+
+    ${events.length ? `
+    <div>
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Event History</div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${events.slice(0,8).map(e => `
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 8px;background:var(--bg2);border-radius:4px;">
+            <span style="color:var(--text3);">${e.date||e.createdAt?.slice(0,10)||''}</span>
+            <span style="padding:1px 6px;border-radius:8px;${FUND_STATUS_CLS[e.eventType]||'background:var(--bg2)'};font-size:9px;">${FUND_STATUS_LABEL[e.eventType]||e.eventType}</span>
+            <span style="color:var(--text2);flex:1;">${e.notes||''}</span>
+            <span style="color:var(--text3);">${e.createdBy||''}</span>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+  `;
+
+  // Wire up NF code selects to show description
+  [1,2,3].forEach(n => {
+    const sel = document.getElementById('fm-nf-'+n);
+    if (sel) sel.onchange = () => {
+      const def = NONFUND_CODES.find(x => x.code === sel.value);
+      const desc = document.getElementById('nf-desc-'+n);
+      if (desc) desc.textContent = def ? def.master+' · '+def.desc+' · Responsible: '+def.party : '';
+    };
+  });
+
+  document.getElementById('funding-modal').style.display='flex';
+}
+
+async function saveFundingModal() {
+  const pid = fundingModalPid;
+  const milestone = fundingModalMilestone;
+  if (!pid || !milestone) return;
+
+  const get = id => document.getElementById(id)?.value||'';
+  const status        = get('fm-status');
+  const amount        = get('fm-amount');
+  const submittedDate = get('fm-submitted-date');
+  const fundedDate    = get('fm-funded-date');
+  const notes         = get('fm-notes');
+  const nf1           = get('fm-nf-1');
+  const nf2           = get('fm-nf-2');
+  const nf3           = get('fm-nf-3');
+
+  const update = {
+    projectId: pid,
+    [milestone+'Status']:        status,
+    [milestone+'Amount']:        amount||null,
+    [milestone+'SubmittedDate']: submittedDate||null,
+    [milestone+'FundedDate']:    fundedDate||null,
+    [milestone+'Notes']:         notes||null,
+    nonfundedCode1: nf1||null,
+    nonfundedCode2: nf2||null,
+    nonfundedCode3: nf3||null,
+  };
+
+  // Optimistic update
+  if (!projectFunding[pid]) projectFunding[pid] = {};
+  Object.assign(projectFunding[pid], update);
+  closeFundingModal();
+  renderFunding();
+  showToast('Funding updated');
+
+  // Persist
+  await sbRun(sb.from('project_funding').upsert(camelToSnake(update), {onConflict:'project_id'}));
+
+  // Log event
+  const oldStatus = getFundingStatus(pid, milestone);
+  if (status !== oldStatus || notes) {
+    await sbRun(sb.from('funding_events').insert({
+      project_id:  pid,
+      milestone,
+      event_type:  status,
+      amount:      amount||null,
+      date:        fundedDate||submittedDate||new Date().toISOString().slice(0,10),
+      notes:       notes||null,
+      nf_code_1:   nf1||null,
+      nf_code_2:   nf2||null,
+      nf_code_3:   nf3||null,
+      created_by:  currentUser.name||'Team',
+    }));
+  }
+}
+
+function closeFundingModal() {
+  document.getElementById('funding-modal').style.display='none';
+  fundingModalPid = null;
+  fundingModalMilestone = null;
+}
+
+
 // ── KEYBOARD SHORTCUTS ───────────────────────────────────
 document.addEventListener('keydown',function(e){
   // Skip if typing in an input/textarea
@@ -4830,7 +5431,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='n'||e.key==='N'){ openNewProject(); return; }
 
   // 1-6 — switch views
-  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule','7':'service'};
+  const viewMap={'1':'command','2':'queue','3':'pipeline','4':'analytics','5':'audit','6':'schedule','7':'service','8':'funding'};
   if(viewMap[e.key]){
     const v=viewMap[e.key];
     setView(v,document.getElementById('btn-'+v));
@@ -4841,5 +5442,20 @@ document.addEventListener('keydown',function(e){
 
 // Session restore and initial load handled by the async IIFE above.
 </script>
+
+<!-- FUNDING MODAL -->
+<div id="funding-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;margin:20px;padding:24px 28px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:500;" id="funding-modal-title">Funding</div>
+      <button onclick="closeFundingModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&#x2715;</button>
+    </div>
+    <div id="funding-modal-content"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <button onclick="closeFundingModal()" style="font-size:12px;padding:7px 16px;border-radius:8px;border:0.5px solid rgba(0,0,0,0.18);background:#fff;cursor:pointer;">Cancel</button>
+      <button onclick="saveFundingModal()" style="font-size:12px;padding:7px 18px;border-radius:8px;border:none;background:var(--green);color:#fff;font-weight:500;cursor:pointer;">Save</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
