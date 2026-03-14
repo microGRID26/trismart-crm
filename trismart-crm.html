@@ -1025,6 +1025,7 @@ select.np-input{cursor:pointer;}
       <button class="ptab" id="ptab-notes" onclick="setPanelTab('notes')">Notes</button>
       <button class="ptab" id="ptab-files" onclick="setPanelTab('files')">Files</button>
       <button class="ptab" id="ptab-schedule" onclick="setPanelTab('schedule')">Schedule</button>
+      <button class="ptab" id="ptab-bom" onclick="setPanelTab('bom')">BOM</button>
     </div>
     <div class="panel-body">
       <div class="panel-left" id="dp-left"></div>
@@ -1399,7 +1400,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={},projectBoms={};
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -1557,6 +1558,7 @@ async function loadData(){
       {data:svcNoteData, error:e8},
       {data:fundData,    error:e9},
       {data:feData,      error:e10},
+      {data:bomData,     error:e11},
     ] = await Promise.all([
       sb.from('projects').select('*').limit(5000),
       sb.from('stage_history').select('*').limit(10000),
@@ -1568,9 +1570,10 @@ async function loadData(){
       sb.from('service_call_notes').select('*').limit(5000),
       sb.from('project_funding').select('*').limit(5000),
       sb.from('funding_events').select('*').order('created_at',{ascending:false}).limit(10000),
+      sb.from('project_boms').select('*').order('created_at',{ascending:false}).limit(2000),
     ]);
 
-    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10].find(Boolean);
+    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11].find(Boolean);
     if (firstErr) throw new Error(firstErr.message);
 
     setLoadingBar(70);
@@ -1625,6 +1628,13 @@ async function loadData(){
       const c=snakeToCamel(r);
       if(!fundingEvents[c.projectId]) fundingEvents[c.projectId]=[];
       fundingEvents[c.projectId].push(c);
+    });
+
+    // BOMs — latest per project
+    projectBoms = {};
+    (bomData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!projectBoms[c.projectId]) projectBoms[c.projectId]=c; // already sorted desc
     });
 
     // Crews
@@ -3207,7 +3217,9 @@ function renderPanel(pid){
     <div class="ptab-pane active" id="ptabpane-tasks-${pid}">${taskHTML}</div>
     <div class="ptab-pane" id="ptabpane-notes-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;">${filesDiv}</div>
-    <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>`;
+    <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>
+    <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>
+    <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>`;
 
   // Inject notes into notes pane (needs live DOM)
   const notesPane=document.getElementById(`ptabpane-notes-${pid}`);
@@ -4065,11 +4077,12 @@ function setPanelTab(tab){
   document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
   const btn=document.getElementById('ptab-'+tab);if(btn) btn.classList.add('active');
   const pid=selectedId;if(!pid) return;
-  ['tasks','notes','files','schedule'].forEach(t=>{
+  ['tasks','notes','files','schedule','bom'].forEach(t=>{
     const pane=document.getElementById(`ptabpane-${t}-${pid}`);
     if(pane) pane.style.display=t===tab?'block':'none';
   });
   if(tab==='schedule') renderPanelSchedule(pid);
+  if(tab==='bom') renderPanelBOM(pid);
 }
 function renderPanelSchedule(pid){
   const pane=document.getElementById(`ptabpane-schedule-${pid}`);
@@ -5889,6 +5902,273 @@ function renderHelp() {
     ${sectionsHtml || '<div style="padding:40px;text-align:center;color:var(--text3);">No results for "'+helpQuery+'"</div>'}
   `;
 }
+
+
+// ── BOM MODULE ────────────────────────────────────────────
+
+function calcBOM(p, inputs) {
+  const modules    = Number(p.moduleQty) || 0;
+  const batteries  = Number(p.batteryQty) || 0;
+  const inverters  = Number(p.inverterQty) || 1;
+  const arrays     = Number(inputs.arrayCount) || 1;
+  const rows       = Number(inputs.rowCount) || 1;
+  const attach     = Number(inputs.attachmentCount) || Math.round(modules * 2.4);
+  const ov         = inputs.overrides || {};
+
+  function qty(key, formula) {
+    return ov[key] !== undefined ? Number(ov[key]) : formula;
+  }
+
+  const rsd        = Math.ceil(modules / 2);
+  const endClamps  = Math.round(attach * 0.375);
+  const midClamps  = (modules - rows) * 2 - 4;
+
+  return [
+    // ── MODULES & INVERTERS ──────────────────────────────
+    {cat:'PV Equipment', key:'modules',       label:'Solar PV Modules',             pn: p.module||'', qty: qty('modules', modules),             unit:'EACH', note:'From project data'},
+    {cat:'PV Equipment', key:'inverters',     label:'Inverters',                    pn: p.inverter||'', qty: qty('inverters', inverters),        unit:'EACH', note:'From project data'},
+    {cat:'PV Equipment', key:'batteries',     label:'Batteries',                    pn: p.battery||'', qty: qty('batteries', batteries),         unit:'EACH', note:'From project data'},
+    // ── RAPID SHUTDOWN ───────────────────────────────────
+    {cat:'Rapid Shutdown', key:'rsd',         label:'Rapid Shutdown Device (RSD)',  pn:'APSMART RSD-D-20', qty: qty('rsd', rsd),                 unit:'EACH', note:'1 RSD per 2 panels'},
+    {cat:'Rapid Shutdown', key:'mlpe_mounts', label:'MLPE Mounts',                  pn:'',             qty: qty('mlpe_mounts', rsd + 4),         unit:'EACH', note:'RSDs + 4 spare'},
+    // ── SOLAR WIRING / ACCESSORIES ───────────────────────
+    {cat:'Solar Wiring',  key:'soladecks',    label:'Soladecks',                    pn:'',             qty: qty('soladecks', arrays),            unit:'EACH', note:'1 per array'},
+    {cat:'Solar Wiring',  key:'trunk_cables', label:'Trunk Cables',                 pn:'',             qty: qty('trunk_cables', modules + arrays*2 + 4), unit:'EACH', note:'Panels + arrays×2 + 4 spare'},
+    {cat:'Solar Wiring',  key:'terminators',  label:'Terminators',                  pn:'',             qty: qty('terminators', arrays*2 + 1),    unit:'EACH', note:'2 per array + 1'},
+    {cat:'Solar Wiring',  key:'seals',        label:'Seals',                        pn:'',             qty: qty('seals', arrays*2 + 1),           unit:'EACH', note:'2 per array + 1'},
+    // ── DISCONNECTS ──────────────────────────────────────
+    {cat:'Disconnects',   key:'disc_30a',     label:'30A/2P Non-Fusible Disconnect',pn:'CHD DG221URB', qty: qty('disc_30a', 1),                  unit:'EACH', note:'As needed'},
+    {cat:'Disconnects',   key:'disc_200a',    label:'200A/2P Non-Fusible Disconnect',pn:'CHD DG224URK',qty: qty('disc_200a', 1),                 unit:'EACH', note:'As needed'},
+    // ── ELECTRICAL ───────────────────────────────────────
+    {cat:'Electrical',    key:'ground_lugs',  label:'Ground Lugs',                  pn:'',             qty: qty('ground_lugs', arrays),          unit:'EACH', note:'1 per continuous array (EcoFasten)'},
+    {cat:'Electrical',    key:'roof_sealant', label:'Roof Sealant',                 pn:'',             qty: qty('roof_sealant', modules<20?6:modules<=40?9:10), unit:'TUBES', note:'<20 panels=6, 20-40=9, >40=10'},
+    {cat:'Electrical',    key:'strain_relief',label:'1/2" Strain Relief',           pn:'',             qty: qty('strain_relief', arrays + 1),    unit:'EACH', note:'1 per array + 1 spare'},
+    {cat:'Electrical',    key:'cts',          label:'CTs (Splitters)',              pn:'',             qty: qty('cts', 2),                        unit:'EACH', note:'Always 2'},
+    {cat:'Electrical',    key:'emt',          label:'3/4" EMT Conduit',             pn:'',             qty: qty('emt', 11),                       unit:'STICKS', note:'Standard'},
+    {cat:'Electrical',    key:'connectors',   label:'3/4" EMT Connectors',          pn:'',             qty: qty('connectors', 6),                 unit:'EACH', note:'Standard'},
+    {cat:'Electrical',    key:'couplings',    label:'3/4" EMT Couplings',           pn:'',             qty: qty('couplings', 6),                  unit:'EACH', note:'Standard'},
+    {cat:'Electrical',    key:'zip_ties',     label:'Zip Ties',                     pn:'',             qty: qty('zip_ties', 1),                   unit:'BUNDLE', note:'Standard'},
+    {cat:'Electrical',    key:'water',        label:'Water',                        pn:'',             qty: qty('water', 1),                      unit:'CASE', note:'Standard'},
+    {cat:'Electrical',    key:'bare_copper6', label:'#6 Bare Copper Wire',          pn:'',             qty: qty('bare_copper6', 22),              unit:'FT', note:'Avg per install'},
+    {cat:'Electrical',    key:'green6',       label:'Green #6 THHN Wire',           pn:'',             qty: qty('green6', 99),                    unit:'FT', note:'Avg per install'},
+    {cat:'Electrical',    key:'black10',      label:'Black #10 Copper Wire',        pn:'',             qty: qty('black10', 83),                   unit:'FT', note:'Avg per install'},
+    {cat:'Electrical',    key:'red10',        label:'Red #10 Copper Wire',          pn:'',             qty: qty('red10', 83),                     unit:'FT', note:'Avg per install'},
+    // ── ECOFLOW ACCESSORIES ──────────────────────────────
+    {cat:'EcoFlow',       key:'smart_panel',  label:'EcoFlow Smart Electrical Panel',pn:'',            qty: qty('smart_panel', 1),               unit:'EACH', note:'As needed'},
+    {cat:'EcoFlow',       key:'efa_ct',       label:'EcoFlow OCEAN Pro CT',         pn:'ECO5018004001',qty: qty('efa_ct', 2),                    unit:'EACH', note:'As needed'},
+    {cat:'EcoFlow',       key:'handle_bar',   label:'EcoFlow OCEAN Pro Handle Bar', pn:'ECO5018004005',qty: qty('handle_bar', 1),               unit:'EACH', note:'As needed'},
+    {cat:'EcoFlow',       key:'epo',          label:'Emergency Power Off Device',   pn:'CE4T-10R-02',  qty: qty('epo', 1),                      unit:'EACH', note:'As needed'},
+    // ── RACKING (ECOFASTEN CLICKFIT) ─────────────────────
+    {cat:'Racking',       key:'smart_foot',   label:'CF Smart Foot AL MLL',         pn:'2012036',      qty: qty('smart_foot', attach),           unit:'EACH', note:'From design — exact count'},
+    {cat:'Racking',       key:'rail_clicker', label:'CF Rail Clicker AL MLL',       pn:'2012039',      qty: qty('rail_clicker', attach),         unit:'EACH', note:'Same as smart foot count'},
+    {cat:'Racking',       key:'rails',        label:'Rails CF LTE US 165.4"',       pn:'2012034',      qty: qty('rails', 0),                     unit:'EACH', note:'From design — enter count'},
+    {cat:'Racking',       key:'rail_splice',  label:'Rail Splice SS',               pn:'2012013',      qty: qty('rail_splice', 0),               unit:'EACH', note:'From design — enter count'},
+    {cat:'Racking',       key:'mid_clamps',   label:'Mid Clamps 30-40mm',           pn:'2099045',      qty: qty('mid_clamps', Math.max(0,midClamps)), unit:'EACH', note:'2 between each panel in a row'},
+    {cat:'Racking',       key:'end_clamps',   label:'End Clamps 30-40mm',           pn:'2099046',      qty: qty('end_clamps', endClamps),        unit:'EACH', note:'Based on attachment count'},
+    {cat:'Racking',       key:'mlpe_mount',   label:'CF MLPE Mount SS',             pn:'2012019',      qty: qty('mlpe_mount', modules + 5),      unit:'EACH', note:'Modules + 5'},
+    {cat:'Racking',       key:'wire_clip',    label:'CF Wire Mgmt Clip',            pn:'2012020',      qty: qty('wire_clip', modules + 5),       unit:'EACH', note:'Modules + 5'},
+    {cat:'Racking',       key:'end_cap',      label:'CF End Cap PLS BLK',           pn:'2012029',      qty: qty('end_cap', endClamps),           unit:'EACH', note:'Same as end clamp count'},
+    {cat:'Racking',       key:'screw_14x3',   label:'Screw 14x3 W/WB',             pn:'3016018',      qty: qty('screw_14x3', attach * 3),       unit:'EACH', note:'3 per attachment'},
+    {cat:'Racking',       key:'module_jumper',label:'CF Module Jumper SS 8"',       pn:'4011011',      qty: qty('module_jumper', arrays * 2),    unit:'EACH', note:'2 per array'},
+  ];
+}
+
+function renderPanelBOM(pid) {
+  const pane = document.getElementById(`ptabpane-bom-${pid}`);
+  if (!pane) return;
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+
+  const saved = projectBoms[pid] || {};
+  const inputs = {
+    arrayCount:       saved.arrayCount       || p.arrayCount       || '',
+    rowCount:         saved.rowCount         || p.rowCount         || '',
+    attachmentCount:  saved.attachmentCount  || p.attachmentCount  || '',
+    orientation:      saved.orientation      || 'portrait',
+    overrides:        saved.overrides        || {},
+  };
+
+  pane.innerHTML = renderBOMContent(pid, p, inputs);
+}
+
+function renderBOMContent(pid, p, inputs) {
+  const items = calcBOM(p, inputs);
+  const cats = [...new Set(items.map(i => i.cat))];
+
+  const tableRows = cats.map(cat => {
+    const catItems = items.filter(i => i.cat === cat);
+    return `
+      <tr style="background:var(--bg2);">
+        <td colspan="5" style="padding:6px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">${cat}</td>
+      </tr>
+      ${catItems.map(item => `
+      <tr class="bom-row" data-key="${item.key}">
+        <td style="padding:6px 12px;font-size:11px;font-weight:500;">${item.label}</td>
+        <td style="padding:6px 12px;font-size:10px;color:var(--text3);">${item.pn}</td>
+        <td style="padding:6px 8px;text-align:center;">
+          <input type="number" class="bom-qty-input" data-key="${item.key}"
+            value="${item.qty}"
+            style="width:60px;text-align:center;padding:3px 6px;border:0.5px solid var(--border2);border-radius:6px;font-size:12px;background:var(--bg);"
+            onchange="setBOMOverride('${pid}','${item.key}',this.value)">
+        </td>
+        <td style="padding:6px 8px;font-size:10px;color:var(--text2);text-align:center;">${item.unit}</td>
+        <td style="padding:6px 8px;font-size:10px;color:var(--text3);">${item.note}</td>
+      </tr>`).join('')}`;
+  }).join('');
+
+  return `
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;">Bill of Materials</div>
+          <div style="font-size:10px;color:var(--text3);">Auto-calculated from project data · override any quantity</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="action-btn" style="margin:0;font-size:10px;" onclick="saveBOM('${pid}')">Save BOM</button>
+          <button class="action-btn" style="margin:0;font-size:10px;" onclick="downloadBOMCSV('${pid}')">↓ CSV</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Arrays</div>
+          <input type="number" class="np-input" id="bom-arrays-${pid}" value="${inputs.arrayCount}"
+            style="font-size:11px;padding:4px 8px;"
+            placeholder="e.g. 3"
+            onchange="refreshBOM('${pid}')">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Strings / Rows</div>
+          <input type="number" class="np-input" id="bom-rows-${pid}" value="${inputs.rowCount}"
+            style="font-size:11px;padding:4px 8px;"
+            placeholder="e.g. 5"
+            onchange="refreshBOM('${pid}')">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Attachments (Smart Feet)</div>
+          <input type="number" class="np-input" id="bom-attach-${pid}" value="${inputs.attachmentCount}"
+            style="font-size:11px;padding:4px 8px;"
+            placeholder="from planset"
+            onchange="refreshBOM('${pid}')">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Orientation</div>
+          <select class="np-input" id="bom-orient-${pid}" style="font-size:11px;padding:4px 8px;" onchange="refreshBOM('${pid}')">
+            <option value="portrait" ${inputs.orientation==='portrait'?'selected':''}>Portrait</option>
+            <option value="landscape" ${inputs.orientation==='landscape'?'selected':''}>Landscape</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+          <th style="padding:7px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--text2);">Item</th>
+          <th style="padding:7px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--text2);">Part Number</th>
+          <th style="padding:7px 8px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);">Qty</th>
+          <th style="padding:7px 8px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);">Unit</th>
+          <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:500;color:var(--text2);">Formula</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    </div>`;
+}
+
+// Store per-project overrides in memory for the current session
+const _bomInputs = {};
+
+function refreshBOM(pid) {
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const saved = projectBoms[pid] || {};
+  const inputs = {
+    arrayCount:      document.getElementById(`bom-arrays-${pid}`)?.value || saved.arrayCount || '',
+    rowCount:        document.getElementById(`bom-rows-${pid}`)?.value   || saved.rowCount   || '',
+    attachmentCount: document.getElementById(`bom-attach-${pid}`)?.value || saved.attachmentCount || '',
+    orientation:     document.getElementById(`bom-orient-${pid}`)?.value || 'portrait',
+    overrides:       saved.overrides || {},
+  };
+  _bomInputs[pid] = inputs;
+  const pane = document.getElementById(`ptabpane-bom-${pid}`);
+  if (pane) pane.innerHTML = renderBOMContent(pid, p, inputs);
+}
+
+function setBOMOverride(pid, key, val) {
+  if (!_bomInputs[pid]) _bomInputs[pid] = { overrides: {} };
+  if (!_bomInputs[pid].overrides) _bomInputs[pid].overrides = {};
+  _bomInputs[pid].overrides[key] = Number(val);
+  // Update projectBoms in memory too
+  if (!projectBoms[pid]) projectBoms[pid] = {};
+  if (!projectBoms[pid].overrides) projectBoms[pid].overrides = {};
+  projectBoms[pid].overrides[key] = Number(val);
+}
+
+async function saveBOM(pid) {
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const inputs = _bomInputs[pid] || {};
+  const saved = projectBoms[pid] || {};
+
+  const row = {
+    project_id:       pid,
+    version:          (saved.version || 0) + 1,
+    array_count:      Number(inputs.arrayCount) || null,
+    row_count:        Number(inputs.rowCount)   || null,
+    attachment_count: Number(inputs.attachmentCount) || null,
+    orientation:      inputs.orientation || 'portrait',
+    overrides:        inputs.overrides   || {},
+    created_by:       currentUser.name  || 'Team',
+  };
+
+  // If existing BOM, upsert by project_id (keep latest)
+  let err;
+  if (saved.id) {
+    ({error:err} = await sb.from('project_boms').update({
+      version:          row.version,
+      array_count:      row.array_count,
+      row_count:        row.row_count,
+      attachment_count: row.attachment_count,
+      orientation:      row.orientation,
+      overrides:        row.overrides,
+      updated_at:       new Date().toISOString(),
+    }).eq('id', saved.id));
+  } else {
+    const {data, error} = await sb.from('project_boms').insert(row).select().single();
+    err = error;
+    if (data) {
+      projectBoms[pid] = snakeToCamel(data);
+    }
+  }
+
+  if (err) { showToast('Error saving BOM: ' + err.message); return; }
+  showToast('BOM saved');
+}
+
+function downloadBOMCSV(pid) {
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  const inputs = _bomInputs[pid] || projectBoms[pid] || {};
+  const items = calcBOM(p, inputs);
+
+  const header = ['Item','Part Number','Qty','Unit','Formula'];
+  const rows = items.map(i => [
+    i.label, i.pn, i.qty, i.unit, i.note
+  ]);
+
+  const csv = [header, ...rows].map(r =>
+    r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')
+  ).join('\n');
+
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `BOM_${pid}_${p.name.replace(/\s+/g,'_')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 // ── KEYBOARD SHORTCUTS ───────────────────────────────────
 document.addEventListener('keydown',function(e){
