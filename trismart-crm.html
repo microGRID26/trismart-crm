@@ -700,96 +700,138 @@ select.np-input{cursor:pointer;}
   </div>
 </div>
 
-<!-- NEW PROJECT MODAL -->
+<!-- NEW / EDIT PROJECT MODAL -->
+<style>
+.np-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border2);margin-bottom:20px;}
+.np-tab{font-size:12px;padding:7px 14px;cursor:pointer;border:none;background:none;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.np-tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:500;}
+.np-tab-pane{display:none;}
+.np-tab-pane.active{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.np-full{grid-column:1/-1;}
+</style>
 <div id="np-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;overflow-y:auto;">
-  <div style="background:#fff;border-radius:12px;max-width:620px;margin:40px auto;padding:24px 28px;position:relative;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+  <div style="background:#fff;border-radius:12px;max-width:680px;margin:40px auto;padding:24px 28px;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div>
-        <div style="font-size:16px;font-weight:500;">New Project</div>
-        <div style="font-size:11px;color:#999;margin-top:2px;">All fields required unless marked optional</div>
+        <div style="font-size:16px;font-weight:500;" id="np-title">New Project</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;" id="np-subtitle">All fields required unless marked optional</div>
       </div>
       <button onclick="closeNewProject()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&#x2715;</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div style="grid-column:1/-1;">
-        <div class="np-label">Customer Name</div>
-        <input class="np-input" id="np-name" type="text" placeholder="First Last">
-      </div>
-      <div style="grid-column:1/-1;">
-        <div class="np-label">Street Address</div>
-        <input class="np-input" id="np-address" type="text" placeholder="123 Main St, Austin, TX 78701">
-      </div>
-      <div>
-        <div class="np-label">City, State</div>
-        <input class="np-input" id="np-city" type="text" placeholder="Austin, TX">
-      </div>
-      <div>
-        <div class="np-label">Phone</div>
-        <input class="np-input" id="np-phone" type="text" placeholder="(555) 555-5555">
-      </div>
-      <div style="grid-column:1/-1;">
-        <div class="np-label">Email</div>
-        <input class="np-input" id="np-email" type="email" placeholder="customer@email.com">
-      </div>
-      <div>
-        <div class="np-label">Sale Date</div>
-        <input class="np-input" id="np-saledate" type="date">
-      </div>
-      <div>
-        <div class="np-label">Current Stage</div>
+    <!-- Tabs — Basic always shows; extra tabs only in edit mode -->
+    <div class="np-tabs">
+      <button class="np-tab active" id="np-tab-basic" onclick="npSwitchTab('basic')">Basic</button>
+      <button class="np-tab" id="np-tab-equipment" onclick="npSwitchTab('equipment')" style="display:none;">Equipment</button>
+      <button class="np-tab" id="np-tab-site" onclick="npSwitchTab('site')" style="display:none;">Site & Permitting</button>
+      <button class="np-tab" id="np-tab-milestones" onclick="npSwitchTab('milestones')" style="display:none;">Milestones & Funding</button>
+    </div>
+
+    <!-- TAB 1: BASIC -->
+    <div class="np-tab-pane active" id="np-pane-basic">
+      <div class="np-full"><div class="np-label">Customer Name</div><input class="np-input" id="np-name" type="text" placeholder="First Last"></div>
+      <div class="np-full"><div class="np-label">Street Address</div><input class="np-input" id="np-address" type="text" placeholder="123 Main St, Austin, TX 78701"></div>
+      <div><div class="np-label">City, State</div><input class="np-input" id="np-city" type="text" placeholder="Austin, TX"></div>
+      <div><div class="np-label">Phone</div><input class="np-input" id="np-phone" type="text" placeholder="(555) 555-5555"></div>
+      <div class="np-full"><div class="np-label">Email</div><input class="np-input" id="np-email" type="email" placeholder="customer@email.com"></div>
+      <div><div class="np-label">Sale Date</div><input class="np-input" id="np-saledate" type="date"></div>
+      <div><div class="np-label">Current Stage</div>
         <select class="np-input" id="np-stage">
-          <option value="evaluation">Evaluation</option>
-          <option value="survey">Site Survey</option>
-          <option value="design">Design</option>
-          <option value="permit">Permitting</option>
-          <option value="install">Installation</option>
-          <option value="inspection">Inspection</option>
+          <option value="evaluation">Evaluation</option><option value="survey">Site Survey</option>
+          <option value="design">Design</option><option value="permit">Permitting</option>
+          <option value="install">Installation</option><option value="inspection">Inspection</option>
           <option value="complete">Completion</option>
         </select>
       </div>
-      <div>
-        <div class="np-label">Project Manager</div>
-        <select class="np-input" id="np-pm">
-          <option value="Ari">Ari</option>
-          <option value="Jen">Jen</option>
-        </select>
+      <div><div class="np-label">Project Manager</div>
+        <select class="np-input" id="np-pm"><option value="Ari">Ari</option><option value="Jen">Jen</option></select>
       </div>
-      <div>
-        <div class="np-label">Disposition</div>
-        <select class="np-input" id="np-disposition">
-          <option value="Sale">Sale</option>
-          <option value="Loyalty">Loyalty</option>
-        </select>
+      <div><div class="np-label">Disposition</div>
+        <select class="np-input" id="np-disposition"><option value="Sale">Sale</option><option value="Loyalty">Loyalty</option><option value="Cancelled">Cancelled</option></select>
       </div>
-      <div>
-        <div class="np-label">Contract Value ($)</div>
-        <input class="np-input" id="np-contract" type="number" placeholder="75000">
+      <div><div class="np-label">Contract Value ($)</div><input class="np-input" id="np-contract" type="number" placeholder="75000"></div>
+      <div><div class="np-label">System Size (kW)</div><input class="np-input" id="np-systemkw" type="number" step="0.001" placeholder="18.00"></div>
+      <div><div class="np-label">Financier</div><input class="np-input" id="np-financier" type="text" placeholder="Edge"></div>
+      <div><div class="np-label">AHJ</div><input class="np-input" id="np-ahj" type="text" placeholder="City name or County"></div>
+      <div><div class="np-label">Utility</div><input class="np-input" id="np-utility" type="text" placeholder="Oncor"></div>
+      <div><div class="np-label">Energy Advisor</div><input class="np-input" id="np-advisor" type="text" placeholder="Full name"></div>
+      <div><div class="np-label">Energy Consultant</div><input class="np-input" id="np-consultant" type="text" placeholder="Full name"></div>
+    </div>
+
+    <!-- TAB 2: EQUIPMENT -->
+    <div class="np-tab-pane" id="np-pane-equipment">
+      <div><div class="np-label">Module Model</div><input class="np-input" id="np-module" type="text" placeholder="HY-DH108P8-405B"></div>
+      <div><div class="np-label">Module Qty</div><input class="np-input" id="np-module-qty" type="number" placeholder="53"></div>
+      <div><div class="np-label">Inverter</div><input class="np-input" id="np-inverter" type="text" placeholder="Model name"></div>
+      <div><div class="np-label">Inverter Qty</div><input class="np-input" id="np-inverter-qty" type="number" placeholder="1"></div>
+      <div><div class="np-label">Battery</div><input class="np-input" id="np-battery" type="text" placeholder="EcoFlow"></div>
+      <div><div class="np-label">Battery Qty</div><input class="np-input" id="np-battery-qty" type="number" placeholder="8"></div>
+      <div><div class="np-label">Optimizer</div><input class="np-input" id="np-optimizer" type="text" placeholder="Model name"></div>
+      <div><div class="np-label">Optimizer Qty</div><input class="np-input" id="np-optimizer-qty" type="number" placeholder="0"></div>
+      <div><div class="np-label">Financing Type</div><input class="np-input" id="np-financing-type" type="text" placeholder="TPO (Lease, PPA)"></div>
+      <div><div class="np-label">Down Payment ($)</div><input class="np-input" id="np-down-payment" type="number" placeholder="0"></div>
+      <div><div class="np-label">TPO Escalator</div><input class="np-input" id="np-tpo-escalator" type="text" placeholder="0"></div>
+      <div><div class="np-label">Adv Pmt Schedule</div><input class="np-input" id="np-financier-adv-pmt" type="text" placeholder="Edge"></div>
+    </div>
+
+    <!-- TAB 3: SITE & PERMITTING -->
+    <div class="np-tab-pane" id="np-pane-site">
+      <div><div class="np-label">Meter Location</div><input class="np-input" id="np-meter-location" type="text" placeholder="Right side of house"></div>
+      <div><div class="np-label">Panel Location</div><input class="np-input" id="np-panel-location" type="text" placeholder="Inside garage"></div>
+      <div><div class="np-label">Voltage</div><input class="np-input" id="np-voltage" type="text" placeholder="240"></div>
+      <div><div class="np-label">MSP Bus Rating</div><input class="np-input" id="np-msp-bus-rating" type="text" placeholder="225A"></div>
+      <div><div class="np-label">MPU</div>
+        <select class="np-input" id="np-mpu"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
       </div>
-      <div>
-        <div class="np-label">System Size (kW)</div>
-        <input class="np-input" id="np-systemkw" type="number" step="0.001" placeholder="18.00">
+      <div><div class="np-label">Shutdown</div>
+        <select class="np-input" id="np-shutdown"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
       </div>
-      <div>
-        <div class="np-label">Financier</div>
-        <input class="np-input" id="np-financier" type="text" placeholder="Edge">
+      <div><div class="np-label">Performance Meter</div>
+        <select class="np-input" id="np-performance-meter"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select>
       </div>
-      <div>
-        <div class="np-label">AHJ</div>
-        <input class="np-input" id="np-ahj" type="text" placeholder="City name or County">
-      </div>
-      <div>
-        <div class="np-label">Utility</div>
-        <input class="np-input" id="np-utility" type="text" placeholder="Oncor">
-      </div>
-      <div>
-        <div class="np-label">Energy Advisor</div>
-        <input class="np-input" id="np-advisor" type="text" placeholder="Full name">
-      </div>
-      <div>
-        <div class="np-label">Energy Consultant</div>
-        <input class="np-input" id="np-consultant" type="text" placeholder="Full name">
-      </div>
+      <div><div class="np-label">Interconnect Breaker</div><input class="np-input" id="np-interconnection-breaker" type="text" placeholder="30A"></div>
+      <div><div class="np-label">Main Breaker</div><input class="np-input" id="np-main-breaker" type="text" placeholder="200A"></div>
+      <div><div class="np-label">HOA</div><input class="np-input" id="np-hoa" type="text" placeholder="HOA name or None"></div>
+      <div><div class="np-label">ESID #</div><input class="np-input" id="np-esid" type="text" placeholder="10443700000000000"></div>
+      <div class="np-full"><div class="np-label">Permit Number</div><input class="np-input" id="np-permit-number" type="text" placeholder="PB25-11359"></div>
+      <div><div class="np-label">Utility App #</div><input class="np-input" id="np-utility-app-number" type="text" placeholder="DRG-156817"></div>
+      <div><div class="np-label">Permit Fee ($)</div><input class="np-input" id="np-permit-fee" type="number" placeholder="340.55"></div>
+      <div><div class="np-label">City Permit Date</div><input class="np-input" id="np-city-permit-date" type="date"></div>
+      <div><div class="np-label">Utility Permit Date</div><input class="np-input" id="np-utility-permit-date" type="date"></div>
+      <div><div class="np-label">Site Surveyor</div><input class="np-input" id="np-site-surveyor" type="text" placeholder="Full name"></div>
+      <div><div class="np-label">Consultant Email</div><input class="np-input" id="np-consultant-email" type="email" placeholder="email@example.com"></div>
+    </div>
+
+    <!-- TAB 4: MILESTONES & FUNDING -->
+    <div class="np-tab-pane" id="np-pane-milestones">
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);">Milestone Dates</div>
+      <div><div class="np-label">NTP Date</div><input class="np-input" id="np-ntp-date" type="date"></div>
+      <div><div class="np-label">Survey Scheduled</div><input class="np-input" id="np-survey-scheduled-date" type="date"></div>
+      <div><div class="np-label">Survey Complete</div><input class="np-input" id="np-survey-date" type="date"></div>
+      <div><div class="np-label">Install Scheduled</div><input class="np-input" id="np-install-scheduled-date" type="date"></div>
+      <div><div class="np-label">Install Complete</div><input class="np-input" id="np-install-complete-date" type="date"></div>
+      <div><div class="np-label">City Inspection</div><input class="np-input" id="np-city-inspection-date" type="date"></div>
+      <div><div class="np-label">Utility Inspection</div><input class="np-input" id="np-utility-inspection-date" type="date"></div>
+      <div><div class="np-label">PTO Date</div><input class="np-input" id="np-pto-date" type="date"></div>
+      <div><div class="np-label">In Service Date</div><input class="np-input" id="np-in-service-date" type="date"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">M1 Funding</div>
+      <div><div class="np-label">M1 Amount ($)</div><input class="np-input" id="np-m1-amount" type="number" placeholder="0"></div>
+      <div><div class="np-label">M1 Funded Date</div><input class="np-input" id="np-m1-funded-date" type="date"></div>
+      <div><div class="np-label">M1 Chargeback ($)</div><input class="np-input" id="np-m1-cb" type="number" placeholder="0"></div>
+      <div><div class="np-label">M1 CB Credit ($)</div><input class="np-input" id="np-m1-cb-credit" type="number" placeholder="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">M2 Funding</div>
+      <div><div class="np-label">M2 Amount ($)</div><input class="np-input" id="np-m2-amount" type="number" placeholder="0"></div>
+      <div><div class="np-label">M2 Funded Date</div><input class="np-input" id="np-m2-funded-date" type="date"></div>
+      <div><div class="np-label">M2 Chargeback ($)</div><input class="np-input" id="np-m2-cb" type="number" placeholder="0"></div>
+      <div><div class="np-label">M2 CB Credit ($)</div><input class="np-input" id="np-m2-cb-credit" type="number" placeholder="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">M3 Funding</div>
+      <div><div class="np-label">M3 Amount ($)</div><input class="np-input" id="np-m3-amount" type="number" placeholder="0"></div>
+      <div><div class="np-label">M3 Funded Date</div><input class="np-input" id="np-m3-funded-date" type="date"></div>
+      <div><div class="np-label">M3 Projected ($)</div><input class="np-input" id="np-m3-projected" type="number" placeholder="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding-bottom:4px;border-bottom:1px solid var(--border);margin-top:8px;">Nonfunded Codes</div>
+      <div><div class="np-label">Nonfunded Code 1</div><input class="np-input" id="np-nonfunded-code-1" type="text"></div>
+      <div><div class="np-label">Nonfunded Code 2</div><input class="np-input" id="np-nonfunded-code-2" type="text"></div>
+      <div><div class="np-label">Nonfunded Code 3</div><input class="np-input" id="np-nonfunded-code-3" type="text"></div>
     </div>
 
     <div id="np-error" style="display:none;margin-top:12px;padding:8px 12px;background:#fcebeb;color:#a32d2d;border-radius:8px;font-size:12px;"></div>
@@ -3304,23 +3346,43 @@ function duplicateProject(pid){
 }
 
 function openNewProject(){
-  document.querySelector('#np-overlay [style*="font-size:16px"]').textContent='New Project';
+  _editMode=false;_editPid=null;
+  document.getElementById('np-title').textContent='New Project';
+  document.getElementById('np-subtitle').textContent='All fields required unless marked optional';
   document.getElementById('np-submit').textContent='Create Project';
   document.getElementById('np-overlay').style.display='block';
   document.getElementById('np-saledate').value=today.toISOString().slice(0,10);
   document.getElementById('np-error').style.display='none';
-  // reset stage select to evaluation
   document.getElementById('np-stage').value='evaluation';
+  npShowEditTabs(false);
+}
+
+function npSwitchTab(tab){
+  ['basic','equipment','site','milestones'].forEach(t=>{
+    document.getElementById('np-tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('np-pane-'+t).classList.toggle('active',t===tab);
+  });
+}
+
+function npShowEditTabs(show){
+  ['equipment','site','milestones'].forEach(t=>{
+    document.getElementById('np-tab-'+t).style.display=show?'':'none';
+  });
+  // Switch back to basic when hiding tabs
+  if(!show) npSwitchTab('basic');
 }
 
 function openEditProject(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
   _editMode=true;_editPid=pid;
-  document.querySelector('#np-overlay [style*="font-size:16px"]').textContent='Edit Project — '+p.id;
+  document.getElementById('np-title').textContent='Edit Project — '+p.id;
+  document.getElementById('np-subtitle').textContent='Changes save immediately on all tabs.';
   document.getElementById('np-submit').textContent='Save Changes';
   document.getElementById('np-error').style.display='none';
+  npShowEditTabs(true);
+  npSwitchTab('basic');
 
-  // populate fields
+  // Tab 1: Basic
   document.getElementById('np-name').value=p.name||'';
   document.getElementById('np-city').value=p.city||'';
   document.getElementById('np-address').value=p.address||'';
@@ -3337,13 +3399,81 @@ function openEditProject(pid){
   document.getElementById('np-utility').value=p.utility||'';
   document.getElementById('np-advisor').value=p.advisor||'';
   document.getElementById('np-consultant').value=p.consultant||'';
+
+  // Tab 2: Equipment
+  document.getElementById('np-module').value=p.module||'';
+  document.getElementById('np-module-qty').value=p.moduleQty||'';
+  document.getElementById('np-inverter').value=p.inverter||'';
+  document.getElementById('np-inverter-qty').value=p.inverterQty||'';
+  document.getElementById('np-battery').value=p.battery||'';
+  document.getElementById('np-battery-qty').value=p.batteryQty||'';
+  document.getElementById('np-optimizer').value=p.optimizer||'';
+  document.getElementById('np-optimizer-qty').value=p.optimizerQty||'';
+  document.getElementById('np-financing-type').value=p.financingType||'';
+  document.getElementById('np-down-payment').value=p.downPayment||'';
+  document.getElementById('np-tpo-escalator').value=p.tpoEscalator||'';
+  document.getElementById('np-financier-adv-pmt').value=p.financierAdvPmt||'';
+
+  // Tab 3: Site & Permitting
+  document.getElementById('np-meter-location').value=p.meterLocation||'';
+  document.getElementById('np-panel-location').value=p.panelLocation||'';
+  document.getElementById('np-voltage').value=p.voltage||'';
+  document.getElementById('np-msp-bus-rating').value=p.mspBusRating||'';
+  document.getElementById('np-mpu').value=p.mpu||'';
+  document.getElementById('np-shutdown').value=p.shutdown||'';
+  document.getElementById('np-performance-meter').value=p.performanceMeter||'';
+  document.getElementById('np-interconnection-breaker').value=p.interconnectionBreaker||'';
+  document.getElementById('np-main-breaker').value=p.mainBreaker||'';
+  document.getElementById('np-hoa').value=p.hoa||'';
+  document.getElementById('np-esid').value=p.esid||'';
+  document.getElementById('np-permit-number').value=p.permitNumber||'';
+  document.getElementById('np-utility-app-number').value=p.utilityAppNumber||'';
+  document.getElementById('np-permit-fee').value=p.permitFee||'';
+  document.getElementById('np-city-permit-date').value=(p.cityPermitDate||'').slice(0,10);
+  document.getElementById('np-utility-permit-date').value=(p.utilityPermitDate||'').slice(0,10);
+  document.getElementById('np-site-surveyor').value=p.siteSurveyor||'';
+  document.getElementById('np-consultant-email').value=p.consultantEmail||'';
+
+  // Tab 4: Milestones & Funding
+  document.getElementById('np-ntp-date').value=(p.ntpDate||'').slice(0,10);
+  document.getElementById('np-survey-scheduled-date').value=(p.surveyScheduledDate||'').slice(0,10);
+  document.getElementById('np-survey-date').value=(p.surveyDate||'').slice(0,10);
+  document.getElementById('np-install-scheduled-date').value=(p.installScheduledDate||'').slice(0,10);
+  document.getElementById('np-install-complete-date').value=(p.installCompleteDate||'').slice(0,10);
+  document.getElementById('np-city-inspection-date').value=(p.cityInspectionDate||'').slice(0,10);
+  document.getElementById('np-utility-inspection-date').value=(p.utilityInspectionDate||'').slice(0,10);
+  document.getElementById('np-pto-date').value=(p.ptoDate||'').slice(0,10);
+  document.getElementById('np-in-service-date').value=(p.inServiceDate||'').slice(0,10);
+
+  // Funding from projectFunding table
+  const f=projectFunding[pid]||{};
+  document.getElementById('np-m1-amount').value=f.m1Amount||'';
+  document.getElementById('np-m1-funded-date').value=(f.m1FundedDate||'').slice(0,10);
+  document.getElementById('np-m1-cb').value=f.m1Cb||'';
+  document.getElementById('np-m1-cb-credit').value=f.m1CbCredit||'';
+  document.getElementById('np-m2-amount').value=f.m2Amount||'';
+  document.getElementById('np-m2-funded-date').value=(f.m2FundedDate||'').slice(0,10);
+  document.getElementById('np-m2-cb').value=f.m2Cb||'';
+  document.getElementById('np-m2-cb-credit').value=f.m2CbCredit||'';
+  document.getElementById('np-m3-amount').value=f.m3Amount||'';
+  document.getElementById('np-m3-funded-date').value=(f.m3FundedDate||'').slice(0,10);
+  document.getElementById('np-m3-projected').value=f.m3Projected||'';
+  document.getElementById('np-nonfunded-code-1').value=f.nonfundedCode1||'';
+  document.getElementById('np-nonfunded-code-2').value=f.nonfundedCode2||'';
+  document.getElementById('np-nonfunded-code-3').value=f.nonfundedCode3||'';
+
   document.getElementById('np-overlay').style.display='block';
 }
 
 function closeNewProject(){
   document.getElementById('np-overlay').style.display='none';
-  ['np-name','np-city','np-address','np-phone','np-email','np-contract','np-systemkw','np-financier','np-ahj','np-utility','np-advisor','np-consultant'].forEach(id=>{
-    document.getElementById(id).value='';
+  npShowEditTabs(false);
+  document.getElementById('np-title').textContent='New Project';
+  document.getElementById('np-subtitle').textContent='All fields required unless marked optional';
+  // Clear all inputs in the modal
+  document.getElementById('np-overlay').querySelectorAll('input,select,textarea').forEach(el=>{
+    if(el.type==='checkbox'||el.type==='radio') return;
+    el.value='';
   });
   _editMode=false;_editPid=null;
 }
@@ -3412,25 +3542,81 @@ async function submitEditProject(){
   const btn=document.getElementById('np-submit');
   btn.textContent='Saving...';btn.disabled=true;
 
-  // fields that can be edited
+  const str=v=>v||null;
+  const num=v=>v?Number(v)||null:null;
+  const dt=v=>(v||'').slice(0,10)||null;
+
+  // All editable fields across all tabs
   const editable={
+    // Basic
     name:get('np-name'),city:get('np-city'),address:get('np-address'),
-    phone:get('np-phone'),email:get('np-email'),saleDate:get('np-saledate'),pm:get('np-pm'),
-    disposition:get('np-disposition'),contract:Number(get('np-contract'))||p.contract,
-    systemkw:Number(get('np-systemkw'))||p.systemkw,financier:get('np-financier'),
+    phone:get('np-phone'),email:get('np-email'),saleDate:dt(get('np-saledate')),pm:get('np-pm'),
+    disposition:get('np-disposition'),contract:num(get('np-contract'))||p.contract,
+    systemkw:num(get('np-systemkw'))||p.systemkw,financier:get('np-financier'),
     ahj:get('np-ahj'),utility:get('np-utility'),advisor:get('np-advisor'),
     consultant:get('np-consultant'),
+    // Equipment
+    module:str(get('np-module')),moduleQty:str(get('np-module-qty')),
+    inverter:str(get('np-inverter')),inverterQty:str(get('np-inverter-qty')),
+    battery:str(get('np-battery')),batteryQty:str(get('np-battery-qty')),
+    optimizer:str(get('np-optimizer')),optimizerQty:str(get('np-optimizer-qty')),
+    financingType:str(get('np-financing-type')),downPayment:str(get('np-down-payment')),
+    tpoEscalator:str(get('np-tpo-escalator')),financierAdvPmt:str(get('np-financier-adv-pmt')),
+    // Site & Permitting
+    meterLocation:str(get('np-meter-location')),panelLocation:str(get('np-panel-location')),
+    voltage:str(get('np-voltage')),mspBusRating:str(get('np-msp-bus-rating')),
+    mpu:str(get('np-mpu')),shutdown:str(get('np-shutdown')),
+    performanceMeter:str(get('np-performance-meter')),
+    interconnectionBreaker:str(get('np-interconnection-breaker')),
+    mainBreaker:str(get('np-main-breaker')),hoa:str(get('np-hoa')),esid:str(get('np-esid')),
+    permitNumber:str(get('np-permit-number')),utilityAppNumber:str(get('np-utility-app-number')),
+    permitFee:str(get('np-permit-fee')),
+    cityPermitDate:dt(get('np-city-permit-date')),
+    utilityPermitDate:dt(get('np-utility-permit-date')),
+    siteSurveyor:str(get('np-site-surveyor')),consultantEmail:str(get('np-consultant-email')),
+    // Milestones
+    ntpDate:dt(get('np-ntp-date')),
+    surveyScheduledDate:dt(get('np-survey-scheduled-date')),
+    surveyDate:dt(get('np-survey-date')),
+    installScheduledDate:dt(get('np-install-scheduled-date')),
+    installCompleteDate:dt(get('np-install-complete-date')),
+    cityInspectionDate:dt(get('np-city-inspection-date')),
+    utilityInspectionDate:dt(get('np-utility-inspection-date')),
+    ptoDate:dt(get('np-pto-date')),
+    inServiceDate:dt(get('np-in-service-date')),
   };
 
-  // optimistic update in memory
+  // Funding rows (separate table)
+  const fundingRow={
+    projectId:p.id,
+    m1Amount:str(get('np-m1-amount')),m1FundedDate:dt(get('np-m1-funded-date')),
+    m1Cb:str(get('np-m1-cb')),m1CbCredit:str(get('np-m1-cb-credit')),
+    m2Amount:str(get('np-m2-amount')),m2FundedDate:dt(get('np-m2-funded-date')),
+    m2Cb:str(get('np-m2-cb')),m2CbCredit:str(get('np-m2-cb-credit')),
+    m3Amount:str(get('np-m3-amount')),m3FundedDate:dt(get('np-m3-funded-date')),
+    m3Projected:str(get('np-m3-projected')),
+    nonfundedCode1:str(get('np-nonfunded-code-1')),
+    nonfundedCode2:str(get('np-nonfunded-code-2')),
+    nonfundedCode3:str(get('np-nonfunded-code-3')),
+  };
+  const hasFunding=Object.entries(fundingRow).some(([k,v])=>k!=='projectId'&&v);
+
+  // Optimistic update in memory
   Object.assign(p,editable);
+  if(hasFunding){
+    projectFunding[p.id]=projectFunding[p.id]||{};
+    Object.assign(projectFunding[p.id],fundingRow);
+  }
   closeNewProject();
   render();
   if(selectedId===_editPid) renderPanel(_editPid);
   showToast('Project updated');
 
-  // persist changed fields
+  // Persist to Supabase
   await post({action:'updateProject',projectId:p.id,fields:editable});
+  if(hasFunding){
+    await sbRun(sb.from('project_funding').upsert(camelToSnake(fundingRow),{onConflict:'project_id'}));
+  }
   btn.textContent='Save Changes';btn.disabled=false;
 }
 
