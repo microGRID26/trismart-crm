@@ -5661,6 +5661,7 @@ async function quickFundAction(pid, milestone, newStatus) {
 
   if (!projectFunding[pid]) projectFunding[pid] = {};
   Object.assign(projectFunding[pid], update);
+  if(typeof bustFundingStatusCache==='function') bustFundingStatusCache(pid);
   renderFunding();
   showToast(milestone.toUpperCase() + ' marked ' + newStatus);
 
@@ -5685,7 +5686,7 @@ function openFundingModal(pid, milestone) {
   const row = getFundingRow(pid, milestone);
   const f = projectFunding[pid] || {};
   const events = (fundingEvents[pid]||[]).filter(e => e.milestone === milestone)
-    .sort((a,b) => (b.createdAt||b.date||'') > (a.createdAt||a.date||'') ? 1 : -1);
+    .sort((a,b) => (b.createdAt||b.date||'') > (a.createdAt||a.date||'') ? -1 : 1);
 
   const el = document.getElementById('funding-modal-content');
   const title = document.getElementById('funding-modal-title');
@@ -5800,6 +5801,7 @@ async function saveFundingModal() {
   if (!projectFunding[pid]) projectFunding[pid] = {};
   Object.assign(projectFunding[pid], update);
   closeFundingModal();
+  if(typeof bustFundingStatusCache==='function') bustFundingStatusCache(pid);
   renderFunding();
   showToast('Funding updated');
 
@@ -6330,7 +6332,7 @@ async function saveDocument(pid) {
   showToast('Document saved');
 }
 
-async function deleteDocument(pid, docId) {
+async async function deleteDocument(pid, docId) {
   if (!confirm('Remove this document link?')) return;
   if (!projectDocuments[pid]) return;
   projectDocuments[pid] = projectDocuments[pid].filter(d => d.id !== docId);
