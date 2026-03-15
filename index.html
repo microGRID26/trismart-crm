@@ -1964,7 +1964,7 @@ async function post(body){
     } else if(action==='updateServiceCall'){
       const {id,...fields}=b;
       const allowed=['customer','phone','email','address','projectId','type',
-        'priority','issue','crewId','date','time','status','resolution'];
+        'priority','issue','crewId','date','time','status','resolution','pm'];
       const upd={};
       allowed.forEach(k=>{ if(fields[k]!==undefined) upd[k]=fields[k]; });
       await sbRun(sb.from('service_calls').update(camelToSnake(upd)).eq('id',id));
@@ -2367,6 +2367,8 @@ function populatePipeFilters(){
   opts(fin,vis.map(p=>p.financier));
   opts(util,vis.map(p=>p.utility));
   opts(ahjEl,vis.map(p=>p.ahj));
+  const dispEl=document.getElementById('pf-disposition');
+  if(dispEl) opts(dispEl,vis.map(p=>p.disposition));
 }
 function clearPipeFilters(){
   document.getElementById('pf-financier').value='';
@@ -3204,7 +3206,9 @@ function renderPanel(pid){
         let html='<div class="stage-timeline">';
         sorted.forEach((h,i)=>{
           const isLast=i===sorted.length-1;
-          const isCur=h.stage===p.stage;
+          // h.stage stores the label (e.g. 'Installation'), p.stage stores the ID (e.g. 'install')
+          const curStageLabel=(STAGES.find(x=>x.id===p.stage)||{label:p.stage}).label;
+          const isCur=h.stage===curStageLabel||h.stage===p.stage;
           const stageLabel=(STAGES.find(x=>x.id===h.stage)||{label:h.stage}).label;
           const enteredDate=h.entered?new Date(h.entered):null;
           // Calculate duration: time until next stage entry, or now if current
@@ -5206,15 +5210,20 @@ function saveSvcCall(){
 
   if(svcEditId){
     const s=serviceCalls.find(x=>x.id===svcEditId);
+    const pmVal=get('svc-pm')||pm;
     if(s){
       Object.assign(s,{
         customer,phone,email:get('svc-email'),address:get('svc-address'),
         projectId:get('svc-project'),type:get('svc-type'),priority:get('svc-priority'),
         issue,crewId:get('svc-crew'),date:get('svc-date'),time:get('svc-time'),
-        status:get('svc-status'),resolution:get('svc-resolution'),
+        status:get('svc-status'),resolution:get('svc-resolution'),pm:pmVal,
       });
     }
-    post({action:'updateServiceCall',id:svcEditId,...s});
+    // Only send allowed fields — never spread full object (notes[] is client-side only)
+    post({action:'updateServiceCall',id:svcEditId,customer,phone,email:get('svc-email'),
+      address:get('svc-address'),projectId:get('svc-project'),type:get('svc-type'),
+      priority:get('svc-priority'),issue,crewId:get('svc-crew'),date:get('svc-date'),
+      time:get('svc-time'),status:get('svc-status'),resolution:get('svc-resolution'),pm:pmVal});
     showToast('Service call updated');
   } else {
     const id='svc'+Date.now();
@@ -5222,7 +5231,7 @@ function saveSvcCall(){
       id,customer,phone,email:get('svc-email'),address:get('svc-address'),
       projectId:get('svc-project'),type:get('svc-type'),priority:get('svc-priority'),
       issue,crewId:get('svc-crew'),date:get('svc-date'),time:get('svc-time'),
-      status:get('svc-status'),resolution:'',notes:[],pm,created:now,
+      status:get('svc-status'),resolution:'',notes:[],pm:get('svc-pm')||pm,created:now,
     };
     serviceCalls.push(entry);
     // Don't send notes[] array to backend — it's a client-side field only
