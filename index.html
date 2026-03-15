@@ -2056,11 +2056,12 @@ function renderCmdScheduleWidget(){
 // ── COMMAND CENTER ───────────────────────────────────────
 function renderCommand(){
   const vis=visProjects();
-  const blocked=vis.filter(p=>p.blocker);
-  const crit=vis.filter(p=>!p.blocker&&getSLA(p).status==='crit');
-  const risk=vis.filter(p=>!p.blocker&&getSLA(p).status==='risk');
-  const stall=vis.filter(p=>isStalled(p));
-  const ok=vis.filter(p=>!p.blocker&&getSLA(p).status==='ok'&&!isStalled(p));
+  const active=vis.filter(p=>p.stage!=='complete');
+  const blocked=active.filter(p=>p.blocker);
+  const crit=active.filter(p=>!p.blocker&&getSLA(p).status==='crit');
+  const risk=active.filter(p=>!p.blocker&&getSLA(p).status==='risk');
+  const stall=active.filter(p=>isStalled(p));
+  const ok=active.filter(p=>!p.blocker&&getSLA(p).status==='ok'&&!isStalled(p));
   const aging=vis.filter(p=>p.stage!=='complete'&&cycleDays(p)>=90).sort((a,b)=>cycleDays(b)-cycleDays(a));
   const totalVal=vis.reduce((a,p)=>a+(Number(p.contract)||0),0);
   const avgCycle=vis.length?Math.round(vis.reduce((a,p)=>a+cycleDays(p),0)/vis.length):0;
@@ -2717,6 +2718,7 @@ function renderPipelineAnalytics(){
 
   const active=vis.filter(p=>p.stage!=='complete');
   const completed=vis.filter(p=>p.stage==='complete');
+  const pms=[...new Set(vis.map(p=>p.pm).filter(Boolean))].sort();
 
   // Revenue numbers
   const totalVal=vis.reduce((a,p)=>a+(Number(p.contract)||0),0);
@@ -2781,7 +2783,7 @@ function renderPipelineAnalytics(){
     const healthy=Math.round(ok/pp.length*100)||0;
     return {count:pp.length,val,blocked,crit,risk,warn,ok,avgCycle:avgC,healthy};
   }
-  const ari=pmStat('Ari');const jen=pmStat('Jen');
+  const pmStats=pms.map(name=>({name,stats:pmStat(name)}));
 
   // Intervention list — blocked + crit sorted by $ value
   const interventions=vis.filter(p=>p.blocker||getSLA(p).status==='crit'||getSLA(p).status==='risk')
@@ -2945,7 +2947,7 @@ function renderPipelineAnalytics(){
       </div>
       <button style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;" onclick="openPMRebalance()">⇄ Rebalance</button>
     </div>
-    <div class="pm-grid">${pmCard('Ari',ari)}${pmCard('Jen',jen)}</div>
+    <div class="pm-grid">${pmStats.map(({name,stats})=>pmCard(name,stats)).join('')}</div>
   </div></div>`;
 
   // Row 5: Intervention table
@@ -5119,7 +5121,7 @@ function saveSvcCall(){
   if(!customer||!phone||!issue){showToast('Customer, phone, and issue are required');return;}
 
   const pm=currentUser.name||currentPM||'Team';
-  const now=today.toLocaleDateString();
+  const now=new Date().toISOString();
 
   if(svcEditId){
     const s=serviceCalls.find(x=>x.id===svcEditId);
@@ -5157,7 +5159,7 @@ function addSvcNote(){
   const text=inp?inp.value.trim():'';if(!text) return;
   const s=serviceCalls.find(x=>x.id===svcEditId);if(!s) return;
   if(!Array.isArray(s.notes)) s.notes=[];
-  const note={text,time:today.toLocaleDateString(),pm:currentUser.name||currentPM||'Team'};
+  const note={text,time:new Date().toISOString(),pm:currentUser.name||currentPM||'Team'};
   s.notes.push(note);
   inp.value='';
   const tl=document.getElementById('svc-timeline');
