@@ -6282,19 +6282,16 @@ async function saveDocument(pid) {
     if (!url.startsWith('http')) { showToast('Enter a valid URL starting with https://'); return; }
   }
 
-  const tempDoc = { id:'tmp_'+Date.now(), projectId:pid, docType, label, url, notes, addedBy, addedAt:new Date().toISOString() };
-  if (!projectDocuments[pid]) projectDocuments[pid] = [];
-  projectDocuments[pid].unshift(tempDoc);
-
-  // Clear form
+  // Clear form first
   document.getElementById(`doc-label-${pid}`).value = '';
   if (document.getElementById(`doc-url-${pid}`)) document.getElementById(`doc-url-${pid}`).value = '';
   document.getElementById(`doc-notes-${pid}`).value = '';
   clearDocFile(pid);
   cancelAddDoc(pid);
-  renderPanelFiles(pid);
 
+  // Persist — post() adds the real entry to projectDocuments[pid]
   await post({ action:'addDocument', projectId:pid, docType, label, url, notes, addedBy });
+  renderPanelFiles(pid);
   showToast('Document saved');
 }
 
