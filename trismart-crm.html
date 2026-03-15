@@ -1508,10 +1508,19 @@ function getDueTodayTasks(){
   });
   return out;
 }
+// Pre-computed constant — all required tasks across all stages
+const ALL_REQ_TASKS = Object.values(TASKS).flat().filter(t=>t.req);
+const ALL_REQ_TASK_IDS = ALL_REQ_TASKS.map(t=>t.id);
+
 function getProgress(pid){
-  const req=Object.values(TASKS).flat().filter(t=>t.req);
-  const done=req.filter(t=>ts(pid,t.id)==='Complete').length;
-  return {done,total:req.length,pct:Math.round(done/req.length*100)};
+  const st=taskState[pid]||{};
+  let done=0;
+  for(let i=0;i<ALL_REQ_TASK_IDS.length;i++){
+    const v=st[ALL_REQ_TASK_IDS[i]];
+    if(v&&(typeof v==='object'?v.status:v)==='Complete') done++;
+  }
+  const total=ALL_REQ_TASKS.length;
+  return {done,total,pct:Math.round(done/total*100)};
 }
 function getReadyTasks(pid,stageId){
   return (TASKS[stageId]||[]).filter(t=>{const s=ts(pid,t.id);return s&&s!=='Not Ready'&&s!=='Complete';});
@@ -1661,6 +1670,7 @@ async function loadData(){
 
     // BOMs — latest per project
     projectBoms = {};
+    bustFundingStatusCache(); // bust after full reload
     (bomData||[]).forEach(r=>{
       const c=snakeToCamel(r);
       if(!projectBoms[c.projectId]) projectBoms[c.projectId]=c; // already sorted desc
@@ -1845,8 +1855,8 @@ function setupRealtime(){
       if(!r.projectId) return;
       if(!projectFunding[r.projectId]) projectFunding[r.projectId]={};
       Object.assign(projectFunding[r.projectId], r);
+      bustFundingStatusCache(r.projectId);
       if(currentView==='funding') renderFunding();
-      // Also re-render panel left if this project is open
       if(selectedId===r.projectId) renderPanel(r.projectId);
     })
 
@@ -1987,6 +1997,7 @@ function setStatus(pid,tid,val,e){
   taskState[pid][tid]={status:val,completedDate};
   // recalcUnlocks now guards internally if taskState[pid] is sparse
   recalcUnlocks(pid);
+  bustFundingStatusCache(pid); // task completion may change M2/M3 eligibility
   if(selectedId===pid) renderPanel(pid);
   // Bust SLA cache for this project by prefix — stage key may have changed
   Object.keys(_slaCache).forEach(k=>{if(k.startsWith(pid+'|')) delete _slaCache[k];});
@@ -2511,48 +2522,56 @@ function renderLeadershipDashboard(){
   const completionsVal=completions.reduce((a,p)=>a+(Number(p.contract)||0),0);
 
   // ── Installs (install_complete_date in range) ─────────────────────────────
-  const installs=vis.filter(p=>inRange(p.installCompleteDate,period));
+  // ── Single-pass computation (replaces 10 separate filter/reduce passes) ──
+  let installCount=0, installVal=0;
+  let m2FundedCount=0, m2Val=0;
+  let m3FundedCount=0, m3Val=0;
+  let pendingM2Val=0, pendingM3Val=0;
+  let next30=[],next60=[],next90=[];
+  const installs=[],m2Funded=[],m3Funded=[],m2Eligible=[],m3Eligible=[];
 
-  // ── M2 funding in range ──────────────────────────────────────────────────
-  const m2Funded=vis.filter(p=>{
+  for(let i=0;i<vis.length;i++){
+    const p=vis[i];
     const f=projectFunding[p.id];
-    return f&&f.m2FundedDate&&inRange(f.m2FundedDate,period);
-  });
-  const m2Val=m2Funded.reduce((a,p)=>{
-    const f=projectFunding[p.id];
-    return a+(Number(f?.m2Amount)||Number(p.contract)*0.65||0);
-  },0);
+    const contract=Number(p.contract)||0;
 
-  // ── M3 funding in range ──────────────────────────────────────────────────
-  const m3Funded=vis.filter(p=>{
-    const f=projectFunding[p.id];
-    return f&&f.m3FundedDate&&inRange(f.m3FundedDate,period);
-  });
-  const m3Val=m3Funded.reduce((a,p)=>{
-    const f=projectFunding[p.id];
-    return a+(Number(f?.m3Amount)||Number(p.contract)*0.35||0);
-  },0);
+    // Installs in period
+    const icd=p.installCompleteDate||(p.stage==='complete'?p.stageDate:null);
+    if(icd&&inRange(icd,period)){installs.push(p);installVal+=contract;}
 
-  // ── Pending funding ──────────────────────────────────────────────────────
-  const m2Eligible=vis.filter(p=>{
-    const s=getFundingStatus(p.id,'m2');
-    return s==='eligible'||s==='submitted';
-  });
-  const m3Eligible=vis.filter(p=>{
-    const s=getFundingStatus(p.id,'m3');
-    return s==='eligible'||s==='submitted';
-  });
-  const pendingM2Val=m2Eligible.reduce((a,p)=>a+(Number(p.contract)||0)*0.65,0);
-  const pendingM3Val=m3Eligible.reduce((a,p)=>a+(Number(p.contract)||0)*0.35,0);
+    // M2 funded in period
+    if(f&&f.m2FundedDate&&inRange(f.m2FundedDate,period)){
+      m2Funded.push(p);m2Val+=Number(f.m2Amount)||contract*0.65;
+    }
 
-  // ── 90-day pipeline forecast ─────────────────────────────────────────────
-  const active=vis.filter(p=>p.stage!=='complete');
-  const next30=active.filter(p=>(STAGE_DAYS_REMAINING[p.stage]||60)<=30);
-  const next60=active.filter(p=>{const d=STAGE_DAYS_REMAINING[p.stage]||60;return d>30&&d<=60;});
-  const next90=active.filter(p=>{const d=STAGE_DAYS_REMAINING[p.stage]||60;return d>60&&d<=90;});
+    // M3 funded in period
+    if(f&&f.m3FundedDate&&inRange(f.m3FundedDate,period)){
+      m3Funded.push(p);m3Val+=Number(f.m3Amount)||contract*0.35;
+    }
+
+    // Pending funding
+    if(p.stage!=='complete'){
+      const s2=getFundingStatus(p.id,'m2');
+      const s3=getFundingStatus(p.id,'m3');
+      if(s2==='eligible'||s2==='submitted'){m2Eligible.push(p);pendingM2Val+=contract*0.65;}
+      if(s3==='eligible'||s3==='submitted'){m3Eligible.push(p);pendingM3Val+=contract*0.35;}
+
+      // 90-day forecast
+      const dr=STAGE_DAYS_REMAINING[p.stage]||60;
+      if(dr<=30) next30.push(p);
+      else if(dr<=60) next60.push(p);
+      else if(dr<=90) next90.push(p);
+    }
+  }
+
+  installCount=installs.length;
+  m2FundedCount=m2Funded.length;
+  m3FundedCount=m3Funded.length;
   const next30Val=next30.reduce((a,p)=>a+(Number(p.contract)||0),0);
   const next60Val=next60.reduce((a,p)=>a+(Number(p.contract)||0),0);
   const next90Val=next90.reduce((a,p)=>a+(Number(p.contract)||0),0);
+  const active=vis.filter(p=>p.stage!=='complete');
+
 
   // ── Monthly trend (last 6 months of completions) ─────────────────────────
   const months=[];
@@ -3596,7 +3615,16 @@ function fmtTimestamp(raw){
   }
   return raw;
 }
+let _renderTimer=null;
 function render(){
+  // Debounce: coalesce rapid successive render calls into one
+  if(_renderTimer) return;
+  _renderTimer=setTimeout(()=>{
+    _renderTimer=null;
+    _doRender();
+  },16); // ~1 frame
+}
+function _doRender(){
     if(currentView==='command') renderCommand();
   else if(currentView==='queue') renderQueue();
   else if(currentView==='pipeline') renderPipeline();
@@ -5368,7 +5396,11 @@ let fundingModalPid = null;
 let fundingModalMilestone = null;
 
 // Derive funding status for a project/milestone from task state + project_funding
+const _fsCache={};
+function bustFundingStatusCache(pid){if(pid){delete _fsCache[pid+'|m2'];delete _fsCache[pid+'|m3'];}else{Object.keys(_fsCache).forEach(k=>delete _fsCache[k]);}}
 function getFundingStatus(pid, milestone) {
+  const ckey = pid+'|'+milestone;
+  if (_fsCache[ckey] !== undefined) return _fsCache[ckey];
   const f = projectFunding[pid];
   if (f && f[milestone + 'Status']) return f[milestone + 'Status'];
   // Auto-derive eligibility from task completion
@@ -5385,7 +5417,7 @@ function getFundingStatus(pid, milestone) {
     const hasPtoDate = p2 && p2.ptoDate;
     return (pto || hasPtoDate) ? 'eligible' : 'not_eligible';
   }
-  return 'not_eligible';
+  _fsCache[ckey]='not_eligible';return _fsCache[ckey];
 }
 
 function getFundingRow(pid, milestone) {
