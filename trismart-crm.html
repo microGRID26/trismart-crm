@@ -987,6 +987,7 @@ select.np-input{cursor:pointer;}
           <option value="Sale">Sale</option>
           <option value="Loyalty">Loyalty</option>
         </select>
+        <select class="pf-sel" id="pf-dealer" onchange="renderPipeline()"><option value="">All dealers</option></select>
         <input class="pf-input" id="pf-city" type="text" placeholder="City..." oninput="renderPipeline()">
       </div>
       <div class="pf-group">
@@ -2399,12 +2400,15 @@ function populatePipeFilters(){
   opts(ahjEl,vis.map(p=>p.ahj));
   const dispEl=document.getElementById('pf-disposition');
   if(dispEl) opts(dispEl,vis.map(p=>p.disposition));
+  const dealerEl=document.getElementById('pf-dealer');
+  if(dealerEl) opts(dealerEl,vis.map(p=>p.dealer));
 }
 function clearPipeFilters(){
   document.getElementById('pf-financier').value='';
   document.getElementById('pf-utility').value='';
   document.getElementById('pf-ahj').value='';
   document.getElementById('pf-disposition').value='';
+  const dEl=document.getElementById('pf-dealer');if(dEl) dEl.value='';
   document.getElementById('pf-city').value='';
   document.getElementById('pf-sort').value='sla';
   document.getElementById('pf-dir').value='desc';
@@ -2420,7 +2424,7 @@ function getPipeFiltered(){
   const sort=g('pf-sort')||'sla';
   const dir=g('pf-dir')||'desc';
 
-  ['pf-financier','pf-utility','pf-ahj','pf-disposition'].forEach(id=>{
+  ['pf-financier','pf-utility','pf-ahj','pf-disposition','pf-dealer'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.classList.toggle('pf-active',!!el.value);
   });
@@ -2432,6 +2436,8 @@ function getPipeFiltered(){
   if(utility)     vis=vis.filter(p=>p.utility===utility);
   if(ahj)         vis=vis.filter(p=>p.ahj===ahj);
   if(disposition) vis=vis.filter(p=>p.disposition===disposition);
+  const dealer=g('pf-dealer');
+  if(dealer) vis=vis.filter(p=>p.dealer===dealer);
   if(city)        vis=vis.filter(p=>(p.city||'').toLowerCase().includes(city));
 
   // sort
