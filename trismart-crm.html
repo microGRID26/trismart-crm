@@ -4212,6 +4212,7 @@ function setPanelTab(tab){
   });
   if(tab==='schedule') renderPanelSchedule(pid);
   if(tab==='bom') renderPanelBOM(pid);
+  if(tab==='files') renderPanelFiles(pid);
 }
 function renderPanelSchedule(pid){
   const pane=document.getElementById(`ptabpane-schedule-${pid}`);
