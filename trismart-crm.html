@@ -3988,7 +3988,7 @@ async function submitEditProject(){
 
   // All editable fields across all tabs
   const editable={
-    // Basic
+    // Basic (stage intentionally excluded — use Move Stage for stage changes)
     name:get('np-name'),city:get('np-city'),address:get('np-address'),
     phone:get('np-phone'),email:get('np-email'),saleDate:dt(get('np-saledate')),pm:get('np-pm'),
     disposition:get('np-disposition'),contract:num(get('np-contract'))||p.contract,
@@ -5278,11 +5278,16 @@ function getFundingStatus(pid, milestone) {
   // Auto-derive eligibility from task completion
   if (milestone === 'm2') {
     const installDone = ts(pid, 'install_done') === 'Complete';
-    return installDone ? 'eligible' : 'not_eligible';
+    // Also check milestone date as fallback for projects loaded without opening panel
+    const p2 = projects.find(x=>x.id===pid);
+    const hasInstallDate = p2 && p2.installCompleteDate;
+    return (installDone || hasInstallDate) ? 'eligible' : 'not_eligible';
   }
   if (milestone === 'm3') {
     const pto = ts(pid, 'pto') === 'Complete';
-    return pto ? 'eligible' : 'not_eligible';
+    const p2 = projects.find(x=>x.id===pid);
+    const hasPtoDate = p2 && p2.ptoDate;
+    return (pto || hasPtoDate) ? 'eligible' : 'not_eligible';
   }
   return 'not_eligible';
 }
@@ -6082,12 +6087,13 @@ function refreshBOM(pid) {
   const p = projects.find(x => x.id === pid);
   if (!p) return;
   const saved = projectBoms[pid] || {};
+  const existing = _bomInputs[pid] || {};
   const inputs = {
     arrayCount:      document.getElementById(`bom-arrays-${pid}`)?.value || saved.arrayCount || '',
     rowCount:        document.getElementById(`bom-rows-${pid}`)?.value   || saved.rowCount   || '',
     attachmentCount: document.getElementById(`bom-attach-${pid}`)?.value || saved.attachmentCount || '',
     orientation:     document.getElementById(`bom-orient-${pid}`)?.value || 'portrait',
-    overrides:       saved.overrides || {},
+    overrides:       existing.overrides || saved.overrides || {},
   };
   _bomInputs[pid] = inputs;
   const pane = document.getElementById(`ptabpane-bom-${pid}`);
@@ -6158,9 +6164,9 @@ function downloadBOMCSV(pid) {
 
   const csv = [header, ...rows].map(r =>
     r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')
-  ).join('\n');
+  ).join('\r\n');
 
-  const blob = new Blob([csv], {type:'text/csv'});
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
