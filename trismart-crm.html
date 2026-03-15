@@ -3329,6 +3329,11 @@ function moveStage(pid){
   if(newIdx>curIdx){
     const check=canAdvanceStage(pid,p.stage);
     if(!check.ok){showToast('Complete required tasks: '+check.missing.slice(0,2).join(', ')+(check.missing.length>2?' +more':''));renderPanel(pid);return;}
+  } else if(newIdx<curIdx){
+    const s2=STAGES.find(x=>x.id===newStage);
+    if(!confirm('Move '+p.name+' backward to '+s2.label+'? Stage history will be updated.')) return;
+  } else {
+    showToast('Already in this stage');return;
   }
   // Intercept move to complete stage — show closeout modal
   if(newStage==='complete'){
@@ -3405,6 +3410,11 @@ function confirmCompletion(){
   render();
   if(selectedId===pid) renderPanel(pid);
   showToast('🎉 '+p.name+' marked complete');
+  // Also record install complete date if not already set
+  if(!p.installCompleteDate){
+    p.installCompleteDate=dateStr;
+    post({action:'updateProject',projectId:pid,fields:{installCompleteDate:dateStr}});
+  }
   post({action:'moveStage',projectId:pid,stage:'complete',stageDate:dateStr,stageLabel:'Completion',completed:true});
 }
 function saveBlocker(pid){
@@ -3421,7 +3431,7 @@ function saveBlocker(pid){
 function addNote(pid){
   const p=projects.find(x=>x.id===pid);const inp=document.getElementById('note-input');
   if(!p||!inp||!inp.value.trim()) return;
-  const note={text:inp.value.trim(),time:new Date().toISOString(),pm:currentPM==='all'?'Team':currentPM};
+  const note={text:inp.value.trim(),time:new Date().toISOString(),pm:currentUser.name||currentPM||'Team'};
   if(!notes[pid]) notes[pid]=[];
   notes[pid].push(note);renderPanel(pid);showToast('Note saved');
   markDetailStale(pid); // force re-fetch next open so other PMs see this note
@@ -3685,7 +3695,7 @@ function renderChatMessages(msgs){
 }
 
 function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function highlightMentions(s){return s.replace(/@(\w+)/g,'<span class="chat-mention">@$1</span>');}
+function highlightMentions(s){return s.replace(/@(\w+(?:\s+\w+)?)/g,'<span class="chat-mention">@$1</span>');}
 
 // @mention autocomplete
 let mentionActive=false,mentionStart=-1,mentionPid=null,mentionSelectedIdx=0;
@@ -6142,7 +6152,7 @@ function downloadBOMCSV(pid) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `BOM_${pid}_${p.name.replace(/\s+/g,'_')}.csv`;
+  a.download = `BOM_${pid}_${p.name.replace(/[^a-zA-Z0-9]/g,'_')}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
