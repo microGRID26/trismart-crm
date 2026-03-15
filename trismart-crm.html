@@ -1507,8 +1507,13 @@ function recalcUnlocks(pid){
   // Guard: if task detail hasn't loaded yet, taskState[pid] may not exist
   if(!taskState[pid]) return;
   Object.values(TASKS).flat().forEach(t=>{
-    if(ts(pid,t.id)==='Not Ready'&&t.pre.every(p2=>ts(pid,p2)==='Complete'))
+    const cur=ts(pid,t.id);
+    // Only unlock tasks that are currently Not Ready — never downgrade active/complete tasks
+    if(cur==='Not Ready'&&t.pre.every(p2=>ts(pid,p2)==='Complete'))
       taskState[pid][t.id]={status:'Ready To Start',completedDate:''};
+    // Lock tasks whose prerequisites are no longer complete (e.g. if a task is un-completed)
+    if(cur!=='Not Ready'&&cur!=='Complete'&&t.pre.length>0&&!t.pre.every(p2=>ts(pid,p2)==='Complete'))
+      taskState[pid][t.id]={status:'Not Ready',completedDate:''};
   });
 }
 function canAdvanceStage(pid,stg){
@@ -1839,6 +1844,14 @@ function setupRealtime(){
       } else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
         if(dot) dot.style.background='var(--red)';
         console.warn('Realtime disconnected:',status);
+        // Auto-reconnect after 10 seconds
+        setTimeout(()=>{
+          if(_realtimeChannel){
+            sb.removeChannel(_realtimeChannel);
+            _realtimeChannel=null;
+          }
+          setupRealtime();
+        }, 10000);
       }
     });
 }
@@ -1954,7 +1967,7 @@ function setStatus(pid,tid,val,e){
   if(val==='Not Ready') return;
   // Initialize taskState[pid] if it doesn't exist yet (detail may still be loading)
   if(!taskState[pid]) taskState[pid]={};
-  const completedDate=val==='Complete'?new Date().toLocaleDateString():'';
+  const completedDate=val==='Complete'?new Date().toISOString().slice(0,10):'';
   taskState[pid][tid]={status:val,completedDate};
   // recalcUnlocks now guards internally if taskState[pid] is sparse
   recalcUnlocks(pid);
@@ -3205,7 +3218,7 @@ function renderPanel(pid){
     (TASKS[st.id]||[]).forEach(t=>{
       const status=ts(pid,t.id);
       const completedDate=tcd(pid,t.id);
-      const cdBadge=completedDate&&status==='Complete'?`<span style="font-size:9px;color:var(--text3);margin-left:4px;">${completedDate}</span>`:``;
+      const cdBadge=completedDate&&status==='Complete'?`<span style="font-size:9px;color:var(--text3);margin-left:4px;">${fdate(completedDate)}</span>`:``;
       const locked=status==='Not Ready';
       const preNames=t.pre.map(p2=>{const tf=Object.values(TASKS).flat().find(x=>x.id===p2);return tf?tf.name:p2;}).join(', ');
       const dueDate=(taskDueDates[pid]||{})[t.id]||'';
@@ -5066,8 +5079,9 @@ function openSvcModal(id){
 
   // Populate project dropdown
   const pSel=document.getElementById('svc-project');
+  const sortedProjects=[...projects].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   pSel.innerHTML='<option value="">— None —</option>'+
-    projects.map(p=>`<option value="${p.id}" ${s&&s.projectId===p.id?'selected':''}>${p.name} (${p.id})</option>`).join('');
+    sortedProjects.map(p=>`<option value="${p.id}" ${s&&s.projectId===p.id?'selected':''}>${p.name} — ${p.city||''} (${p.id})</option>`).join('');
 
   // Populate crew dropdown
   const cSel=document.getElementById('svc-crew');
