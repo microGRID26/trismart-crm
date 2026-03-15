@@ -1415,7 +1415,7 @@ const TASKS={
   ],
 };
 
-let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={},projectBoms={};
+let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={},projectBoms={},projectDocuments={};
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -1597,6 +1597,7 @@ async function loadData(){
       {data:fundData,    error:e9},
       {data:feData,      error:e10},
       {data:bomData,     error:e11},
+      {data:docData,     error:e12},
     ] = await Promise.all([
       sb.from('projects').select('*').limit(5000),
       sb.from('stage_history').select('*').limit(10000),
@@ -1609,9 +1610,10 @@ async function loadData(){
       sb.from('project_funding').select('*').limit(5000),
       sb.from('funding_events').select('*').order('created_at',{ascending:false}).limit(10000),
       sb.from('project_boms').select('*').order('created_at',{ascending:false}).limit(2000),
+      sb.from('project_documents').select('*').order('added_at',{ascending:false}).limit(10000),
     ]);
 
-    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11].find(Boolean);
+    const firstErr = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11,e12].find(Boolean);
     if (firstErr) throw new Error(firstErr.message);
 
     setLoadingBar(70);
@@ -1671,6 +1673,14 @@ async function loadData(){
     // BOMs — latest per project
     projectBoms = {};
     bustFundingStatusCache(); // bust after full reload
+
+    // Documents — grouped by project
+    projectDocuments = {};
+    (docData||[]).forEach(r=>{
+      const c=snakeToCamel(r);
+      if(!projectDocuments[c.projectId]) projectDocuments[c.projectId]=[];
+      projectDocuments[c.projectId].push(c);
+    });
     (bomData||[]).forEach(r=>{
       const c=snakeToCamel(r);
       if(!projectBoms[c.projectId]) projectBoms[c.projectId]=c; // already sorted desc
@@ -1971,6 +1981,24 @@ async function post(body){
 
     } else if(action==='addSvcNote'){
       await sbRun(sb.from('service_call_notes').insert(camelToSnake({svcId:b.id, text:b.text, time:b.time, pm:b.pm})));
+
+    } else if(action==='addDocument'){
+      const {projectId,docType,label,url,notes,addedBy} = b;
+      const {data,error:de} = await sb.from('project_documents').insert(
+        camelToSnake({projectId,docType,label,url,notes:notes||null,addedBy})
+      ).select().single();
+      if(de) throw de;
+      if(data){
+        const c=snakeToCamel(data);
+        if(!projectDocuments[projectId]) projectDocuments[projectId]=[];
+        projectDocuments[projectId].unshift(c);
+        b._insertedId = c.id;
+      }
+
+    } else if(action==='deleteDocument'){
+      await sbRun(sb.from('project_documents').delete().eq('id',b.id));
+      if(projectDocuments[b.projectId])
+        projectDocuments[b.projectId]=projectDocuments[b.projectId].filter(d=>d.id!==b.id);
 
     } else if(action==='saveFolder'){
       await sbRun(sb.from('project_folders').upsert(camelToSnake({
@@ -3277,14 +3305,12 @@ function renderPanel(pid){
     });
   });
 
-  // Build files HTML container
-  const filesDiv=`<div id="files-tab-container-${pid}"></div>`;
 
   // Set up tab panes
   document.getElementById('dp-right').innerHTML=`
     <div class="ptab-pane active" id="ptabpane-tasks-${pid}">${taskHTML}</div>
     <div class="ptab-pane" id="ptabpane-notes-${pid}" style="display:none;"></div>
-    <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;">${filesDiv}</div>
+    <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>`;
@@ -3324,8 +3350,6 @@ function renderPanel(pid){
   document.getElementById('detail-panel').classList.add('open');
 
   // Render files section into files pane
-  const filesContainer=document.getElementById(`files-tab-container-${pid}`);
-  if(filesContainer) renderFilesSectionInto(pid, filesContainer);
 }
 
 // ── ACTIONS ──────────────────────────────────────────────
@@ -3508,7 +3532,7 @@ function markDetailStale(pid) { detailLoaded.delete(pid); }
 async function openPanel(pid){
   selectedId=pid;
   // Reset to tasks tab when switching projects to avoid showing stale tab content
-  if(currentPanelTab==='bom'||currentPanelTab==='schedule') currentPanelTab='tasks';
+  if(currentPanelTab==='bom'||currentPanelTab==='schedule'||currentPanelTab==='files') currentPanelTab='tasks';
   // Render immediately with whatever we have (may be empty task state)
   renderPanel(pid);render();
   setTimeout(()=>document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
@@ -5980,6 +6004,165 @@ function renderHelp() {
   `;
 }
 
+
+// ── DOCUMENTS MODULE ─────────────────────────────────────────────────────
+
+const DOC_TYPES = [
+  {id:'contract',    label:'Contract',            icon:'📄', required:true},
+  {id:'planset',     label:'Planset / Engineering',icon:'📐', required:true},
+  {id:'permit',      label:'Permit',               icon:'🏛', required:true},
+  {id:'utility_app', label:'Utility Application',  icon:'⚡', required:true},
+  {id:'structural',  label:'Structural Letter',    icon:'🏗', required:false},
+  {id:'hoa',         label:'HOA Approval',         icon:'🏘', required:false},
+  {id:'funding',     label:'Funding Document',     icon:'💰', required:false},
+  {id:'photos',      label:'Site Photos',          icon:'📷', required:false},
+  {id:'other',       label:'Other',                icon:'📎', required:false},
+];
+
+const DOC_TYPE_MAP = Object.fromEntries(DOC_TYPES.map(d=>[d.id,d]));
+
+function renderPanelFiles(pid) {
+  const pane = document.getElementById(`ptabpane-files-${pid}`);
+  if (!pane) return;
+  const p = projects.find(x => x.id === pid);
+  if (!p) return;
+  pane.innerHTML = renderFilesContent(pid, p);
+}
+
+function renderFilesContent(pid, p) {
+  const docs = projectDocuments[pid] || [];
+  const folder = projectFolders[pid];
+
+  const byType = {};
+  docs.forEach(d => {
+    if (!byType[d.docType]) byType[d.docType] = [];
+    byType[d.docType].push(d);
+  });
+
+  const required = DOC_TYPES.filter(t => t.required);
+  const missing  = required.filter(t => !byType[t.id]?.length);
+  const complete = required.filter(t =>  byType[t.id]?.length > 0);
+
+  const statusBar = `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:${missing.length===0?'#E8F5EE':'#FFF8E8'};border-radius:var(--radius);margin-bottom:14px;border:0.5px solid ${missing.length===0?'#A8D5B8':'#F5CBA7'};">
+      <span style="font-size:16px;">${missing.length===0?'✅':'⚠️'}</span>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:${missing.length===0?'#1B6B47':'#7D5A00'};">${missing.length===0?'All required documents attached':`${missing.length} required document${missing.length>1?'s':''} missing`}</div>
+        ${missing.length>0?`<div style="font-size:10px;color:var(--text3);margin-top:2px;">${missing.map(t=>t.label).join(', ')}</div>`:''}
+      </div>
+      <div style="margin-left:auto;font-size:10px;color:var(--text3);">${complete.length}/${required.length} required</div>
+    </div>`;
+
+  const folderBar = folder?.folderUrl ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;border:0.5px solid var(--border);">
+      <span>📁</span><span style="font-size:11px;color:var(--text2);flex:1;">Google Drive project folder</span>
+      <a href="${folder.folderUrl}" target="_blank" style="font-size:11px;color:var(--green);text-decoration:none;font-weight:500;">Open ↗</a>
+      <button onclick="clearFolderUrl('${pid}')" style="background:none;border:none;cursor:pointer;color:var(--text3);">✕</button>
+    </div>` : `<div style="padding:8px 12px;background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;border:0.5px dashed var(--border2);">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:11px;color:var(--text3);">📁 Link Drive folder (optional):</span>
+        <input type="text" id="folder-url-input-${pid}" placeholder="https://drive.google.com/drive/folders/..."
+          style="flex:1;font-size:10px;padding:4px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);">
+        <button onclick="saveFolderUrl('${pid}')" style="font-size:10px;padding:4px 10px;border-radius:var(--radius);background:var(--green);color:#fff;border:none;cursor:pointer;">Link</button>
+      </div>
+    </div>`;
+
+  const addForm = `<div id="doc-add-form-${pid}" style="display:none;padding:12px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border);margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:600;margin-bottom:8px;">Add Document</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Type</div>
+          <select id="doc-type-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;">
+            ${DOC_TYPES.map(t=>`<option value="${t.id}">${t.icon} ${t.label}</option>`).join('')}
+          </select></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Label / File name</div>
+          <input type="text" id="doc-label-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="e.g. Signed contract v2"></div>
+      </div>
+      <div style="margin-bottom:8px;"><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">URL</div>
+        <input type="text" id="doc-url-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="https://drive.google.com/... or any URL"></div>
+      <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Notes (optional)</div>
+        <input type="text" id="doc-notes-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="Rev 4, stamped, final, etc."></div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="saveDocument('${pid}')" style="font-size:11px;padding:5px 14px;border-radius:var(--radius);background:var(--green);color:#fff;border:none;cursor:pointer;font-weight:500;">Save</button>
+        <button onclick="cancelAddDoc('${pid}')" style="font-size:11px;padding:5px 14px;border-radius:var(--radius);background:var(--bg);color:var(--text2);border:0.5px solid var(--border2);cursor:pointer;">Cancel</button>
+      </div>
+    </div>`;
+
+  const docRows = DOC_TYPES.map(t => {
+    const typeDocs = byType[t.id] || [];
+    if (!typeDocs.length && !t.required) return '';
+    const rowsHtml = typeDocs.map(d => {
+      const dt = d.addedAt ? new Date(d.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:6px;margin-top:4px;">
+        <a href="${d.url}" target="_blank" style="flex:1;font-size:11px;color:var(--green);text-decoration:none;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.url}">${d.label}</a>
+        ${d.notes?`<span style="font-size:10px;color:var(--text3);white-space:nowrap;">${d.notes}</span>`:''}
+        <span style="font-size:10px;color:var(--text3);white-space:nowrap;">${dt}</span>
+        <span style="font-size:10px;color:var(--text3);white-space:nowrap;">${d.addedBy||''}</span>
+        <button onclick="deleteDocument('${pid}','${d.id}')" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 2px;">✕</button>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span>${t.icon}</span>
+          <span style="font-size:11px;font-weight:600;color:var(--text2);">${t.label}</span>
+          ${t.required?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:${typeDocs.length?'#E8F5EE':'#FEE2E2'};color:${typeDocs.length?'#1B6B47':'#A32D2D'};">${typeDocs.length?'✓':'Required'}</span>`:''}
+          <button onclick="showAddDocForm('${pid}','${t.id}')" title="Add" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--green);font-size:14px;padding:0 2px;">＋</button>
+        </div>
+        ${rowsHtml||`<div style="font-size:10px;color:var(--text3);padding:4px 8px;">${t.required?'Not yet attached':'—'}</div>`}
+      </div>`;
+  }).join('');
+
+  return `<div style="padding:14px 16px;">
+    ${statusBar}${folderBar}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);">Documents (${docs.length})</div>
+      <button onclick="showAddDocForm('${pid}',null)" style="font-size:11px;padding:5px 12px;border-radius:var(--radius);background:var(--green);color:#fff;border:none;cursor:pointer;font-weight:500;">+ Add Document</button>
+    </div>
+    ${addForm}${docRows}
+  </div>`;
+}
+
+function showAddDocForm(pid, preType) {
+  const form = document.getElementById(`doc-add-form-${pid}`);
+  if (!form) { renderPanelFiles(pid); setTimeout(()=>showAddDocForm(pid,preType),50); return; }
+  form.style.display = 'block';
+  if (preType) { const sel=document.getElementById(`doc-type-${pid}`); if(sel) sel.value=preType; }
+  const inp = document.getElementById(`doc-url-${pid}`);
+  if (inp) inp.focus();
+}
+
+function cancelAddDoc(pid) {
+  const form = document.getElementById(`doc-add-form-${pid}`);
+  if (form) form.style.display = 'none';
+}
+
+async function saveDocument(pid) {
+  const get = id => document.getElementById(id)?.value?.trim() || '';
+  const docType = get(`doc-type-${pid}`);
+  const label   = get(`doc-label-${pid}`);
+  const url     = get(`doc-url-${pid}`);
+  const notes   = get(`doc-notes-${pid}`);
+  if (!url)   { showToast('URL is required'); return; }
+  if (!label) { showToast('Label is required'); return; }
+  if (!url.startsWith('http')) { showToast('Enter a valid URL starting with https://'); return; }
+  const addedBy = currentUser.name || 'Team';
+  const tempDoc = { id:'tmp_'+Date.now(), projectId:pid, docType, label, url, notes, addedBy, addedAt:new Date().toISOString() };
+  if (!projectDocuments[pid]) projectDocuments[pid] = [];
+  projectDocuments[pid].unshift(tempDoc);
+  document.getElementById(`doc-label-${pid}`).value = '';
+  document.getElementById(`doc-url-${pid}`).value   = '';
+  document.getElementById(`doc-notes-${pid}`).value = '';
+  cancelAddDoc(pid);
+  renderPanelFiles(pid);
+  await post({ action:'addDocument', projectId:pid, docType, label, url, notes, addedBy });
+  showToast('Document saved');
+}
+
+async function deleteDocument(pid, docId) {
+  if (!confirm('Remove this document link?')) return;
+  if (!projectDocuments[pid]) return;
+  projectDocuments[pid] = projectDocuments[pid].filter(d => d.id !== docId);
+  renderPanelFiles(pid);
+  await post({ action:'deleteDocument', projectId:pid, id:docId });
+  showToast('Document removed');
+}
 
 // ── BOM MODULE ────────────────────────────────────────────
 
