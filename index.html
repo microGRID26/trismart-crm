@@ -794,6 +794,7 @@ select.np-input{cursor:pointer;}
       <div><div class="np-label">Utility</div><input class="np-input" id="np-utility" type="text" placeholder="Oncor"></div>
       <div><div class="np-label">Energy Advisor</div><input class="np-input" id="np-advisor" type="text" placeholder="Full name"></div>
       <div><div class="np-label">Energy Consultant</div><input class="np-input" id="np-consultant" type="text" placeholder="Full name"></div>
+      <div><div class="np-label">Dealer</div><input class="np-input" id="np-dealer" type="text" placeholder="Dealer / partner name"></div>
     </div>
 
     <!-- TAB 2: EQUIPMENT -->
@@ -2053,6 +2054,7 @@ function searchProjects(val){
     (p.city||'').toLowerCase().includes(q)||
     (p.financier||'').toLowerCase().includes(q)||
     (p.advisor||'').toLowerCase().includes(q)||
+    (p.dealer||'').toLowerCase().includes(q)||
     (p.consultant||'').toLowerCase().includes(q)||
     (p.ahj||'').toLowerCase().includes(q)||
     (p.utility||'').toLowerCase().includes(q)
@@ -3146,6 +3148,7 @@ function renderPanel(pid){
       ${frow('TPO escalator', p.tpoEscalator)}
       ${frow('Adv pmt schedule', p.financierAdvPmt)}
       ${frow('Disposition', p.disposition)}
+      ${frow('Dealer', p.dealer)}
     </div>
     <div class="sec"><div class="sec-title">Equipment</div>
       ${frow('Module', p.module ? (p.module+(p.moduleQty?' × '+p.moduleQty:'')) : null)}
@@ -3896,6 +3899,7 @@ function duplicateProject(pid){
   document.getElementById('np-utility').value=p.utility||'';
   document.getElementById('np-advisor').value=p.advisor||'';
   document.getElementById('np-consultant').value=p.consultant||'';
+  document.getElementById('np-dealer').value=p.dealer||'';
 
   document.getElementById('np-overlay').style.display='block';
   // Focus the name field so PM immediately fixes it
@@ -4076,7 +4080,7 @@ async function submitNewProject(){
     pm:get('np-pm'),stageDate:dateStr,saleDate:get('np-saledate'),
     disposition:get('np-disposition'),contract:Number(get('np-contract')),
     systemkw:Number(get('np-systemkw')),ahj:get('np-ahj'),utility:get('np-utility'),
-    advisor:get('np-advisor'),consultant:get('np-consultant'),
+    advisor:get('np-advisor'),consultant:get('np-consultant'),dealer:get('np-dealer'),
     financier:get('np-financier'),blocker:'',
   };
   projects.unshift(newProject);
