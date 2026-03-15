@@ -1186,6 +1186,10 @@ select.np-input{cursor:pointer;}
         </div>
       </div>
       <div class="svc-field">
+        <label>PM / Assigned To</label>
+        <input type="text" id="svc-pm" class="np-input" style="padding:6px 10px;" placeholder="PM name">
+      </div>
+      <div class="svc-field">
         <label>Status</label>
         <select id="svc-status">
           <option value="open">Open</option>
@@ -2298,7 +2302,7 @@ function renderQueue(){
   const overduePrj  =enriched.filter(x=>x.hasOverdue).sort((a,b)=>b.sla.days-a.sla.days);
   const todayPrj    =enriched.filter(x=>x.hasToday).sort((a,b)=>b.sla.days-a.sla.days);
   const blockedPrj  =enriched.filter(x=>x.p.blocker);
-  const ontrackPrj  =enriched.filter(x=>!x.hasOverdue&&!x.hasToday&&!x.p.blocker&&x.tasks.length>0).sort((a,b)=>b.sla.days-a.sla.days);
+  const ontrackPrj  =enriched.filter(x=>!x.hasOverdue&&!x.hasToday&&!x.p.blocker).sort((a,b)=>b.sla.days-a.sla.days);
 
   let html=`<div class="queue-header">`;
   if(totalOverdue) html+=`<div class="queue-stat qs-overdue">⚠ ${totalOverdue} project${totalOverdue>1?'s':''} with overdue tasks</div>`;
