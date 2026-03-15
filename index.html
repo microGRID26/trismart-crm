@@ -5636,225 +5636,155 @@ let helpQuery = '';
 
 const HELP_CONTENT = {
   pms: {
-    label: 'For PMs',
+    label: "For PMs",
     sections: [
       {
-        title: 'Daily workflow',
+        title: "Daily workflow",
         cards: [
-          {
-            h: 'Command Center — your home base',
-            p: 'The Command Center shows everything that needs your attention right now. Blocked projects, critical SLA breaches, overdue tasks, and upcoming schedule are all surfaced here. Start here every morning.',
-          },
-          {
-            h: 'My Queue — your personal task list',
-            p: 'My Queue shows only your active projects with tasks that need action. Each card shows the tasks currently Ready to Start or In Progress. Work top to bottom — overdue tasks appear in red.',
-          },
-          {
-            h: 'Opening a project panel',
-            p: 'Click any project row to open its detail panel on the right. The panel loads task state and notes from the server — a brief spinner is normal. The panel stays open as you scroll.',
-          },
+          {h:"Command Center", p:"Your home base. Shows blocked projects, critical SLA breaches, overdue tasks, and upcoming schedule. Start here every morning."},
+          {h:"My Queue", p:"Shows only your active projects with tasks that need action. Each card shows tasks currently Ready to Start or In Progress. Work top to bottom - overdue tasks appear in red."},
+          {h:"Opening a project panel", p:"Click any project row to open its detail panel on the right. The panel loads task state, notes, and all project data from the server. Tabs across the top: Tasks, Notes, Files, Schedule, BOM."},
         ]
       },
       {
-        title: 'Tasks',
+        title: "Tasks",
         cards: [
-          {
-            h: 'How tasks unlock',
-            p: 'Tasks unlock automatically when their prerequisites are complete. A task showing "Not Ready" is waiting on something else — hover the task name to see what. You cannot change a locked task.',
-            ul: ['Complete prerequisite tasks first', 'The dependent task will unlock to "Ready to Start" automatically', 'You will see this reflected immediately in your queue'],
-          },
-          {
-            h: 'Task statuses',
-            p: 'Each task moves through these statuses:',
-            ul: ['Ready to Start — prerequisites done, waiting to begin', 'Scheduled — date assigned, not yet started', 'In Progress — actively being worked', 'Pending Resolution — blocked, waiting on external action', 'Revision Required — needs rework', 'Complete — done'],
-          },
-          {
-            h: 'Required vs optional tasks',
-            p: 'Tasks marked "opt" are optional and do not block stage advances. Required tasks must all be Complete before you can move to the next stage.',
-          },
-          {
-            h: 'Setting due dates',
-            p: 'Click the date field under any task name to set a due date. Overdue tasks appear in red across Command Center, My Queue, and the daily digest email. Clear a due date with the × button.',
-          },
+          {h:"How tasks unlock", p:"Tasks unlock automatically when their prerequisites are complete. A task showing Not Ready is waiting on something else. You cannot change a locked task.", ul:["Complete prerequisite tasks first","The dependent task will unlock to Ready to Start automatically","You will see this reflected immediately in your queue"]},
+          {h:"Task statuses", p:"Each task moves through these statuses:", ul:["Ready to Start - prerequisites done, waiting to begin","Scheduled - date assigned, not yet started","In Progress - actively being worked","Pending Resolution - blocked, waiting on external action","Revision Required - needs rework","Complete - done"]},
+          {h:"Required vs optional tasks", p:"Tasks marked opt are optional and do not block stage advances. Required tasks must all be Complete before you can move to the next stage."},
+          {h:"Setting due dates", p:"Click the date field under any task name to set a due date. Overdue tasks appear in red across Command Center, My Queue. Clear a due date with the x button."},
         ]
       },
       {
-        title: 'Moving stages',
+        title: "Moving stages",
         cards: [
-          {
-            h: 'Advancing a project to the next stage',
-            p: 'In the project panel left column, scroll to "Move stage". Select the next stage and click Move. If any required tasks are incomplete, the system will block the move and list what is missing.',
-          },
-          {
-            h: 'Completing a project',
-            p: 'Moving to Completion opens a closeout checklist — PTO received, final inspection passed, docs delivered, monitoring active. Fill in the completion date and any closing notes. This triggers a completion notification to Greg and Heidi.',
-          },
+          {h:"Advancing a project to the next stage", p:"In the project panel left column, scroll to Move stage. Select the next stage and click Move. If any required tasks are incomplete, the system will block the move and list what is missing."},
+          {h:"Stage changes are permanent", p:"Moving stage also records a timestamp in Stage History and triggers M2 or M3 funding eligibility when appropriate. Always use Move Stage - never use the Edit modal to change stage."},
         ]
       },
       {
-        title: 'Notes & communication',
+        title: "Notes and communication",
         cards: [
-          {
-            h: 'Adding notes',
-            p: 'Open a project panel → Notes tab. Type your note and press Enter or click Send. Notes are timestamped and attributed to you. All team members see notes in real time.',
-          },
-          {
-            h: '@mentioning someone',
-            p: 'Type @ in a note to trigger the mention dropdown. Select a team member. They receive an email notification with the project context. Mentions appear highlighted in the chat.',
-          },
-          {
-            h: 'Blockers',
-            p: 'Use the Blocker field in the project panel to flag a project that cannot progress. Describe the blocker clearly — it shows on the Command Center and in the daily digest. Clear it by deleting the text and saving.',
-          },
+          {h:"Adding notes", p:"Open a project panel, click the Notes tab. Type your note and press Enter or click Send. Notes are timestamped and attributed to you. All team members see notes in real time."},
+          {h:"Project Chat Import", p:"Historical messages from BluChat are imported under the author name with pm set to Project Chat Import. These are read-only and cannot be edited."},
+          {h:"Blockers", p:"Use the Blocker field in the project panel to flag a project that cannot progress. Describe the blocker clearly - it shows on the Command Center. Clear it by deleting the text and saving."},
         ]
       },
       {
-        title: 'Editing projects',
+        title: "Editing projects",
         cards: [
-          {
-            h: 'Editing project details',
-            p: 'Click the Edit button in the project panel header. The edit modal has 4 tabs: Basic (core info), Equipment (modules, inverters, batteries), Site & Permitting (electrical specs, permit numbers), and Milestones & Funding (key dates, M1/M2/M3).',
-          },
-          {
-            h: 'Reassigning a PM',
-            p: 'In the project panel, use the Reassign dropdown next to the PM name. Or use the PM Rebalance tool in Analytics → Rebalance to move multiple projects at once.',
-          },
+          {h:"Tabbed edit modal", p:"Click Edit in the project panel header. The modal has 4 tabs: Basic (core info), Equipment (modules, inverters, batteries, financing), Site and Permitting (electrical specs, permit numbers, dates), Milestones and Funding (key dates, M1/M2/M3)."},
+          {h:"Stage is not editable in the modal", p:"Stage changes are intentionally excluded from the edit modal. Only Move Stage can change a project stage - this protects stage history integrity."},
+          {h:"Reassigning a PM", p:"In the project panel, use the Reassign dropdown next to the PM name. Changes are saved immediately."},
+        ]
+      },
+      {
+        title: "Bill of Materials",
+        cards: [
+          {h:"BOM tab", p:"Every project has a BOM tab in the panel. The BOM auto-calculates from project equipment data (module qty, battery qty, inverter qty from the Equipment tab)."},
+          {h:"Required inputs", p:"Enter 4 values to get accurate quantities: Arrays (number of roof sections), Strings/Rows (number of string runs), Attachments (smart foot count from planset), Orientation (portrait or landscape)."},
+          {h:"Overriding quantities", p:"Every line item quantity is editable. Change any number directly in the table. Overrides are saved with the BOM."},
+          {h:"Saving and exporting", p:"Click Save BOM to persist to the database. Click CSV to download a formatted spreadsheet ready for ordering. CSV uses proper line endings so it opens correctly in Excel."},
         ]
       },
     ]
   },
   funding: {
-    label: 'For Funding',
+    label: "For Funding",
     sections: [
       {
-        title: 'The Funding tab',
+        title: "The Funding tab",
         cards: [
-          {
-            h: 'What the Funding tab shows',
-            p: 'The Funding tab shows every project and milestone (M2, M3) that needs action. The default filter is "Eligible" — projects where the trigger task has been completed and the milestone is ready to submit.',
-          },
-          {
-            h: 'M2 and M3 triggers',
-            p: 'M2 becomes eligible when the "Installation Complete" task is marked Complete by the PM. M3 becomes eligible when "Permission to Operate" is marked Complete. These update automatically — no manual trigger needed.',
-          },
-          {
-            h: 'Workflow for a funding milestone',
-            ul: ['Filter to Eligible — these are ready to submit to Edge', 'Click "Mark Submitted" on the row, or open the row to set a submitted date', 'After Edge processes it, open the row and record the funded amount + date', 'If Edge returns it nonfunded, open the row and assign the nonfunded code(s)'],
-          },
+          {h:"What the Funding tab shows", p:"Shows every project and milestone (M2, M3) that needs action. Default filter is Eligible - projects where the trigger condition has been met and the milestone is ready to submit."},
+          {h:"M2 trigger", p:"M2 becomes eligible when the Installation Complete task is marked Complete by the PM, or when an install complete date is recorded on the project. Whichever happens first."},
+          {h:"M3 trigger", p:"M3 becomes eligible when Permission to Operate is marked Complete by the PM, or when a PTO date is recorded on the project."},
+          {h:"M1", p:"M1 is built and tracked but not actively used yet. It will be tied to NTP approval when that workflow is defined."},
         ]
       },
       {
-        title: 'Nonfunded codes',
+        title: "Daily workflow",
         cards: [
-          {
-            h: 'What nonfunded codes mean',
-            p: 'Edge returns a code when they cannot fund a milestone. Each code has a description and a responsible party (Field Ops, Sales Ops, Project Management, etc.). The code tells you exactly what needs to be fixed before resubmitting.',
-          },
-          {
-            h: 'Assigning nonfunded codes',
-            p: 'Open the funding row → set status to Nonfunded → select up to 3 codes from the dropdown. The description and responsible party appear automatically. Add a note if needed, then save. The codes appear on the row in the funding table.',
-          },
-          {
-            h: 'Event history',
-            p: 'Every status change is logged in the event history at the bottom of the funding modal — who changed it, when, and what notes were added. This is your audit trail for Edge disputes.',
-          },
+          {h:"Working the queue", ul:["Filter to Eligible - these are ready to submit to Edge","Click Mark Submitted on the row after submitting to Edge portal","After Edge processes it, open the row and record the funded amount and funded date","If Edge returns it nonfunded, open the row and assign the nonfunded code(s)"]},
+          {h:"Funding aging", p:"Sort the table by the Submitted date column to see which projects have been waiting longest. Projects submitted more than 30 days ago should be followed up with Edge."},
+        ]
+      },
+      {
+        title: "Nonfunded codes",
+        cards: [
+          {h:"What nonfunded codes mean", p:"Edge returns a code when they cannot fund a milestone. 190 codes across 13 categories - Photos (79), Installation Issues (43), Contract Error (25) are the most common. Each code has a responsible party."},
+          {h:"Assigning codes", p:"Open the funding row, set status to Nonfunded, select up to 3 codes from the dropdown. The full description and responsible party appear automatically. Add a note, then save."},
+          {h:"Event history", p:"Every status change is logged at the bottom of the funding modal - who changed it, when, and any notes. This is your audit trail for Edge disputes."},
+        ]
+      },
+      {
+        title: "Future: Edge API",
+        cards: [
+          {h:"Manual for now", p:"Currently Taylor manually marks submissions and records funded amounts after checking the Edge portal. The Mark Submitted button and Record Funded flow are designed to be replaced by an API call to Edge when that integration is built."},
         ]
       },
     ]
   },
   leadership: {
-    label: 'For Leadership',
+    label: "For Leadership",
     sections: [
       {
-        title: 'Analytics',
+        title: "Leadership dashboard",
         cards: [
-          {
-            h: 'Portfolio health overview',
-            p: 'Analytics shows the full pipeline: active revenue, revenue at risk, average cycle time, and a stage-by-stage breakdown. The SLA health bar shows what percentage of projects are on track vs at risk vs critical.',
-          },
-          {
-            h: 'SLA status explained',
-            p: 'Each stage has three thresholds — target, risk, and critical — measured in days since the project entered that stage.',
-            ul: ['On track (green) — within target days', 'Past target (amber) — past SLA but not yet at risk threshold', 'At risk (orange) — approaching critical', 'Critical (red) — past the critical threshold', 'Blocked (purple) — flagged with a blocker by PM'],
-          },
-          {
-            h: 'Stage bottlenecks',
-            p: 'The bottleneck chart shows average days spent in each stage vs the SLA target. Bars extending past the vertical line are over target. This tells you where the pipeline is slowing.',
-          },
-          {
-            h: 'Revenue forecast',
-            p: 'The forecast estimates when active projects will reach PTO based on current stage and median days remaining. Groups projects into 14-day, 15-30 day, and 31-60 day windows.',
-          },
-          {
-            h: 'PM rebalance',
-            p: 'In Analytics, click Rebalance to see each PM workload side by side. Select projects from one PM and move them to another in bulk. Useful for redistributing when someone takes PTO or a PM is overloaded.',
-          },
+          {h:"Period selector", p:"The Leadership tab in Analytics has a period selector at the top. Choose from Week to Date, This Month, This Quarter, This Year, Last 7/30/90 Days, Last Week, or Last Month."},
+          {h:"Revenue recognized", p:"Counts contract value for projects where install complete date falls within the selected period. This is when MicroGRID recognizes revenue."},
+          {h:"M2 and M3 funded", p:"Shows actual funded amounts (or estimated at 65%/35% of contract if no amount recorded) for milestones funded within the period."},
+          {h:"Pending funding", p:"Total contract value of projects in Eligible or Submitted status that have not yet been funded. Split by M2 and M3."},
+          {h:"90-day forecast", p:"Active projects bucketed by estimated days to installation based on current stage and historical stage duration data."},
+          {h:"Monthly trend", p:"Last 6 months of install completions by count and contract value. Green bars show completed months."},
+          {h:"PM breakdown", p:"Each PM active project count, portfolio value, critical/blocked counts, and installs in the selected period."},
         ]
       },
       {
-        title: 'Pipeline board',
+        title: "Pipeline and PM analytics",
         cards: [
-          {
-            h: 'Pipeline view',
-            p: 'The Pipeline board shows all active projects in columns by stage. Scroll horizontally to see all stages. Click any project card to open the detail panel. Filter by PM using the dropdown at the top right.',
-          },
+          {h:"Pipeline Health tab", p:"The original analytics view showing SLA status distribution, stage bottlenecks, revenue at risk, and forecast buckets."},
+          {h:"PM Performance tab", p:"Side by side PM comparison showing on-track, at-risk, critical, and blocked counts with a health bar visualization. Includes Rebalance button to move projects between PMs."},
+          {h:"SLA status", ul:["On track (green) - within target days","Past target (amber) - past SLA but not yet at risk","At risk (orange) - approaching critical threshold","Critical (red) - past the critical threshold","Blocked (purple) - flagged with a blocker by PM"]},
         ]
       },
       {
-        title: 'Export',
+        title: "Export",
         cards: [
-          {
-            h: 'Exporting project data',
-            p: 'Click ↓ Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. Use TSV to paste directly into a new Google Sheet with Ctrl+Shift+V.',
-          },
+          {h:"Exporting project data", p:"Click Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. TSV pastes directly into Google Sheets with Ctrl+Shift+V."},
         ]
       },
     ]
   },
   everyone: {
-    label: 'For Everyone',
+    label: "For Everyone",
     sections: [
       {
-        title: 'Navigation',
+        title: "Navigation",
         cards: [
-          {
-            h: 'Keyboard shortcuts',
-            ul: ['1 — Command Center', '2 — My Queue', '3 — Pipeline', '4 — Analytics', '5 — Task Audit', '6 — Schedule', '7 — Service Calls', '8 — Funding', '9 — Help', '/ — Focus search', 'N — New project', 'Esc — Close panel or modal'],
-          },
-          {
-            h: 'Search',
-            p: 'Press / or click the search bar to search across all projects by name, ID, city, financier, AHJ, utility, advisor, or consultant. Results appear instantly. Click a result to open the project panel.',
-          },
-          {
-            h: 'Data freshness',
-            p: 'The green dot and timestamp in the top bar shows when data was last loaded. Click it to force a refresh. The dot turns red if the live connection drops.',
-          },
-          {
-            h: 'Real-time updates',
-            p: 'Changes made by other team members appear on your screen automatically — no refresh needed. Task status changes, new notes, and stage moves all propagate in real time.',
-          },
+          {h:"Keyboard shortcuts", ul:["1 - Command Center","2 - My Queue","3 - Pipeline","4 - Analytics","5 - Task Audit","6 - Schedule","7 - Service Calls","8 - Funding","9 - Help","/ - Focus search","N - New project","Esc - Close panel or modal"]},
+          {h:"Search", p:"Press / or click the search bar to search across all projects by name, ID, city, financier, AHJ, utility, advisor, or consultant. Click a result to open the project panel."},
+          {h:"Real-time updates", p:"Changes made by other team members appear on your screen automatically. Task status changes, new notes, and stage moves all propagate in real time without refreshing."},
+          {h:"Data freshness", p:"The green dot and timestamp in the top bar shows when data was last loaded. Click it to force a refresh."},
         ]
       },
       {
-        title: 'Schedule',
+        title: "Project panel sections",
         cards: [
-          {
-            h: 'Schedule view',
-            p: 'The Schedule tab shows a weekly grid with all crews and their assigned jobs. Switch between Grid and Agenda views. Filter by warehouse, job type, PM, or city.',
-          },
-          {
-            h: 'Scheduling a job',
-            p: 'Click any cell in the grid or click + Schedule Job. Select the project, crew, job type, date, and time. If the crew already has a job that day, a conflict warning appears.',
-          },
+          {h:"Left panel sections", ul:["Contact - address, phone, email","Contract - amount, system size, financier, financing type, disposition","Equipment - module, inverter, battery, optimizer with quantities","Site and Electrical - meter/panel location, voltage, MSP rating, MPU, ESID, HOA","Permitting - AHJ, utility, permit numbers, fees, approval dates","Team - PM, advisor, consultant, site surveyor","Milestones - all key dates from NTP to in service","Funding - M1/M2/M3 amounts and dates (when data exists)","Timing - days in stage, total cycle, SLA thresholds","Stage history - timeline of all stage transitions"]},
+          {h:"Right panel tabs", ul:["Tasks - task checklist with status dropdowns and due dates","Notes - project chat with @mention support","Files - linked Google Drive folder","Schedule - crew job assignments for this project","BOM - auto-calculated bill of materials"]},
         ]
       },
       {
-        title: 'Service Calls',
+        title: "Schedule",
         cards: [
-          {
-            h: 'Creating a service call',
-            p: 'Click + New Service Call in the Service tab. Fill in customer info, issue type, priority, and assign a crew if known. Service calls track through Open → Scheduled → In Progress → Closed.',
-          },
+          {h:"Schedule view", p:"Weekly grid showing all crews and their assigned jobs. Switch between Grid and Agenda views. Filter by warehouse, job type, PM, or city."},
+          {h:"Scheduling a job", p:"Click any cell in the grid or click + Schedule Job. Select the project, crew, job type, date, and time. Conflict warnings show if the crew already has a job that day."},
+        ]
+      },
+      {
+        title: "Service Calls",
+        cards: [
+          {h:"Creating a service call", p:"Click + New Service Call in the Service tab. Fill in customer info, issue type, priority, and assign a crew if known. Service calls track through Open, Scheduled, In Progress, Closed."},
         ]
       },
     ]
