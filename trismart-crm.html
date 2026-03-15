@@ -1425,7 +1425,16 @@ function ts(pid,tid){const v=(taskState[pid]||{})[tid];return v?(typeof v==='obj
 function tcd(pid,tid){const v=(taskState[pid]||{})[tid];return v&&typeof v==='object'?v.completedDate:'';}
 
 let selectedId=null,currentPM='all',currentView='command',anTab='leadership';
-const today=new Date();
+let today=new Date();
+// Recalculate today if app is open past midnight
+setInterval(()=>{
+  const n=new Date();
+  if(n.getDate()!==today.getDate()||n.getMonth()!==today.getMonth()){
+    today=n;
+    Object.keys(_slaCache).forEach(k=>delete _slaCache[k]); // bust SLA cache
+    render();
+  }
+},60000); // check every minute
 
 function daysAgo(d){if(!d) return 0;const n=new Date(d);if(isNaN(n)) return 0;return Math.max(0,Math.floor((today-n)/(1000*60*60*24)));}
 function cycleDays(p){return daysAgo(p.saleDate)||daysAgo(p.stageDate)||0;}
@@ -1773,10 +1782,13 @@ function setupRealtime(){
           msgEl.scrollTop=msgEl.scrollHeight;
         }
       }
-      // Badge on Notes tab if panel is open but on a different tab
+      // Update Notes tab badge count and highlight if panel is open but on different tab
       if(selectedId===n.projectId&&currentPanelTab!=='notes'){
         const tab=document.getElementById('ptab-notes');
-        if(tab) tab.style.background='rgba(29,158,117,0.1)';
+        if(tab){
+          const noteCount=(notes[n.projectId]||[]).length;
+          tab.innerHTML=`Notes <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:rgba(29,158,117,0.2);color:var(--green);">${noteCount}</span>`;
+        }
       }
     })
 
@@ -3467,6 +3479,8 @@ function markDetailStale(pid) { detailLoaded.delete(pid); }
 
 async function openPanel(pid){
   selectedId=pid;
+  // Reset to tasks tab when switching projects to avoid showing stale tab content
+  if(currentPanelTab==='bom'||currentPanelTab==='schedule') currentPanelTab='tasks';
   // Render immediately with whatever we have (may be empty task state)
   renderPanel(pid);render();
   setTimeout(()=>document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
@@ -3578,7 +3592,7 @@ function fmtTimestamp(raw){
   return raw;
 }
 function render(){
-  if(currentView==='command') renderCommand();
+    if(currentView==='command') renderCommand();
   else if(currentView==='queue') renderQueue();
   else if(currentView==='pipeline') renderPipeline();
   else if(currentView==='analytics') renderAnalytics();
@@ -4099,7 +4113,11 @@ async function submitEditProject(){
   }
   closeNewProject();
   render();
-  if(selectedId===_editPid) renderPanel(_editPid);
+  if(selectedId===_editPid){
+    renderPanel(_editPid);
+    // Refresh BOM tab if it's active — equipment data may have changed
+    if(currentPanelTab==='bom') renderPanelBOM(_editPid);
+  }
   showToast('Project updated');
 
   // Persist to Supabase
