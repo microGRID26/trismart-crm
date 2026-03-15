@@ -936,6 +936,17 @@ select.np-input{cursor:pointer;}
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="blocker"> Blocker</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="cycleDays"> Total Cycle Days</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="tasksComplete"> Tasks Complete</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="financingType"> Financing Type</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="permitNumber"> Permit #</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="utilityAppNumber"> Utility App #</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="installCompleteDate"> Install Complete</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="ptoDate"> PTO Date</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="inServiceDate"> In Service Date</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="module"> Module</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="moduleQty"> Module Qty</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="siteSurveyor"> Site Surveyor</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="mpu"> MPU</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="esid"> ESID</label>
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
@@ -1814,6 +1825,8 @@ function setupRealtime(){
       if(!projectFunding[r.projectId]) projectFunding[r.projectId]={};
       Object.assign(projectFunding[r.projectId], r);
       if(currentView==='funding') renderFunding();
+      // Also re-render panel left if this project is open
+      if(selectedId===r.projectId) renderPanel(r.projectId);
     })
 
     .subscribe(status=>{
@@ -3517,7 +3530,6 @@ function hasMention(pid){
 }
 function fmtTimestamp(raw){
   if(!raw) return '';
-  // Handle ISO 8601 (2026-03-14T19:45:00.000Z), GMT, UTC, and Central strings
   const looksLikeDate = raw.includes('T') || raw.includes('GMT') ||
                         raw.includes('UTC') || raw.includes('Central');
   if(looksLikeDate){
@@ -3527,6 +3539,10 @@ function fmtTimestamp(raw){
         const mo=String(d.getMonth()+1).padStart(2,'0');
         const dy=String(d.getDate()).padStart(2,'0');
         const yr=d.getFullYear();
+        // If time is midnight (BluChat import dates), show date only
+        if(d.getHours()===0 && d.getMinutes()===0 && d.getSeconds()===0){
+          return `${mo}/${dy}/${yr}`;
+        }
         const hr=d.getHours()%12||12;
         const mn=String(d.getMinutes()).padStart(2,'0');
         const ap=d.getHours()>=12?'PM':'AM';
@@ -3758,7 +3774,8 @@ function duplicateProject(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
   // Open the new project modal pre-filled, but in create mode
   _editMode=false;_editPid=null;
-  document.querySelector('#np-overlay [style*="font-size:16px"]').textContent='Duplicate Project';
+  document.getElementById('np-title').textContent='Duplicate Project';
+  document.getElementById('np-subtitle').textContent='Review and update before creating.';
   document.getElementById('np-submit').textContent='Create Duplicate';
   document.getElementById('np-error').style.display='none';
 
@@ -3790,11 +3807,19 @@ function openNewProject(){
   document.getElementById('np-title').textContent='New Project';
   document.getElementById('np-subtitle').textContent='All fields required unless marked optional';
   document.getElementById('np-submit').textContent='Create Project';
-  document.getElementById('np-overlay').style.display='block';
-  document.getElementById('np-saledate').value=today.toISOString().slice(0,10);
   document.getElementById('np-error').style.display='none';
-  document.getElementById('np-stage').value='evaluation';
   npShowEditTabs(false);
+  npSwitchTab('basic');
+  // Clear all inputs first, then set defaults
+  document.getElementById('np-overlay').querySelectorAll('input,select,textarea').forEach(el=>{
+    if(el.type==='checkbox'||el.type==='radio') return;
+    el.value='';
+  });
+  document.getElementById('np-saledate').value=today.toISOString().slice(0,10);
+  document.getElementById('np-stage').value='evaluation';
+  document.getElementById('np-pm').value='Ari';
+  document.getElementById('np-disposition').value='Sale';
+  document.getElementById('np-overlay').style.display='block';
 }
 
 function npSwitchTab(tab){
@@ -4284,9 +4309,15 @@ const EXPORT_HEADERS={
   id:'Project ID',name:'Customer Name',city:'City',phone:'Phone',email:'Email',
   stage:'Stage',pm:'PM',saleDate:'Sale Date',stageDate:'Stage Date',
   daysInStage:'Days in Stage',slaStatus:'SLA Status',contract:'Contract Value',
-  systemkw:'System kW',financier:'Financier',ahj:'AHJ',utility:'Utility',
-  advisor:'Energy Advisor',consultant:'Energy Consultant',disposition:'Disposition',
-  blocker:'Blocker',cycleDays:'Total Cycle Days',tasksComplete:'Tasks Complete',
+  systemkw:'System kW',financier:'Financier',financingType:'Financing Type',
+  ahj:'AHJ',utility:'Utility',permitNumber:'Permit #',utilityAppNumber:'Utility App #',
+  advisor:'Energy Advisor',consultant:'Energy Consultant',consultantEmail:'Consultant Email',
+  siteSurveyor:'Site Surveyor',disposition:'Disposition',blocker:'Blocker',
+  ntpDate:'NTP Date',surveyDate:'Survey Date',installCompleteDate:'Install Complete',
+  cityInspectionDate:'City Inspection',utilityInspectionDate:'Utility Inspection',
+  ptoDate:'PTO Date',inServiceDate:'In Service Date',
+  module:'Module',moduleQty:'Module Qty',inverter:'Inverter',batteryQty:'Battery Qty',
+  hoa:'HOA',esid:'ESID',mpu:'MPU',cycleDays:'Total Cycle Days',tasksComplete:'Tasks Complete',
 };
 function getRowValue(p,col){
   const sla=getSLA(p);
