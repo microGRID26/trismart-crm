@@ -4960,6 +4960,19 @@ function saveAssignment(){
   const notes=document.getElementById('am-notes').value.trim();
   if(!projectId||!crewId||!date){showToast('Fill in all required fields');return;}
 
+  // Crew conflict check — warn if same crew already has a job that day
+  const conflictJob = schedule.find(s =>
+    s.crewId === crewId &&
+    s.date === date &&
+    s.id !== assignEditId  // allow editing own entry
+  );
+  if (conflictJob) {
+    const conflictProj = projectMap[String(conflictJob.projectId)];
+    const projName = conflictProj ? conflictProj.name : conflictJob.projectId;
+    const ok = confirm(`Warning: This crew already has a job on ${date} for ${projName}. Schedule anyway?`);
+    if (!ok) return;
+  }
+
   if(assignEditId){
     const entry=schedule.find(s=>s.id===assignEditId);
     if(entry){Object.assign(entry,{projectId,crewId,jobType,date,time,notes});}
@@ -5023,7 +5036,7 @@ function renderService(){
     if(svcSort==='priority'){const p={high:0,medium:1,low:2};return (p[a.priority]||1)-(p[b.priority]||1);}
     if(svcSort==='date') return (a.date||'9999')>(b.date||'9999')?1:-1;
     if(svcSort==='customer') return (a.customer||'').localeCompare(b.customer||'');
-    return (b.created||'')>(a.created||'')?1:-1; // newest first
+    return (b.created||'')>(a.created||'')?-1:1; // newest first (desc)
   });
 
   const counts={all:serviceCalls.length,open:0,scheduled:0,inprog:0,closed:0};
@@ -5060,6 +5073,7 @@ function renderService(){
         <th>Issue</th>
         <th>Priority</th>
         <th>Status</th>
+        <th>Project</th>
         <th>Crew</th>
         <th>Scheduled</th>
         <th>PM</th>
@@ -5080,6 +5094,7 @@ function renderService(){
             </td>
             <td><span class="svc-priority ${priorityCls[s.priority]||'medium'}">${s.priority||'medium'}</span></td>
             <td><span class="svc-status ${statusCls[s.status]||'open'}">${statusLabel[s.status]||s.status}</span></td>
+            <td style="color:var(--text2);font-size:11px;">${(()=>{const proj=projectMap[String(s.projectId)];return proj?`<a href="#" onclick="event.stopPropagation();openPanel('${s.projectId}')" style="color:var(--green);text-decoration:none;">${proj.name}</a>`:'—';})()}</td>
             <td style="color:var(--text2);">${crew?crew.name:'—'}</td>
             <td style="color:var(--text2);">${dateStr}${s.time?' '+s.time:''}</td>
             <td style="color:var(--text3);">${s.pm||'—'}</td>
@@ -5409,6 +5424,10 @@ function renderFunding() {
   rows.sort((a,b) => {
     const sd = (sortOrder[a.row.status]||9) - (sortOrder[b.row.status]||9);
     if (sd !== 0) return sd;
+    // Within same status: submitted/eligible sorted oldest first (longest waiting)
+    const aDate = a.row.submittedDate || a.p.installCompleteDate || '';
+    const bDate = b.row.submittedDate || b.p.installCompleteDate || '';
+    if (aDate && bDate) return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
     return (Number(b.p.contract)||0) - (Number(a.p.contract)||0);
   });
 
@@ -6160,6 +6179,8 @@ async function saveBOM(pid) {
     err = error;
     if (data) {
       projectBoms[pid] = snakeToCamel(data);
+      // Also sync version back so next save increments correctly
+      if (projectBoms[pid]) projectBoms[pid].version = data.version || 1;
     }
   }
 
