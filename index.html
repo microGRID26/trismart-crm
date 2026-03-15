@@ -1428,7 +1428,7 @@ let selectedId=null,currentPM='all',currentView='command',anTab='leadership';
 const today=new Date();
 
 function daysAgo(d){if(!d) return 0;const n=new Date(d);if(isNaN(n)) return 0;return Math.max(0,Math.floor((today-n)/(1000*60*60*24)));}
-function cycleDays(p){return daysAgo(p.saleDate)||0;}
+function cycleDays(p){return daysAgo(p.saleDate)||daysAgo(p.stageDate)||0;}
 function getAgeWarning(p){
   const days=cycleDays(p);
   if(days>=120) return {level:'critical',days,label:`${days}d total — customer churn risk`};
@@ -1453,7 +1453,7 @@ function getSLA(p){
   _slaCache[key]=r;
   return r;
 }
-function isStalled(p){return !p.blocker&&daysAgo(p.stageDate)>=5&&getSLA(p).status==='ok';}
+function isStalled(p){return !p.blocker&&daysAgo(p.stageDate)>=5;}
 function todayStr(){return today.toISOString().slice(0,10);}
 function getDueStatus(pid,taskId,status){
   if(status==='Complete') return 'ok';
@@ -2353,7 +2353,7 @@ function getPipeFiltered(){
   const cityEl=document.getElementById('pf-city');
   if(cityEl) cityEl.classList.toggle('pf-active',!!city);
 
-  let vis=visProjects();
+  let vis=visProjects().filter(p=>p.stage!=='complete'&&p.disposition!=='Cancelled');
   if(financier)   vis=vis.filter(p=>p.financier===financier);
   if(utility)     vis=vis.filter(p=>p.utility===utility);
   if(ahj)         vis=vis.filter(p=>p.ahj===ahj);
@@ -5953,6 +5953,8 @@ function renderPanelBOM(pid) {
     orientation:      saved.orientation      || 'portrait',
     overrides:        saved.overrides        || {},
   };
+  // Populate _bomInputs so Save works correctly without user editing anything first
+  _bomInputs[pid] = {...inputs};
 
   pane.innerHTML = renderBOMContent(pid, p, inputs);
 }
@@ -6074,8 +6076,17 @@ function setBOMOverride(pid, key, val) {
 async function saveBOM(pid) {
   const p = projects.find(x => x.id === pid);
   if (!p) return;
-  const inputs = _bomInputs[pid] || {};
   const saved = projectBoms[pid] || {};
+  // Merge: use _bomInputs if available, fall back to saved values
+  const inputs = Object.keys(_bomInputs[pid]||{}).length
+    ? _bomInputs[pid]
+    : {
+        arrayCount:      saved.arrayCount      || '',
+        rowCount:        saved.rowCount        || '',
+        attachmentCount: saved.attachmentCount || '',
+        orientation:     saved.orientation     || 'portrait',
+        overrides:       saved.overrides       || {},
+      };
 
   const row = {
     project_id:       pid,
