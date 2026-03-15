@@ -6009,15 +6009,16 @@ function renderHelp() {
 // ── DOCUMENTS MODULE ─────────────────────────────────────────────────────
 
 const DOC_TYPES = [
-  {id:'contract',    label:'Contract',            icon:'📄', required:true},
-  {id:'planset',     label:'Planset / Engineering',icon:'📐', required:true},
-  {id:'permit',      label:'Permit',               icon:'🏛', required:true},
-  {id:'utility_app', label:'Utility Application',  icon:'⚡', required:true},
-  {id:'structural',  label:'Structural Letter',    icon:'🏗', required:false},
-  {id:'hoa',         label:'HOA Approval',         icon:'🏘', required:false},
-  {id:'funding',     label:'Funding Document',     icon:'💰', required:false},
-  {id:'photos',      label:'Site Photos',          icon:'📷', required:false},
-  {id:'other',       label:'Other',                icon:'📎', required:false},
+  {id:'contract',    label:'Contract',              icon:'📄', required:true},
+  {id:'install_agreement', label:'Installation Agreement', icon:'✍️', required:true},
+  {id:'planset',     label:'Planset / Engineering', icon:'📐', required:true},
+  {id:'permit',      label:'Permit',                icon:'🏛', required:true},
+  {id:'utility_app', label:'Utility Application',   icon:'⚡', required:true},
+  {id:'structural',  label:'Structural Letter',     icon:'🏗', required:false},
+  {id:'hoa',         label:'HOA Approval',          icon:'🏘', required:false},
+  {id:'funding',     label:'Funding Document',      icon:'💰', required:false},
+  {id:'photos',      label:'Site Photos',           icon:'📷', required:false},
+  {id:'other',       label:'Other',                 icon:'📎', required:false},
 ];
 
 const DOC_TYPE_MAP = Object.fromEntries(DOC_TYPES.map(d=>[d.id,d]));
@@ -6076,8 +6077,43 @@ function renderFilesContent(pid, p) {
         <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Label / File name</div>
           <input type="text" id="doc-label-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="e.g. Signed contract v2"></div>
       </div>
-      <div style="margin-bottom:8px;"><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">URL</div>
-        <input type="text" id="doc-url-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="https://drive.google.com/... or any URL"></div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;">Source — pick one:</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <button id="doc-src-url-btn-${pid}" onclick="switchDocSource('${pid}','url')"
+            style="font-size:10px;padding:3px 10px;border-radius:var(--radius);border:0.5px solid var(--green);background:var(--green);color:#fff;cursor:pointer;">🔗 URL / Link</button>
+          <button id="doc-src-file-btn-${pid}" onclick="switchDocSource('${pid}','file')"
+            style="font-size:10px;padding:3px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;">📤 Upload file</button>
+        </div>
+        <div id="doc-src-url-${pid}">
+          <input type="text" id="doc-url-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="https://drive.google.com/... or any URL">
+        </div>
+        <div id="doc-src-file-${pid}" style="display:none;">
+          <div id="doc-drop-${pid}"
+            ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+            ondragleave="this.style.borderColor='var(--border2)'"
+            ondrop="handleDocDrop(event,'${pid}')"
+            style="border:1.5px dashed var(--border2);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;"
+            onclick="document.getElementById('doc-file-input-${pid}').click()">
+            <div style="font-size:13px;margin-bottom:4px;">📁</div>
+            <div style="font-size:11px;color:var(--text2);">Click to browse or drag file here</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">PDF, images, Word, Excel — max 50MB</div>
+          </div>
+          <input type="file" id="doc-file-input-${pid}" style="display:none;"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.heic"
+            onchange="handleDocFileSelect(event,'${pid}')">
+          <div id="doc-file-selected-${pid}" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);display:flex;align-items:center;gap:8px;">
+            <span id="doc-file-name-${pid}" style="font-size:11px;flex:1;"></span>
+            <button onclick="clearDocFile('${pid}')" style="background:none;border:none;cursor:pointer;color:var(--text3);">✕</button>
+          </div>
+          <div id="doc-upload-progress-${pid}" style="display:none;margin-top:8px;">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px;" id="doc-upload-status-${pid}">Uploading...</div>
+            <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;">
+              <div id="doc-upload-bar-${pid}" style="height:100%;background:var(--green);width:0%;transition:width .3s;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Notes (optional)</div>
         <input type="text" id="doc-notes-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="Rev 4, stamped, final, etc."></div>
       <div style="display:flex;gap:6px;">
@@ -6120,11 +6156,64 @@ function renderFilesContent(pid, p) {
   </div>`;
 }
 
+// Track selected file per pid
+const _docFiles = {};
+
+function switchDocSource(pid, mode) {
+  const urlDiv  = document.getElementById(`doc-src-url-${pid}`);
+  const fileDiv = document.getElementById(`doc-src-file-${pid}`);
+  const urlBtn  = document.getElementById(`doc-src-url-btn-${pid}`);
+  const fileBtn = document.getElementById(`doc-src-file-btn-${pid}`);
+  if (!urlDiv || !fileDiv) return;
+  const isUrl = mode === 'url';
+  urlDiv.style.display  = isUrl ? '' : 'none';
+  fileDiv.style.display = isUrl ? 'none' : '';
+  if (urlBtn)  { urlBtn.style.background  = isUrl ? 'var(--green)' : 'var(--bg)'; urlBtn.style.color  = isUrl ? '#fff' : 'var(--text2)'; urlBtn.style.borderColor  = isUrl ? 'var(--green)' : 'var(--border2)'; }
+  if (fileBtn) { fileBtn.style.background = isUrl ? 'var(--bg)' : 'var(--green)'; fileBtn.style.color = isUrl ? 'var(--text2)' : '#fff'; fileBtn.style.borderColor = isUrl ? 'var(--border2)' : 'var(--green)'; }
+}
+
+function handleDocDrop(e, pid) {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (file) setDocFile(pid, file);
+  document.getElementById(`doc-drop-${pid}`).style.borderColor = 'var(--border2)';
+}
+
+function handleDocFileSelect(e, pid) {
+  const file = e.target?.files?.[0];
+  if (file) setDocFile(pid, file);
+}
+
+function setDocFile(pid, file) {
+  _docFiles[pid] = file;
+  const nameEl = document.getElementById(`doc-file-name-${pid}`);
+  const selEl  = document.getElementById(`doc-file-selected-${pid}`);
+  const dropEl = document.getElementById(`doc-drop-${pid}`);
+  if (nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024/1024).toFixed(1) + 'MB)';
+  if (selEl)  selEl.style.display = 'flex';
+  if (dropEl) dropEl.style.display = 'none';
+  // Auto-fill label if empty
+  const labelEl = document.getElementById(`doc-label-${pid}`);
+  if (labelEl && !labelEl.value) labelEl.value = file.name.replace(/\.[^.]+$/, '');
+}
+
+function clearDocFile(pid) {
+  delete _docFiles[pid];
+  const selEl  = document.getElementById(`doc-file-selected-${pid}`);
+  const dropEl = document.getElementById(`doc-drop-${pid}`);
+  const inp    = document.getElementById(`doc-file-input-${pid}`);
+  if (selEl)  { selEl.style.display = 'none'; }
+  if (dropEl) { dropEl.style.display = ''; }
+  if (inp)    { inp.value = ''; }
+}
+
 function showAddDocForm(pid, preType) {
   const form = document.getElementById(`doc-add-form-${pid}`);
   if (!form) { renderPanelFiles(pid); setTimeout(()=>showAddDocForm(pid,preType),50); return; }
   form.style.display = 'block';
   if (preType) { const sel=document.getElementById(`doc-type-${pid}`); if(sel) sel.value=preType; }
+  // Default to URL mode
+  switchDocSource(pid, 'url');
   const inp = document.getElementById(`doc-url-${pid}`);
   if (inp) inp.focus();
 }
@@ -6132,26 +6221,79 @@ function showAddDocForm(pid, preType) {
 function cancelAddDoc(pid) {
   const form = document.getElementById(`doc-add-form-${pid}`);
   if (form) form.style.display = 'none';
+  clearDocFile(pid);
 }
 
 async function saveDocument(pid) {
-  const get = id => document.getElementById(id)?.value?.trim() || '';
+  const get     = id => document.getElementById(id)?.value?.trim() || '';
   const docType = get(`doc-type-${pid}`);
   const label   = get(`doc-label-${pid}`);
-  const url     = get(`doc-url-${pid}`);
   const notes   = get(`doc-notes-${pid}`);
-  if (!url)   { showToast('URL is required'); return; }
-  if (!label) { showToast('Label is required'); return; }
-  if (!url.startsWith('http')) { showToast('Enter a valid URL starting with https://'); return; }
   const addedBy = currentUser.name || 'Team';
+
+  if (!label) { showToast('Label is required'); return; }
+
+  // Determine if file upload or URL
+  const fileDiv = document.getElementById(`doc-src-file-${pid}`);
+  const isFileMode = fileDiv && fileDiv.style.display !== 'none';
+  const file = _docFiles[pid];
+
+  let url = '';
+
+  if (isFileMode && file) {
+    // Upload to Supabase Storage
+    const ext = file.name.split('.').pop();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = `${pid}/${Date.now()}_${safeName}`;
+
+    // Show progress
+    const progEl   = document.getElementById(`doc-upload-progress-${pid}`);
+    const statusEl = document.getElementById(`doc-upload-status-${pid}`);
+    const barEl    = document.getElementById(`doc-upload-bar-${pid}`);
+    if (progEl)   progEl.style.display = '';
+    if (statusEl) statusEl.textContent = 'Uploading...';
+    if (barEl)    barEl.style.width = '30%';
+
+    const { data: upData, error: upErr } = await sb.storage
+      .from('Project-documents')
+      .upload(path, file, { cacheControl: '3600', upsert: false });
+
+    if (upErr) {
+      if (progEl) progEl.style.display = 'none';
+      showToast('Upload failed: ' + (upErr.message || 'Unknown error'));
+      return;
+    }
+
+    if (barEl) barEl.style.width = '80%';
+
+    // Get public URL
+    const { data: urlData } = sb.storage
+      .from('Project-documents')
+      .getPublicUrl(path);
+
+    url = urlData?.publicUrl || '';
+    if (barEl) barEl.style.width = '100%';
+    if (statusEl) statusEl.textContent = 'Upload complete';
+    setTimeout(() => { if (progEl) progEl.style.display = 'none'; }, 800);
+
+  } else {
+    url = get(`doc-url-${pid}`);
+    if (!url)   { showToast('URL is required'); return; }
+    if (!url.startsWith('http')) { showToast('Enter a valid URL starting with https://'); return; }
+  }
+
   const tempDoc = { id:'tmp_'+Date.now(), projectId:pid, docType, label, url, notes, addedBy, addedAt:new Date().toISOString() };
   if (!projectDocuments[pid]) projectDocuments[pid] = [];
   projectDocuments[pid].unshift(tempDoc);
+
+  // Clear form
   document.getElementById(`doc-label-${pid}`).value = '';
-  document.getElementById(`doc-url-${pid}`).value   = '';
+  if (document.getElementById(`doc-url-${pid}`)) document.getElementById(`doc-url-${pid}`).value = '';
   document.getElementById(`doc-notes-${pid}`).value = '';
+  clearDocFile(pid);
   cancelAddDoc(pid);
   renderPanelFiles(pid);
+
   await post({ action:'addDocument', projectId:pid, docType, label, url, notes, addedBy });
   showToast('Document saved');
 }
