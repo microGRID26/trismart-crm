@@ -1428,7 +1428,7 @@ const STAGE_ORDER=STAGES.map(s=>s.id);
 // Estimated days remaining per stage (median to PTO from each stage)
 const STAGE_DAYS_REMAINING={evaluation:56,survey:50,design:44,permit:31,install:10,inspection:17,complete:3};
 const STATUSES=['Not Ready','Ready To Start','Scheduled','In Progress','Pending Resolution','Revision Required','Complete'];
-const SHORT={'Not Ready':'Not Ready','Ready To Start':'Ready','Scheduled':'Scheduled','In Progress':'In Progress','Pending Resolution':'Pending','Revision Required':'Revision','Complete':'Complete'};
+const SHORT={'Not Ready':'Not Ready','Ready To Start':'Ready to Start','Scheduled':'Scheduled','In Progress':'In Progress','Pending Resolution':'Pending Resolution','Revision Required':'Revision Required','Complete':'Complete'};
 const SS={'Complete':'ss-done','In Progress':'ss-inprog','Not Ready':'ss-notready','Ready To Start':'ss-ready','Scheduled':'ss-sched','Pending Resolution':'ss-pend','Revision Required':'ss-rev'};
 window._SS=SS;
 
@@ -4275,7 +4275,7 @@ const ROLE_COLORS = {
 
 // ── USER & POSITION CONSTANTS ─────────────────────────────────────────────────
 const DEPARTMENTS = ['Inside Operations','Sales','Executive','Field Operations','Funding','Payroll','HR','Accounting','Dealer'];
-const POSITIONS   = ['Admin','Project Manager','Sales','Site Surveyor','Energy Consultant','Energy Advisor','License Holder','Electrician','Solar Lead','Battery Lead','Installer','Battery Tech','Battery Apprentice','MPU Electrician'];
+const POSITIONS   = ['Admin','CEO','CIO','CFO','VP of Sales','VP of Field Operations','VP of HR','Director of Inside Operations','Director of Funding','Operations Manager','Designer','Project Manager','Sales','Site Surveyor','Energy Consultant','Energy Advisor','License Holder','Electrician','Solar Lead','Battery Lead','Installer','Battery Tech','Battery Apprentice','MPU Electrician'];
 const CREW_ROLE_POSITION = {"licenseHolder":"License Holder","electrician":"Electrician","solarLead":"Solar Lead","batteryLead":"Battery Lead","installer1":"Installer","installer2":"Installer","batteryTech1":"Battery Tech","batteryTech2":"Battery Tech","batteryApprentice":"Battery Apprentice","mpuElectrician":"MPU Electrician"};
 const CREW_ROLE_LABELS   = {"licenseHolder":"License Holder","electrician":"Electrician","solarLead":"Solar Lead","batteryLead":"Battery Lead","installer1":"Installer 1","installer2":"Installer 2","batteryTech1":"Battery Tech 1","batteryTech2":"Battery Tech 2","batteryApprentice":"Battery Apprentice","mpuElectrician":"MPU Electrician"};
 
@@ -4453,14 +4453,21 @@ async function renderAdminCrews(el) {
         <button onclick="document.getElementById('new-crew-form').style.display='none'" style="padding:6px 12px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
       </div>
     </div>
-    ${allCrews.length ? allCrews.map((c,i) => {
+    ${allCrews.length ? [...allCrews].sort((a,b)=>(a.name||a.id).localeCompare(b.name||b.id)).map((c,i) => {
       const jobCount = (typeof schedule !== 'undefined' ? schedule : []).filter(s=>s.crewId===c.id).length;
       const roles = Object.keys(CREW_ROLE_LABELS);
       return `<div style="margin-bottom:16px;border:0.5px solid var(--border2);border-radius:var(--radius);overflow:hidden;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:0.5px solid var(--border2);">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-weight:600;font-size:13px;">${c.name||c.id}</span>
-            <span style="font-size:10px;color:var(--text3);">${c.warehouse||''}</span>
+          <div style="display:flex;align-items:center;gap:10px;flex:1;">
+            <input value="${escapeHtml(c.name||c.id)}" id="crew-name-${c.id}"
+              onchange="updateCrewName('${c.id}',this.value)"
+              style="font-weight:600;font-size:13px;border:none;background:transparent;color:var(--text);padding:2px 4px;border-radius:4px;width:100px;"
+              title="Click to edit crew name">
+            <select id="crew-wh-${c.id}" onchange="updateCrewWarehouse('${c.id}',this.value)"
+              style="font-size:10px;border:0.5px solid var(--border2);border-radius:4px;padding:2px 6px;background:var(--bg);color:var(--text2);">
+              <option value="Houston"${c.warehouse==='Houston'?' selected':''}>Houston</option>
+              <option value="DFW"${c.warehouse==='DFW'?' selected':''}>DFW</option>
+            </select>
             <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${c.active!=='false'?'var(--green-bg)':'var(--bg2)'};color:${c.active!=='false'?'var(--green)':'var(--text3)'};">${c.active!=='false'?'Active':'Inactive'}</span>
           </div>
           <span style="font-size:11px;color:var(--text3);">${jobCount} jobs</span>
@@ -4500,6 +4507,23 @@ async function updateCrewRole(crewId, role, value) {
   showToast('Crew updated');
 }
 
+async function updateCrewName(crewId, name) {
+  if (!name.trim()) return;
+  const crew = (typeof crews !== 'undefined' ? crews : []).find(c=>c.id===crewId);
+  if (!crew) return;
+  await post({action:'updateCrew', crewId, name:name.trim(), warehouse:crew.warehouse, members:crew.members});
+  await reloadData();
+  showToast('Crew name updated');
+}
+
+async function updateCrewWarehouse(crewId, warehouse) {
+  const crew = (typeof crews !== 'undefined' ? crews : []).find(c=>c.id===crewId);
+  if (!crew) return;
+  await post({action:'updateCrew', crewId, name:crew.name, warehouse, members:crew.members});
+  await reloadData();
+  showToast('Warehouse updated');
+}
+
 function openNewCrewForm() {
   document.getElementById('new-crew-form').style.display = 'block';
   document.getElementById('new-crew-id').focus();
@@ -4510,11 +4534,15 @@ async function submitNewCrew() {
   const name = document.getElementById('new-crew-name').value.trim();
   const wh   = document.getElementById('new-crew-wh').value;
   if (!id || !name) { showToast('Crew ID and name required'); return; }
+  showToast('Adding crew...');
   await post({action:'addCrew', crewId:id, name, warehouse:wh});
-  showToast('Crew added');
+  document.getElementById('new-crew-id').value = '';
+  document.getElementById('new-crew-name').value = '';
   document.getElementById('new-crew-form').style.display = 'none';
   await reloadData();
-  renderAdminCrews(document.getElementById('admin-content'));
+  const el = document.getElementById('admin-content');
+  if (el) await renderAdminCrews(el);
+  showToast('Crew added: ' + name);
 }
 
 function renderAdminSLA(el) {
