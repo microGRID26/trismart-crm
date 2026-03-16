@@ -780,7 +780,7 @@ select.np-input{cursor:pointer;}
         <div style="font-size:11px;color:var(--text3);" id="ahj-modal-sub"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button onclick="saveAhjModal()" style="padding:7px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">Save Changes</button>
+        <button class="ahj-modal-save-btn" onclick="saveAhjModal()" style="padding:7px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">Save Changes</button>
         <button onclick="closeAhjModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);">✕</button>
       </div>
     </div>
@@ -4220,7 +4220,7 @@ async function openAhjEdit(id) {
   _utilityEditId = null;
   _userEditId = null;
   const modal = document.getElementById('ahj-edit-modal');
-  const saveBtn = modal.querySelector('button');
+  const saveBtn = modal.querySelector('.ahj-modal-save-btn');
   if (saveBtn) saveBtn.setAttribute('onclick','saveAhjModal()');
   const body  = document.getElementById('ahj-modal-body');
   modal.style.display = 'block';
@@ -4291,7 +4291,7 @@ function closeAhjModal() {
   _utilityEditId = null;
   _userEditId = null;
   // Always restore save button to AHJ default on close
-  const saveBtn = document.getElementById('ahj-edit-modal')?.querySelector('button');
+  const saveBtn = document.getElementById('ahj-edit-modal')?.querySelector('.ahj-modal-save-btn');
   if (saveBtn) saveBtn.setAttribute('onclick', 'saveAhjModal()');
 }
 
@@ -4409,7 +4409,7 @@ async function openUtilityEdit(id) {
   _ahjEditId = null;
   _userEditId = null;
   const modal = document.getElementById('ahj-edit-modal');
-  const saveBtn = modal.querySelector('button');
+  const saveBtn = modal.querySelector('.ahj-modal-save-btn');
   if (saveBtn) saveBtn.setAttribute('onclick','saveUtilityModal()');
   const body = document.getElementById('ahj-modal-body');
   modal.style.display = 'block';
@@ -4450,7 +4450,7 @@ async function saveUtilityModal() {
   if (error) { showToast('Save failed: '+error.message); return; }
   Object.keys(utilityCache).forEach(k => { if (utilityCache[k]?.id===id) delete utilityCache[k]; });
   showToast('Utility saved');
-  const saveBtn = document.getElementById('ahj-edit-modal')?.querySelector('button[onclick="saveUtilityModal()"]');
+  const saveBtn = document.getElementById('ahj-edit-modal')?.querySelector('.ahj-modal-save-btn');
   if (saveBtn) saveBtn.setAttribute('onclick','saveAhjModal()');
   closeAhjModal();
   const el = document.getElementById('admin-content');
@@ -4524,7 +4524,11 @@ async function renderAdminUsers(el) {
           </tr>`).join('')}
       </tbody>
     </table>`;
-  if (deptFilter) { const s=document.getElementById('user-dept-filter'); if(s) s.value=deptFilter; }
+  // Restore dept filter selection after re-render
+  if (deptFilter) {
+    const s = document.getElementById('user-dept-filter');
+    if (s) { s.value = deptFilter; }
+  }
 }
 
 async function openUserModal(id) {
@@ -4534,7 +4538,8 @@ async function openUserModal(id) {
   else if (id) { const r=await sb.from('users').select('*').eq('id',id).single(); if(r.data) data=r.data; }
 
   const modal = document.getElementById('ahj-edit-modal');
-  const saveBtn = modal.querySelector('button[onclick="saveAhjModal()"]');
+  // Always grab the first button (Save Changes) regardless of its current onclick
+  const saveBtn = modal.querySelector('.ahj-modal-save-btn');
   if (saveBtn) saveBtn.setAttribute('onclick','saveUserModal()');
   document.getElementById('ahj-modal-title').textContent = id ? 'Edit User' : 'Add User';
   document.getElementById('ahj-modal-sub').textContent = data.email || '';
@@ -4599,11 +4604,12 @@ async function saveUserModal() {
   else { ({error}=await sb.from('users').insert(record)); }
   if (error) { showToast('Save failed: '+error.message); return; }
   showToast(_userEditId?'User saved':'User added');
-  const saveBtn=document.getElementById('ahj-edit-modal')?.querySelector('button[onclick="saveUserModal()"]');
+  const saveBtn=document.getElementById('ahj-edit-modal')?.querySelector('.ahj-modal-save-btn');
   if(saveBtn) saveBtn.setAttribute('onclick','saveAhjModal()');
   closeAhjModal();
   _usersData=null;
-  await renderAdminUsers(document.getElementById('admin-content'));
+  const _adminEl = document.getElementById('admin-content');
+  await renderAdminUsers(_adminEl);
 }
 
 
@@ -4718,11 +4724,18 @@ async function flushCrewChanges() {
     await post({action:'updateCrew', crewId, name:crew.name, warehouse:crew.warehouse, members:crew.members, ...roles});
     delete _crewPending[crewId];
   }
-  await reloadData();
   showToast('Crew saved');
+  // Refresh crews data from server
+  const crewRes = await sb.from('crews').select('*').limit(100);
+  if (crewRes.data) {
+    crews = crewRes.data.map(snakeToCamel);
+    crewMap = {};
+    crews.forEach(c => { crewMap[c.id] = c; });
+  }
   // Re-render crews tab if still open
   const el = document.getElementById('admin-content');
   if (el && document.getElementById('admin-overlay').style.display !== 'none' && _adminTab === 'crews') {
+    _usersData = null; // force fresh user load for dropdowns
     await renderAdminCrews(el);
   }
 }
