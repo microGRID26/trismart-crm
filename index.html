@@ -788,6 +788,26 @@ select.np-input{cursor:pointer;}
   </div>
 </div>
 
+<!-- AHJ / UTILITY INFO CARD MODAL -->
+<div id="info-card-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:650;overflow-y:auto;" onclick="if(event.target===this)closeInfoCard()">
+  <div style="background:var(--bg);border-radius:12px;max-width:520px;margin:60px auto 40px;padding:0;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <!-- Header -->
+    <div id="info-card-header" style="padding:18px 20px 14px;border-bottom:0.5px solid var(--border2);display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div id="info-card-type" style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:3px;"></div>
+        <div id="info-card-title" style="font-size:16px;font-weight:600;color:var(--text);line-height:1.3;"></div>
+        <div id="info-card-sub" style="font-size:11px;color:var(--text3);margin-top:2px;"></div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:12px;">
+        <button id="info-card-edit-btn" onclick="infoCardEdit()" style="display:none;font-size:11px;padding:5px 12px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);cursor:pointer;color:var(--text);font-weight:500;">Edit ↗</button>
+        <button onclick="closeInfoCard()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);padding:0 4px;line-height:1;">✕</button>
+      </div>
+    </div>
+    <!-- Body -->
+    <div id="info-card-body" style="padding:16px 20px 20px;"></div>
+  </div>
+</div>
+
 <!-- NEW / EDIT PROJECT MODAL -->
 <style>
 .np-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border2);margin-bottom:20px;}
@@ -1400,7 +1420,7 @@ select.np-input{cursor:pointer;}
 // Replace these two values with your project's credentials.
 // Find them at: Supabase project → Settings → API
 const SUPABASE_URL  = 'https://hzymsezqfxzpbcqryeim.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_mY0uHkw46TOFM2FmX3Dczw_9xbS1sJD';
+const SUPABASE_ANON = 'sb_publishable_9yPXBcL2QGdKrYgHHWUKfg_kBKznGQT';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // snake_case ↔ camelCase converters — used only in the data layer below.
@@ -3342,7 +3362,7 @@ function renderPanel(pid){
       ${frow('ESID', p.esid)}
     </div>
     <div class="sec"><div class="sec-title">Permitting</div>
-      ${p.ahj ? `<div class="frow"><span class="flabel">AHJ</span><span class="fval">${isAdmin() ? `<span onclick="openAdminToAHJ('${p.ahj.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open in Admin">${escapeHtml(p.ahj)}</span>` : escapeHtml(p.ahj)}</span></div>` : ''}
+      ${p.ahj ? `<div class="frow"><span class="flabel">AHJ</span><span class="fval"><span onclick="showAhjCard('${p.ahj.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="View AHJ details">${escapeHtml(p.ahj)}</span></span></div>` : ''}
       ${(()=>{
         const ahj=p.ahj?ahjCache[p.ahj.toLowerCase()]:null;
         if(!ahj) return '';
@@ -3355,7 +3375,7 @@ function renderPanel(pid){
         if(ahj.permit_notes) parts.push(`<div style="margin:4px 0;padding:6px 8px;background:var(--bg2);border-radius:4px;font-size:10px;color:var(--text2);line-height:1.5;">${escapeHtml(ahj.permit_notes).slice(0,300)}${ahj.permit_notes.length>300?'…':''}</div>`);
         return parts.join('');
       })()}
-      ${p.utility ? `<div class="frow"><span class="flabel">Utility</span><span class="fval">${isAdmin() ? `<span onclick="openAdminToUtility('${p.utility.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open in Admin">${escapeHtml(p.utility)}</span>` : escapeHtml(p.utility)}</span></div>` : ''}
+      ${p.utility ? `<div class="frow"><span class="flabel">Utility</span><span class="fval"><span onclick="showUtilityCard('${p.utility.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="View utility details">${escapeHtml(p.utility)}</span></span></div>` : ''}
       ${(()=>{
         const util=p.utility?utilityCache[p.utility.toLowerCase()]:null;
         if(!util) return '';
@@ -4874,6 +4894,155 @@ async function renderAdminInfo(el) {
       <div><strong>Deployed:</strong> microgrid26.github.io/trismart-crm</div>
     </div>
   `;
+}
+
+// ── AHJ / UTILITY INFO CARD POPUP ────────────────────────────────────────────
+let _infoCardEditFn = null;
+
+function closeInfoCard() {
+  document.getElementById('info-card-modal').style.display = 'none';
+  _infoCardEditFn = null;
+}
+
+function infoCardEdit() {
+  closeInfoCard();
+  if (_infoCardEditFn) _infoCardEditFn();
+}
+
+function _infoRow(label, val, opts={}) {
+  if (!val) return '';
+  let display = escapeHtml(String(val));
+  if (opts.tel)  display = `<a href="tel:${val}" style="color:var(--green);text-decoration:none;">${escapeHtml(val)}</a>`;
+  if (opts.url)  display = `<a href="${val}" target="_blank" style="color:var(--green);text-decoration:none;">Open ↗</a>`;
+  if (opts.mono) display = `<span style="font-family:monospace;font-size:11px;">${escapeHtml(val)}</span>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:0.5px solid var(--border);">
+    <span style="font-size:11px;color:var(--text3);min-width:120px;flex-shrink:0;">${label}</span>
+    <span style="font-size:12px;color:var(--text);text-align:right;">${display}</span>
+  </div>`;
+}
+
+function _infoNote(text, maxLen=350) {
+  if (!text) return '';
+  const short = text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+  return `<div style="margin-top:6px;padding:8px 10px;background:var(--bg2);border-radius:6px;font-size:11px;color:var(--text2);line-height:1.6;white-space:pre-wrap;">${escapeHtml(short)}</div>`;
+}
+
+function _infoSection(title) {
+  return `<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:14px 0 4px;">${title}</div>`;
+}
+
+async function showAhjCard(ahjName) {
+  if (!ahjName) return;
+  const modal = document.getElementById('info-card-modal');
+  document.getElementById('info-card-type').textContent = 'Authority Having Jurisdiction';
+  document.getElementById('info-card-title').textContent = ahjName;
+  document.getElementById('info-card-sub').textContent = '';
+  document.getElementById('info-card-body').innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--text3);font-size:12px;">Loading…</div>';
+  document.getElementById('info-card-edit-btn').style.display = 'none';
+  modal.style.display = 'block';
+
+  // Try cache first, then fetch
+  let ahj = ahjCache[ahjName.toLowerCase()];
+  if (!ahj) {
+    await loadAhjForProject(ahjName);
+    ahj = ahjCache[ahjName.toLowerCase()];
+  }
+
+  if (!ahj) {
+    document.getElementById('info-card-body').innerHTML =
+      `<div style="padding:20px 0;text-align:center;color:var(--text3);font-size:12px;">No database record found for <strong>${escapeHtml(ahjName)}</strong>.<br><span style="font-size:10px;">AHJs can be added via Settings → AHJ Manager.</span></div>`;
+    return;
+  }
+
+  // Title / sub update
+  document.getElementById('info-card-title').textContent = ahj.name || ahjName;
+  document.getElementById('info-card-sub').textContent = [ahj.city, ahj.county ? ahj.county + ' County' : null, ahj.state].filter(Boolean).join(' · ');
+
+  // Edit button for admins
+  if (isAdmin()) {
+    document.getElementById('info-card-edit-btn').style.display = '';
+    _infoCardEditFn = () => openAdminToAHJ(ahjName);
+  }
+
+  const hasPermit  = ahj.permit_phone || ahj.permit_website || ahj.max_duration || ahj.electric_code || ahj.building_code || ahj.fire_code || ahj.permit_username || ahj.permit_notes;
+  const hasInsp    = ahj.inspection_portal || ahj.inspection_login || ahj.inspection_email || ahj.inspection_notes || ahj.plans_on_site || ahj.host_type_required || ahj.how_to_request;
+
+  let html = '';
+
+  if (hasPermit) {
+    html += _infoSection('Permit Info');
+    html += _infoRow('Phone',          ahj.permit_phone,    {tel: true});
+    html += _infoRow('Portal',         ahj.permit_website,  {url: true});
+    html += _infoRow('Turnaround',     ahj.max_duration ? ahj.max_duration + ' days' : null);
+    html += _infoRow('Electric code',  ahj.electric_code);
+    html += _infoRow('Building code',  ahj.building_code);
+    html += _infoRow('Fire code',      ahj.fire_code);
+    html += _infoRow('Username',       ahj.permit_username, {mono: true});
+    if (isAdmin() && ahj.permit_password) html += _infoRow('Password', '••••••••', {mono: true});
+    if (ahj.permit_notes) html += _infoNote(ahj.permit_notes);
+  }
+
+  if (hasInsp) {
+    html += _infoSection('Inspection Info');
+    html += _infoRow('Portal',         ahj.inspection_portal,  {url: ahj.inspection_portal?.startsWith('http')});
+    html += _infoRow('Login',          ahj.inspection_login,   {mono: true});
+    html += _infoRow('Email',          ahj.inspection_email);
+    html += _infoRow('Plans on site',  ahj.plans_on_site);
+    html += _infoRow('Host type',      ahj.host_type_required);
+    html += _infoRow('How to request', ahj.how_to_request);
+    if (isAdmin() && ahj.inspection_password) html += _infoRow('Password', '••••••••', {mono: true});
+    if (ahj.inspection_notes) html += _infoNote(ahj.inspection_notes);
+  }
+
+  if (!hasPermit && !hasInsp) {
+    html = '<div style="padding:16px 0;text-align:center;color:var(--text3);font-size:12px;">No permit or inspection details on file yet.</div>';
+  }
+
+  document.getElementById('info-card-body').innerHTML = html;
+}
+
+async function showUtilityCard(utilityName) {
+  if (!utilityName) return;
+  const modal = document.getElementById('info-card-modal');
+  document.getElementById('info-card-type').textContent = 'Utility Company';
+  document.getElementById('info-card-title').textContent = utilityName;
+  document.getElementById('info-card-sub').textContent = '';
+  document.getElementById('info-card-body').innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--text3);font-size:12px;">Loading…</div>';
+  document.getElementById('info-card-edit-btn').style.display = 'none';
+  modal.style.display = 'block';
+
+  let util = utilityCache[utilityName.toLowerCase()];
+  if (!util) {
+    await loadUtilityForProject(utilityName);
+    util = utilityCache[utilityName.toLowerCase()];
+  }
+
+  if (!util) {
+    document.getElementById('info-card-body').innerHTML =
+      `<div style="padding:20px 0;text-align:center;color:var(--text3);font-size:12px;">No database record found for <strong>${escapeHtml(utilityName)}</strong>.<br><span style="font-size:10px;">Utilities can be added via Settings → Utility Manager.</span></div>`;
+    return;
+  }
+
+  document.getElementById('info-card-title').textContent = util.name || utilityName;
+  document.getElementById('info-card-sub').textContent = [util.short_name, util.state].filter(Boolean).join(' · ');
+
+  if (isAdmin()) {
+    document.getElementById('info-card-edit-btn').style.display = '';
+    _infoCardEditFn = () => openAdminToUtility(utilityName);
+  }
+
+  let html = _infoSection('Contact & Portal');
+  html += _infoRow('Phone',   util.phone,   {tel: true});
+  html += _infoRow('Website', util.website, {url: true});
+  html += _infoRow('State',   util.state);
+  if (util.notes) html += _infoNote(util.notes, 400);
+
+  const hasAny = util.phone || util.website || util.state || util.notes;
+  if (!hasAny) {
+    html = '<div style="padding:16px 0;text-align:center;color:var(--text3);font-size:12px;">No details on file yet.</div>';
+  }
+
+  document.getElementById('info-card-body').innerHTML = html;
 }
 
 // ── AHJ AUTOCOMPLETE ─────────────────────────────────────────────────────────
@@ -8177,6 +8346,7 @@ document.addEventListener('keydown',function(e){
 
   // Escape — close panel or modal
   if(e.key==='Escape'){
+    if(document.getElementById('info-card-modal').style.display!=='none'){closeInfoCard();return;}
     if(document.getElementById('np-overlay').style.display!=='none'){closeNewProject();return;}
     if(document.getElementById('funding-modal').style.display!=='none'){closeFundingModal();return;}
     if(document.getElementById('pmr-overlay').style.display!=='none'){closePMRebalance();return;}
