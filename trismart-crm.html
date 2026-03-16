@@ -465,6 +465,11 @@ select.np-input{cursor:pointer;}
 .chat-send{font-size:11px;padding:5px 14px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;}
 .chat-send:hover{opacity:.88;}
 .mention-dropdown{position:absolute;bottom:calc(100% + 4px);left:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;min-width:180px;overflow:hidden;display:none;}
+.ahj-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;max-height:200px;overflow-y:auto;display:none;}
+.ahj-item{padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:0.5px solid var(--border);}
+.ahj-item:hover,.ahj-item.active{background:var(--bg2);}
+.ahj-item-name{font-weight:500;color:var(--text);}
+.ahj-item-sub{font-size:10px;color:var(--text3);margin-top:1px;}
 .mention-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:12px;}
 .mention-item:hover,.mention-item.active{background:var(--bg2);}
 .mention-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;flex-shrink:0;}
@@ -788,7 +793,15 @@ select.np-input{cursor:pointer;}
       <div><div class="np-label">Contract Value ($)</div><input class="np-input" id="np-contract" type="number" placeholder="75000"></div>
       <div><div class="np-label">System Size (kW)</div><input class="np-input" id="np-systemkw" type="number" step="0.001" placeholder="18.00"></div>
       <div><div class="np-label">Financier</div><input class="np-input" id="np-financier" type="text" placeholder="Edge"></div>
-      <div><div class="np-label">AHJ</div><input class="np-input" id="np-ahj" type="text" placeholder="City name or County"></div>
+      <div style="position:relative;">
+        <div class="np-label">AHJ</div>
+        <input class="np-input" id="np-ahj" type="text" placeholder="City name or County"
+          autocomplete="off"
+          oninput="ahjAutocomplete(this)"
+          onblur="setTimeout(()=>closeAhjDropdown(),200)"
+          onkeydown="ahjKeydown(event)">
+        <div class="ahj-dropdown" id="ahj-dropdown"></div>
+      </div>
       <div><div class="np-label">Utility</div><input class="np-input" id="np-utility" type="text" placeholder="Oncor"></div>
       <div><div class="np-label">Energy Advisor</div><input class="np-input" id="np-advisor" type="text" placeholder="Full name"></div>
       <div><div class="np-label">Energy Consultant</div><input class="np-input" id="np-consultant" type="text" placeholder="Full name"></div>
@@ -1428,6 +1441,7 @@ const TASKS={
 };
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={},projectBoms={},projectDocuments={};
+let ahjCache={}; // name→AHJ record, loaded on demand
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -3200,6 +3214,7 @@ function renderPMAnalytics(){
 // ── PANEL ─────────────────────────────────────────────────
 function renderPanel(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
+  if(p.ahj) loadAhjForProject(p.ahj);
   const sla=getSLA(p);const pr=getProgress(pid);
   const s=STAGES.find(x=>x.id===p.stage);const cycle=cycleDays(p);
   const pNotes=notes[pid]||[];const pHistory=stageHistory[pid]||[];
@@ -3268,6 +3283,18 @@ function renderPanel(pid){
     </div>
     <div class="sec"><div class="sec-title">Permitting</div>
       ${frow('AHJ', p.ahj)}
+      ${(()=>{
+        const ahj=p.ahj?ahjCache[p.ahj.toLowerCase()]:null;
+        if(!ahj) return '';
+        const parts=[];
+        if(ahj.permit_phone) parts.push(`<div class="frow"><span class="flabel">Permit phone</span><span class="fval"><a href="tel:${ahj.permit_phone}" style="color:var(--green);text-decoration:none;">${ahj.permit_phone}</a></span></div>`);
+        if(ahj.permit_website) parts.push(`<div class="frow"><span class="flabel">Permit portal</span><span class="fval"><a href="${ahj.permit_website}" target="_blank" style="color:var(--green);text-decoration:none;font-size:11px;">Open ↗</a></span></div>`);
+        if(ahj.max_duration) parts.push(`<div class="frow"><span class="flabel">Turnaround</span><span class="fval">${ahj.max_duration} days</span></div>`);
+        if(ahj.permit_username) parts.push(`<div class="frow"><span class="flabel">Username</span><span class="fval" style="font-size:11px;">${ahj.permit_username}</span></div>`);
+        if(ahj.electric_code) parts.push(`<div class="frow"><span class="flabel">Electric code</span><span class="fval">${ahj.electric_code}</span></div>`);
+        if(ahj.permit_notes) parts.push(`<div style="margin:4px 0;padding:6px 8px;background:var(--bg2);border-radius:4px;font-size:10px;color:var(--text2);line-height:1.5;">${escapeHtml(ahj.permit_notes).slice(0,300)}${ahj.permit_notes.length>300?'…':''}</div>`);
+        return parts.join('');
+      })()}
       ${frow('Utility', p.utility)}
       ${frow('Permit #', p.permitNumber)}
       ${frow('Utility app #', p.utilityAppNumber)}
@@ -3983,6 +4010,84 @@ function chatKeydown(e,pid){
   }
   // Enter sends, Shift+Enter = newline
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat(pid);}
+}
+
+// ── AHJ AUTOCOMPLETE ─────────────────────────────────────────────────────────
+let _ahjResults=[], _ahjIdx=-1;
+
+async function ahjAutocomplete(input) {
+  const q = input.value.trim();
+  const dd = document.getElementById('ahj-dropdown');
+  if (!q || q.length < 2) { dd.style.display='none'; _ahjResults=[]; return; }
+
+  // Query Supabase ahjs table
+  try {
+    const res = await sb.from('ahjs')
+      .select('name,state,city,permit_phone,permit_website,max_duration,permit_notes,permit_username,electric_code,inspection_portal,inspection_login,inspection_password,inspection_email,inspection_notes,plans_on_site,host_type_required,how_to_request')
+      .ilike('name', `${q}%`)
+      .eq('state', 'TX')
+      .limit(8);
+    if (res.error || !res.data?.length) {
+      dd.style.display='none'; _ahjResults=[]; return;
+    }
+    _ahjResults = res.data;
+    _ahjIdx = -1;
+    dd.innerHTML = res.data.map((a,i) => `
+      <div class="ahj-item" data-idx="${i}" onmousedown="selectAhj(${i})">
+        <div class="ahj-item-name">${escapeHtml(a.name)}</div>
+        <div class="ahj-item-sub">${[a.max_duration?a.max_duration+'d turnaround':null, a.permit_phone].filter(Boolean).join(' · ')}</div>
+      </div>`).join('');
+    dd.style.display='block';
+  } catch(e) {
+    dd.style.display='none';
+  }
+}
+
+function ahjKeydown(e) {
+  const dd = document.getElementById('ahj-dropdown');
+  if (dd.style.display==='none') return;
+  if (e.key==='ArrowDown') {
+    e.preventDefault();
+    _ahjIdx = Math.min(_ahjIdx+1, _ahjResults.length-1);
+    dd.querySelectorAll('.ahj-item').forEach((el,i)=>el.classList.toggle('active',i===_ahjIdx));
+  } else if (e.key==='ArrowUp') {
+    e.preventDefault();
+    _ahjIdx = Math.max(_ahjIdx-1, 0);
+    dd.querySelectorAll('.ahj-item').forEach((el,i)=>el.classList.toggle('active',i===_ahjIdx));
+  } else if (e.key==='Enter' && _ahjIdx>=0) {
+    e.preventDefault();
+    selectAhj(_ahjIdx);
+  } else if (e.key==='Escape') {
+    closeAhjDropdown();
+  }
+}
+
+function selectAhj(idx) {
+  const ahj = _ahjResults[idx];
+  if (!ahj) return;
+  document.getElementById('np-ahj').value = ahj.name;
+  // Cache the AHJ record for the panel card
+  ahjCache[ahj.name.toLowerCase()] = ahj;
+  closeAhjDropdown();
+}
+
+function closeAhjDropdown() {
+  const dd = document.getElementById('ahj-dropdown');
+  if (dd) dd.style.display='none';
+}
+
+// Pre-load AHJ data for the currently open project
+async function loadAhjForProject(ahjName) {
+  if (!ahjName || ahjCache[ahjName.toLowerCase()]) return;
+  try {
+    const res = await sb.from('ahjs')
+      .select('*')
+      .ilike('name', ahjName)
+      .limit(1);
+    if (res.data?.length) {
+      ahjCache[ahjName.toLowerCase()] = res.data[0];
+    }
+  } catch(e) {}
 }
 
 // Team email map for @mention notifications
