@@ -2002,8 +2002,7 @@ async function post(body){
 
     } else if(action==='deleteDocument'){
       await sbRun(sb.from('project_documents').delete().eq('id',b.id));
-      if(projectDocuments[b.projectId])
-        projectDocuments[b.projectId]=projectDocuments[b.projectId].filter(d=>d.id!==b.id);
+      // Note: projectDocuments[pid] already filtered optimistically in deleteDocument()
 
     } else if(action==='saveFolder'){
       await sbRun(sb.from('project_folders').upsert(camelToSnake({
@@ -3351,7 +3350,6 @@ function renderPanel(pid){
     <div class="ptab-pane" id="ptabpane-notes-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-files-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-schedule-${pid}" style="display:none;"></div>
-    <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>
     <div class="ptab-pane" id="ptabpane-bom-${pid}" style="display:none;"></div>`;
 
   // Inject notes into notes pane (needs live DOM)
@@ -3384,8 +3382,8 @@ function renderPanel(pid){
   document.getElementById('ptab-notes').innerHTML=`Notes${noteCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg2);color:var(--text2);">${noteCount}</span>`:''}`;
   document.getElementById('ptab-tasks').innerHTML=`Tasks${stuckCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#fff0f0;color:#A32D2D;">${stuckCount} stuck</span>`:''}`;
   document.getElementById('ptab-schedule').innerHTML=`Schedule${schedCount?` <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg2);color:var(--text2);">${schedCount}</span>`:'+'}`;
-  // Reset to tasks tab
-  setPanelTab('tasks');
+  // Restore current tab (don't kick user back to tasks on every re-render)
+  setPanelTab(currentPanelTab);
   document.getElementById('detail-panel').classList.add('open');
 
   // Render files section into files pane
@@ -4213,6 +4211,7 @@ async function submitEditProject(){
     projectFunding[p.id]=projectFunding[p.id]||{};
     Object.assign(projectFunding[p.id],fundingRow);
   }
+  bustFundingStatusCache(_editPid);
   closeNewProject();
   render();
   if(selectedId===_editPid){
@@ -5692,7 +5691,7 @@ function openFundingModal(pid, milestone) {
   const row = getFundingRow(pid, milestone);
   const f = projectFunding[pid] || {};
   const events = (fundingEvents[pid]||[]).filter(e => e.milestone === milestone)
-    .sort((a,b) => (b.createdAt||b.date||'') > (a.createdAt||a.date||'') ? -1 : 1);
+    .sort((a,b) => (b.createdAt||b.date||'') > (a.createdAt||a.date||'') ? 1 : -1);
 
   const el = document.getElementById('funding-modal-content');
   const title = document.getElementById('funding-modal-title');
@@ -6588,6 +6587,7 @@ async function saveBOM(pid) {
       overrides:        row.overrides,
       updated_at:       new Date().toISOString(),
     }).eq('id', saved.id));
+    if (!err && projectBoms[pid]) projectBoms[pid].version = row.version;
   } else {
     const {data, error} = await sb.from('project_boms').insert(row).select().single();
     err = error;
