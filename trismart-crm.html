@@ -3364,7 +3364,7 @@ function renderPanel(pid){
       ${frow('ESID', p.esid)}
     </div>
     <div class="sec"><div class="sec-title">Permitting</div>
-      ${p.ahj ? `<div class="frow"><span class="flabel">AHJ</span><span class="fval"><span onclick="openAhjByName(this.dataset.name)" data-name="${escapeHtml(p.ahj)}" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open AHJ record">${escapeHtml(p.ahj)}</span></span></div>` : ''}
+      ${p.ahj ? `<div class="frow"><span class="flabel">AHJ</span><span class="fval"><span onclick="openAhjByName(projectMap[String(selectedId)]?.ahj)" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open AHJ record">${escapeHtml(p.ahj)}</span></span></div>` : ''}
       ${(()=>{
         const ahj=p.ahj?ahjCache[p.ahj.toLowerCase()]:null;
         if(!ahj) return '';
@@ -3377,7 +3377,7 @@ function renderPanel(pid){
         if(ahj.permit_notes) parts.push(`<div style="margin:4px 0;padding:6px 8px;background:var(--bg2);border-radius:4px;font-size:10px;color:var(--text2);line-height:1.5;">${escapeHtml(ahj.permit_notes).slice(0,300)}${ahj.permit_notes.length>300?'…':''}</div>`);
         return parts.join('');
       })()}
-      ${p.utility ? `<div class="frow"><span class="flabel">Utility</span><span class="fval"><span onclick="openUtilityByName(this.dataset.name)" data-name="${escapeHtml(p.utility)}" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open Utility record">${escapeHtml(p.utility)}</span></span></div>` : ''}
+      ${p.utility ? `<div class="frow"><span class="flabel">Utility</span><span class="fval"><span onclick="openUtilityByName(projectMap[String(selectedId)]?.utility)" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open Utility record">${escapeHtml(p.utility)}</span></span></div>` : ''}
       ${(()=>{
         const util=p.utility?utilityCache[p.utility.toLowerCase()]:null;
         if(!util) return '';
