@@ -1,0 +1,11 @@
+gdrive_credentials.json
+gdrive_token.pkl
+*.pkl
+migration_log*.txt
+migrate_to_gdrive*.py
+import_notes.js
+link_drive_folders.gs
+project_notes.json
+node_modules/
+package-lock.json
+package.json
