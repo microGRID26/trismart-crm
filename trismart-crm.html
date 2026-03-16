@@ -1531,6 +1531,8 @@ function ts(pid,tid){const v=(taskState[pid]||{})[tid];return v?(typeof v==='obj
 function tcd(pid,tid){const v=(taskState[pid]||{})[tid];return v&&typeof v==='object'?v.completedDate:'';}
 
 let selectedId=null,currentPM='all',currentView='command',anTab='leadership';
+let cmdFilter=null;
+let currentPanelTab='tasks';
 let today=new Date();
 // Recalculate today if app is open past midnight
 setInterval(()=>{
@@ -5517,8 +5519,6 @@ async function submitEditProject(){
 }
 
 // ── FILES / DRIVE ─────────────────────────────────────────
-let currentPanelTab='tasks';
-let cmdFilter=null;
 function cmdDrilldown(filter){
   cmdFilter=cmdFilter===filter||filter==='all'?null:filter;
   renderCommand();
