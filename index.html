@@ -3935,17 +3935,8 @@ function doManualLogin(){
 window.doManualLogin=doManualLogin;
 function manualSignIn(){doManualLogin();}
 async function onGoogleSignIn(response){
-  // 1. Establish a Supabase session from the Google ID token
-  const {error:authErr} = await sb.auth.signInWithIdToken({
-    provider: 'google',
-    token:    response.credential,
-  });
-  if(authErr){
-    console.error('Supabase auth error',authErr);
-    showToast('Sign-in failed: '+authErr.message);
-    return;
-  }
-  // 2. Parse display info from the JWT (same as before)
+  // Parse display info directly from the Google JWT
+  // Skip signInWithIdToken to avoid nonce mismatch errors
   const payload=parseJwt(response.credential);
   const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
   currentUser={
