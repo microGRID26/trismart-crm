@@ -2847,6 +2847,19 @@ function renderLeadershipDashboard(){
     </div>`;
 
   // Dealer breakdown row
+  const dealerStats=dealers.map(d=>{
+    const dp=vis.filter(p=>p.dealer===d);
+    const val=dp.reduce((a,p)=>a+(Number(p.contract)||0),0);
+    const _period=window._ldPeriod||'mtd'; const installs=dp.filter(p=>_inRange(p.installCompleteDate||(p.stage==='complete'?p.stageDate:null),_period)).length;
+    return {name:d,count:dp.length,val,installs};
+  }).sort((a,b)=>b.val-a.val);
+
+  // Intervention list — blocked + crit sorted by $ value
+  const interventions=vis.filter(p=>p.blocker||getSLA(p).status==='crit'||getSLA(p).status==='risk')
+    .sort((a,b)=>{
+      const rank=p=>p.blocker?0:getSLA(p).status==='crit'?1:2;
+      return rank(a)-rank(b)||(Number(b.contract)||0)-(Number(a.contract)||0);
+    });
   const dealerRow = dealerStats.length ? `<div class="an-row-2"><div class="an-card">
     <div class="an-title">Revenue by Dealer</div>
     <div class="an-sub">All active projects · sorted by contract value</div>
@@ -2943,19 +2956,6 @@ function renderPipelineAnalytics(){
   }
   const pmStats=pms.map(name=>({name,stats:pmStat(name)}));
   const dealers=[...new Set(vis.map(p=>p.dealer).filter(Boolean))].sort();
-  const dealerStats=dealers.map(d=>{
-    const dp=vis.filter(p=>p.dealer===d);
-    const val=dp.reduce((a,p)=>a+(Number(p.contract)||0),0);
-    const _period=window._ldPeriod||'mtd'; const installs=dp.filter(p=>_inRange(p.installCompleteDate||(p.stage==='complete'?p.stageDate:null),_period)).length;
-    return {name:d,count:dp.length,val,installs};
-  }).sort((a,b)=>b.val-a.val);
-
-  // Intervention list — blocked + crit sorted by $ value
-  const interventions=vis.filter(p=>p.blocker||getSLA(p).status==='crit'||getSLA(p).status==='risk')
-    .sort((a,b)=>{
-      const rank=p=>p.blocker?0:getSLA(p).status==='crit'?1:2;
-      return rank(a)-rank(b)||(Number(b.contract)||0)-(Number(a.contract)||0);
-    });
 
   // ── RENDER ──
 
@@ -2982,7 +2982,11 @@ function renderPipelineAnalytics(){
       <div class="an-sub">Sale date to today across all projects</div>
       <div class="kpi-val">${avgCycle}d</div>
       <div class="kpi-label">Portfolio average</div>
-      <div class="kpi-note">Ari ${ari.avgCycle}d &nbsp;·&nbsp; Jen ${jen.avgCycle}d</div>
+      <div class="kpi-note">${pms.slice(0,2).map(pm=>{
+        const pp=vis.filter(p=>p.pm===pm);
+        const avg=pp.length?Math.round(pp.reduce((a,p)=>a+cycleDays(p),0)/pp.length):0;
+        return pm+' '+avg+'d';
+      }).join(' &nbsp;·&nbsp; ')}</div>
       <div class="kpi-trend ${avgCycle>60?'bad':avgCycle>45?'warn':'ok'}">${avgCycle>60?'Above benchmark':avgCycle>45?'Approaching benchmark':'Healthy pace'}</div>
     </div>
   </div>`;
