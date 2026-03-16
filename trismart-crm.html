@@ -4108,11 +4108,16 @@ function isAdmin() {
 async function openAdminToAHJ(ahjName) {
   if (!isAdmin()) return;
   let data;
-  ({data} = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1));
-  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('short_name', ahjName).limit(1));
-  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `${ahjName}%`).limit(1));
-  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('short_name', `${ahjName}%`).limit(1));
-  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `%${ahjName}%`).limit(1));
+  try {
+    ({data} = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1));
+    if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `${ahjName}%`).limit(1));
+    if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `%${ahjName}%`).limit(1));
+    if (!data?.length) {
+      // Try short_name if column exists
+      const sn = await sb.from('ahjs').select('id').ilike('short_name', ahjName).limit(1);
+      if (sn.data?.length) data = sn.data;
+    }
+  } catch(e) { console.warn('AHJ lookup error:', e); }
   if (data?.length) openAhjEdit(data[0].id);
   else showToast('AHJ not found in database: ' + ahjName);
 }
@@ -4647,18 +4652,18 @@ async function renderAdminCrews(el) {
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:0.5px solid var(--border2);">
           <div style="display:flex;align-items:center;gap:10px;flex:1;">
             <input value="${escapeHtml(c.name||c.id)}" id="crew-name-${c.id}"
-              onchange="updateCrewName('${c.id}',this.value)"
-              onfocus="this.style.border='0.5px solid var(--border2)';this.style.background='var(--bg)'"
-              onblur="this.style.border='none';this.style.background='transparent'"
-              onmouseover="this.style.background='var(--bg2)'"
-              onmouseout="if(document.activeElement!==this)this.style.background='transparent'"
-              style="font-weight:600;font-size:13px;border:none;background:transparent;color:var(--text);padding:2px 4px;border-radius:4px;width:120px;cursor:text;"
+              onblur="updateCrewName('${c.id}',this.value)"
+              onkeydown="if(event.key==='Enter'){this.blur();}"
+              style="font-weight:600;font-size:13px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text);padding:4px 8px;border-radius:4px;width:130px;cursor:text;"
               title="Click to rename crew">
-            <select id="crew-wh-${c.id}" onchange="updateCrewWarehouse('${c.id}',this.value)"
-              style="font-size:10px;border:0.5px solid var(--border2);border-radius:4px;padding:2px 6px;background:var(--bg);color:var(--text2);">
-              <option value="Houston"${c.warehouse==='Houston'?' selected':''}>Houston</option>
-              <option value="DFW"${c.warehouse==='DFW'?' selected':''}>DFW</option>
-            </select>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:10px;color:var(--text3);">Warehouse:</span>
+              <select id="crew-wh-${c.id}" onchange="updateCrewWarehouse('${c.id}',this.value)"
+                style="font-size:11px;border:0.5px solid var(--border2);border-radius:4px;padding:2px 6px;background:var(--bg);color:var(--text);">
+                <option value="Houston"${c.warehouse==='Houston'?' selected':''}>Houston</option>
+                <option value="DFW"${c.warehouse==='DFW'?' selected':''}>DFW</option>
+              </select>
+            </div>
             <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${c.active!=='false'?'var(--green-bg)':'var(--bg2)'};color:${c.active!=='false'?'var(--green)':'var(--text3)'};">${c.active!=='false'?'Active':'Inactive'}</span>
           </div>
           <span style="font-size:11px;color:var(--text3);">${jobCount} jobs</span>
@@ -4992,9 +4997,11 @@ async function loadUtilityForProject(utilityName) {
 async function openAdminToUtility(utilityName) {
   if (!isAdmin()) return;
   let data;
-  ({data} = await sb.from('utilities').select('id').ilike('name', utilityName).limit(1));
-  if (!data?.length) ({data} = await sb.from('utilities').select('id').ilike('name', `${utilityName}%`).limit(1));
-  if (!data?.length) ({data} = await sb.from('utilities').select('id').ilike('name', `%${utilityName}%`).limit(1));
+  try {
+    ({data} = await sb.from('utilities').select('id').ilike('name', utilityName).limit(1));
+    if (!data?.length) ({data} = await sb.from('utilities').select('id').ilike('name', `${utilityName}%`).limit(1));
+    if (!data?.length) ({data} = await sb.from('utilities').select('id').ilike('name', `%${utilityName}%`).limit(1));
+  } catch(e) { console.warn('Utility lookup error:', e); }
   if (data?.length) openUtilityEdit(data[0].id);
   else showToast('Utility not found in database: ' + utilityName);
 }
@@ -7353,6 +7360,16 @@ const HELP_CONTENT = {
           {h:"AHJ autocomplete", p:"When editing or creating a project, typing in the AHJ field shows a dropdown of matching AHJ names from the database. Use arrow keys to navigate, Enter to select. The project panel will then automatically show permit phone, portal link, turnaround days, and notes for that AHJ."},
           {h:"Adding more AHJs", p:"To add AHJs from other states, update the import script (import_ahjs.py) to remove the Texas filter and re-run it. The script is safe to run multiple times — it will not create duplicates for existing records."},
           {h:"Updating AHJ data in bulk", p:"Export a fresh spreadsheet from NetSuite, run the import script again. To update existing records rather than insert new ones, the import script will need an upsert flag added — request this when you have an updated export ready."},
+          {h:"AHJ name matching", p:"AHJ names in projects (e.g. 'Abilene') are matched to database records (e.g. 'Abilene city') using a 4-pass fuzzy lookup: exact name → short_name → starts-with → contains. The normalize_ahj_names.sql script must be run in Supabase to populate short_name values for this to work correctly."},
+          {h:"Password security", p:"Portal passwords and inspection passwords in AHJ records are masked by default. Click the eye icon to reveal. Passwords are not included in autocomplete queries — they are only loaded when an admin opens the full edit modal."},
+        ]
+      },
+      {
+        title: "Utility Manager",
+        cards: [
+          {h:"What is the Utility Manager", p:"The Utility Manager lets you search, view, and edit all 203 active utility company records imported from NetSuite. Each record has name, short name, state, phone, website, and notes."},
+          {h:"Searching and editing utilities", p:"Same pattern as AHJ Manager — search by name, click Edit to open the edit modal. Utility name in the project panel Permitting section is a clickable green link for admins that opens the edit modal directly."},
+          {h:"Utility name matching", p:"Same fuzzy matching as AHJ — exact, then starts-with, then contains. If a project has 'Oncor' and the database has 'Oncor Electric Delivery', the panel card still loads correctly."},
         ]
       },
       {
@@ -7361,6 +7378,8 @@ const HELP_CONTENT = {
           {h:"Viewing crews", p:"The Crews tab in Settings shows all active crews with their warehouse, total job count, and active status. This is the source of truth for crew assignments across the Schedule tab and Service Calls."},
           {h:"Adding a crew", p:"Click + Add Crew, enter a Crew ID (e.g. hou3), a display name (e.g. HOU 3), and select a warehouse (Houston or DFW). Click Add Crew. The new crew is available immediately in the Schedule and Service tabs."},
           {h:"Crew IDs", p:"Crew IDs are short lowercase identifiers used internally (hou1, hou2, dfw1, dfw2). Once set they cannot be changed without a data migration. Choose them carefully. The display name can always be updated."},
+          {h:"Assigning crew members", p:"Each crew card shows all role slots as dropdowns — License Holder, Electrician, Solar Lead, Battery Lead, Installer 1/2, Battery Tech 1/2, Battery Apprentice, MPU Electrician. Each dropdown only shows employees whose position matches. If no employees have a given position, the slot shows as a free-text field."},
+          {h:"Crew role changes", p:"Role dropdown changes are batched — you can assign multiple roles and they all save together 800ms after your last change. You will see a 'Crew saved' toast when the batch completes and the tab refreshes."},
         ]
       },
       {
@@ -7377,14 +7396,16 @@ const HELP_CONTENT = {
         cards: [
           {h:"Current user list", p:"The Users tab shows all team members configured in the CRM with their name, email address, and admin status. This reflects the hardcoded TEAM list in the CRM code."},
           {h:"Adding or removing team members", p:"Currently, adding or removing team members requires a code change to the TEAM array and TEAM_EMAILS object in the CRM. Full user management with a UI for adding, editing, and deactivating users is on the roadmap for the next session."},
-          {h:"Granting admin access", p:"Admin access is currently determined by name matching against a list in the code (Greg Kelsch, Heidi Hildreth). To grant admin access to additional users, the ADMIN_USERS array in the CRM needs to be updated. This will be moved to the Users UI in the next session."},
+          {h:"Granting admin access", p:"Admin access is currently determined by name matching against a list in the code (Greg Kelsch, Heidi Hildreth). To grant admin access to additional users, the ADMIN_USERS array in the CRM needs to be updated. This will be moved to the Users UI in a future session."},
+          {h:"Departments and positions", p:"Users can be assigned a department (Inside Operations, Sales, Executive, Field Operations, Funding, Payroll, HR, Accounting, Dealer) and a position. Crew positions (License Holder, Electrician, Solar Lead, Battery Lead, Installer, Battery Tech, Battery Apprentice, MPU Electrician) determine which users appear in crew role dropdowns."},
+          {h:"Avatar color", p:"Each user has an avatar color used in notes, @mentions, and team displays. Use the color picker in the user edit modal to set it visually, or type a hex code directly. The two inputs stay in sync."},
         ]
       },
       {
         title: "CRM Info",
         cards: [
           {h:"What CRM Info shows", p:"The CRM Info tab shows live stats: total projects, active vs completed count, total notes in the database, how many projects have Drive folders linked, AHJ database size, and links to the GitHub repo and Supabase project."},
-          {h:"Database stats", p:"Stats are pulled live from the loaded data on each open of the admin panel. Project and note counts reflect what is currently loaded in memory — force a data refresh (click the green dot in the top bar) before opening admin for the most current numbers."},
+          {h:"Database stats", p:"Project and note counts reflect what is currently loaded in memory — force a data refresh (click the green dot in the top bar) before opening admin for the most current numbers. AHJ and Utility counts are queried live from Supabase each time CRM Info is opened."},
         ]
       },
     ]
@@ -7392,6 +7413,38 @@ const HELP_CONTENT = {
   changelog: {
     label: "What's New",
     sections: [
+      {
+        title: "Session 4 — March 2026",
+        cards: [
+          {h:"AHJ database (1,633 Texas AHJs)", p:"All Texas AHJs imported from NetSuite. When a project has a matching AHJ, the Permitting section shows permit phone, portal link, turnaround days, username, and permit notes automatically. AHJ name is a clickable link for admins to open the edit form directly."},
+          {h:"Utility Company database (203 companies)", p:"All active utility companies imported. Same autocomplete and panel card pattern as AHJ — typing in the Utility field shows matching companies, and the panel shows phone and portal info when a match is found."},
+          {h:"AHJ & Utility autocomplete", p:"Typing in the AHJ or Utility field in the edit modal shows a live dropdown of matching records from the database. Arrow keys to navigate, Enter to select. Falls back to free text for records not in the database."},
+          {h:"Settings & Admin portal — full build", p:"Gear icon (⚙) in the top right for Greg Kelsch and Heidi Hildreth. Six modules: AHJ Manager, Utility Manager, Users, Crews, SLA Thresholds, CRM Info."},
+          {h:"AHJ Manager", p:"Search, paginate, and edit all 1,633 TX AHJ records. Edit modal with tabbed Permit Info and Inspection Info sections. Password fields masked with show/hide toggle. Clicking any AHJ name in a project panel opens the edit modal directly."},
+          {h:"Utility Manager", p:"Search and edit all 203 active utility companies. Same edit modal pattern as AHJ. Utility name in project panel links directly to edit form for admins."},
+          {h:"Users module", p:"Full user CRUD with department, position, admin access, and active status. Department filter dropdown. Avatar color picker. Supports all positions including crew roles."},
+          {h:"Crews module", p:"Each crew shown as a card with all role slots as dropdowns. Dropdowns filter to employees whose position matches that role — Installer slots only show Installers. Crew name and warehouse editable inline. Add new crews from the admin panel."},
+          {h:"SLA Thresholds — editable", p:"All stage thresholds (target, at-risk, critical days) are now editable in the admin panel. Changes save to localStorage and apply immediately across all views. Reset to Defaults button included. Warning banner shown since thresholds are browser-local."},
+          {h:"Departments and positions", p:"Full list of departments (Inside Operations, Sales, Executive, Field Operations, Funding, Payroll, HR, Accounting, Dealer) and positions (Admin, CEO, CIO, CFO, VP, Director, Manager, Designer, PM, Sales, Site Surveyor, Energy Consultant/Advisor, all crew positions) added to user records."},
+          {h:"Fuzzy name matching", p:"AHJ, Utility, team color, and @mention email lookups all now use multi-pass fuzzy matching. Handles 'Abilene' matching 'Abilene city', 'Oncor' matching 'Oncor Electric Delivery', and first-name matching for team members."},
+          {h:"Analytics tab fixes", p:"Leadership and Pipeline Health tabs were broken due to variables scoped in wrong functions (dealerStats, interventions, hardcoded Ari/Jen references). All fixed with proper error handling added."},
+          {h:"Task status full labels", p:"Task status dropdown now shows full labels: Ready to Start, Pending Resolution, Revision Required instead of abbreviated versions."},
+          {h:"Admin portal audit — 12 fixes", ul:[
+            "Modal save button no longer gets stuck on wrong handler when closing via Escape or X",
+            "Admin sidebar active class resets correctly on reopen",
+            "AHJ and Utility search debounced 300ms — no longer fires on every keystroke",
+            "Crew role changes batch-save with 800ms debounce instead of reloading on every dropdown change",
+            "Crew tab re-renders after batch save",
+            "SLA threshold warning banner — browser-local storage caveat shown",
+            "Crew name shows hover state so admins know it is editable",
+            "Passwords masked in AHJ edit modal with show/hide toggle",
+            "Passwords removed from AHJ autocomplete query",
+            "AHJ and Utility hyperlinks in project panel now open edit modal correctly",
+            "Live AHJ and utility counts in CRM Info pulled from Supabase",
+            "Admin panel height increased to not clip on smaller screens",
+          ]},
+        ]
+      },
       {
         title: "Session 3 — March 2026",
         cards: [
