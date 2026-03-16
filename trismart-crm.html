@@ -1914,7 +1914,7 @@ async function post(body){
         projectId: b.projectId,
         taskId:    b.taskId,
         status:    b.status,
-        completedDate: b.status==='Complete' ? new Date().toLocaleDateString() : ''
+        completedDate: b.status==='Complete' ? new Date().toISOString().slice(0,10) : ''
       }), {onConflict:'project_id,task_id'}));
 
     } else if(action==='moveStage'){
@@ -1952,7 +1952,7 @@ async function post(body){
     } else if(action==='updateSchedule'){
       await sbRun(sb.from('schedule').update(camelToSnake({
         projectId:b.projectId, crewId:b.crewId, jobType:b.jobType,
-        date:b.date, time:b.time, notes:b.notes||''
+        date:b.date, time:b.time, notes:b.notes||'', pm:b.pm||''
       })).eq('id',b.id));
 
     } else if(action==='deleteSchedule'){
@@ -3157,7 +3157,8 @@ function renderPanel(pid){
       // Convert MM/DD/YYYY to ISO if needed
       const mdy=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if(mdy) s=`${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
-      const dt=new Date(s.includes('T')||s.includes('-')?s:s+'T00:00:00');
+      // Always append T00:00:00 when no time present — prevents UTC parse shifting date back 1 day in US timezones
+      const dt=new Date(s.includes('T')?s:s+'T00:00:00');
       if(isNaN(dt.getTime())) return '';
       return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     }catch(e){return '';}
@@ -3805,13 +3806,16 @@ async function signOut(){
 
 // ── CHAT ─────────────────────────────────────────────────
 const TEAM=[
-  {name:'Greg',    color:'#1D9E75'},
-  {name:'Heidi',   color:'#534AB7'},
-  {name:'Ari',     color:'#0C447C'},
-  {name:'Jen',     color:'#BA7517'},
-  {name:'Aaron',   color:'#CF5A1A'},
-  {name:'Zach',    color:'#E24B4A'},
-  {name:'Mark',    color:'#2C7A4B'},
+  {name:'Greg',   color:'#1D9E75'},
+  {name:'Heidi',  color:'#534AB7'},
+  {name:'Ari',    color:'#0C447C'},
+  {name:'Jen',    color:'#BA7517'},
+  {name:'Will',   color:'#0C447C'},
+  {name:'Taylor', color:'#7C3AED'},
+  {name:'Aaron',  color:'#CF5A1A'},
+  {name:'Zach',   color:'#E24B4A'},
+  {name:'Mark',   color:'#2C7A4B'},
+  // Add new team members here — they'll appear in @mention autocomplete
 ];
 function teamColor(name){return (TEAM.find(t=>t.name===name)||{color:'#999'}).color;}
 function teamInitials(name){return name.slice(0,2).toUpperCase();}
@@ -3936,7 +3940,7 @@ function duplicateProject(pid){
   document.getElementById('np-email').value=p.email||'';
   document.getElementById('np-saledate').value=isoDate(today);
   document.getElementById('np-stage').value='evaluation'; // always starts fresh
-  document.getElementById('np-pm').value=p.pm||'Ari';
+  document.getElementById('np-pm').value=p.pm||([...new Set(projects.map(x=>x.pm).filter(Boolean))].sort()[0]||'');
   document.getElementById('np-disposition').value=p.disposition||'Sale';
   document.getElementById('np-contract').value=p.contract||'';
   document.getElementById('np-systemkw').value=p.systemkw||'';
@@ -4096,8 +4100,11 @@ function closeNewProject(){
 
 function generateProjectId(){
   const existing=projects.map(p=>parseInt((p.id||'').replace('PROJ-',''))||0);
-  const max=existing.length?Math.max(...existing):28000;
-  return 'PROJ-'+(max+Math.floor(Math.random()*10)+1);
+  const max=existing.length?existing.reduce((a,b)=>a>b?a:b,0):28000;
+  let next=max+1;
+  // Collision guard — increment until ID not already in projectMap
+  while(projectMap['PROJ-'+next]) next++;
+  return 'PROJ-'+next;
 }
 
 async function submitNewProject(){
@@ -5083,7 +5090,8 @@ function saveAssignment(){
   const conflictJob = schedule.find(s =>
     s.crewId === crewId &&
     s.date === date &&
-    s.id !== assignEditId  // allow editing own entry
+    s.id !== assignEditId &&   // allow editing own entry
+    s.status !== 'cancelled'   // cancelled jobs don't count as conflicts
   );
   if (conflictJob) {
     const conflictProj = projectMap[String(conflictJob.projectId)];
@@ -5094,8 +5102,9 @@ function saveAssignment(){
 
   if(assignEditId){
     const entry=schedule.find(s=>s.id===assignEditId);
-    if(entry){Object.assign(entry,{projectId,crewId,jobType,date,time,notes});}
-    post({action:'updateSchedule',id:assignEditId,projectId,crewId,jobType,date,time,notes});
+    const pm=currentUser.name||currentPM||'Team';
+    if(entry){Object.assign(entry,{projectId,crewId,jobType,date,time,notes,pm});}
+    post({action:'updateSchedule',id:assignEditId,projectId,crewId,jobType,date,time,notes,pm});
     showToast('Updated');
   } else {
     const id='sch'+Date.now();
@@ -5452,6 +5461,7 @@ function executePMMove(){
     const p=projects.find(x=>x.id===pid);
     if(!p) return;
     p.pm=toPM;
+    projectMap[String(pid)]=p; // keep O(1) lookup in sync
     post({action:'reassignPM',projectId:pid,pm:toPM});
     moved++;
   });
@@ -6025,7 +6035,7 @@ const HELP_CONTENT = {
       {
         title: "Session 2 — March 2026",
         cards: [
-          {h:"23 bugs fixed across 6 push batches", ul:[
+          {h:"27 bugs fixed across 7 push batches", ul:[
             "Funding events now sort newest-first correctly",
             "Panel tab no longer resets to Tasks on every re-render",
             "Panel tab only resets to Tasks when switching to a different project",
@@ -6041,7 +6051,14 @@ const HELP_CONTENT = {
             "Funding event log now correctly fires on status-only changes (no note required)",
             "Dead addNote() function removed — sendChat() is the active notes path",
             "Service calls default sort (Newest) was backwards — fixed",
+            "PM Rebalance now keeps projectMap in sync after moving projects",
+            "Duplicate Project no longer hardcodes Ari as fallback PM",
+            "generateProjectId now uses reduce instead of spread — safe at any scale",
             "New project form now captures Dealer, Module, Inverter, Battery, Financing Type",
+            "completedDate written to DB in ISO format (was locale string — caused sort/display issues)",
+            "Date display in project panel no longer shifts one day back in US timezones",
+            "generateProjectId: replaced random offset with deterministic max+1 plus collision guard",
+            "Schedule edit now saves PM field — was silently dropped on updates",
             "render() debounce fixed — last call in a burst wins, not first",
             "saveEdit now keeps projectMap O(1) lookup in sync",
           ]},
