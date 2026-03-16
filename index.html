@@ -690,6 +690,7 @@ select.np-input{cursor:pointer;}
       data-client_id="628637774830-q3097k1680on1nk51jjjfv8jlsn7b4p2.apps.googleusercontent.com"
       data-callback="onGoogleSignIn"
       data-auto_select="false"
+      data-itp_support="true">
     </div>
     <div class="g_id_signin"
       data-type="standard"
@@ -3922,7 +3923,6 @@ function _doRender(){
 }
 // ── GOOGLE AUTH ──────────────────────────────────────────
 let currentUser={name:'',email:'',picture:''};
-let cmdFilter=null;
 
 function parseJwt(token){
   try{return JSON.parse(atob(token.split('.')[1]));}catch(e){return {};}
@@ -3939,11 +3939,7 @@ function isAdmin() {
 function doManualLogin(){
   const inp = document.getElementById('login-name-input');
   const name = inp ? inp.value.trim() : '';
-  if (!name) {
-    // Try Google prompt as fallback
-    try { google.accounts.id.prompt(); } catch(e) {}
-    return;
-  }
+  if (!name) { try { google.accounts.id.prompt(); } catch(e) {} return; }
   currentUser = { name: name, fullName: name, email: '', picture: '' };
   sessionStorage.setItem('crm_user', JSON.stringify(currentUser));
   showUserChip();
@@ -3953,8 +3949,6 @@ function doManualLogin(){
 window.doManualLogin=doManualLogin;
 function manualSignIn(){doManualLogin();}
 async function onGoogleSignIn(response){
-  // Parse display info directly from the Google JWT
-  // Skip signInWithIdToken to avoid nonce mismatch errors
   const payload=parseJwt(response.credential);
   const firstName=(payload.name||payload.given_name||payload.email||'').split(' ')[0];
   currentUser={
@@ -3996,10 +3990,10 @@ async function signOut(){
 }
 
 // Check for an existing Supabase session on page load.
-// Restore session from sessionStorage — no Supabase auth session needed.
+// Restore session from sessionStorage only — no Supabase auth session needed.
 (function(){
   const saved = sessionStorage.getItem('crm_user');
-  if (!saved) return; // login screen stays visible
+  if (!saved) return;
   try { currentUser = JSON.parse(saved); } catch(e) { return; }
   if (currentUser.name) {
     showUserChip();
@@ -5524,6 +5518,7 @@ async function submitEditProject(){
 
 // ── FILES / DRIVE ─────────────────────────────────────────
 let currentPanelTab='tasks';
+let cmdFilter=null;
 function cmdDrilldown(filter){
   cmdFilter=cmdFilter===filter||filter==='all'?null:filter;
   renderCommand();
