@@ -2540,9 +2540,18 @@ function renderAnalytics(){
     if(btn) btn.classList.toggle('active',t===anTab);
   });
 
-  if(anTab==='leadership') renderLeadershipDashboard();
-  else if(anTab==='pipeline') renderPipelineAnalytics();
-  else renderPMAnalytics();
+  const pg=document.getElementById('an-page');
+  try {
+    if(anTab==='leadership') renderLeadershipDashboard();
+    else if(anTab==='pipeline') renderPipelineAnalytics();
+    else renderPMAnalytics();
+  } catch(e) {
+    console.error('Analytics render error:', e);
+    if(pg) pg.innerHTML=`<div style="padding:40px;color:var(--red);font-size:13px;">
+      <strong>Analytics error:</strong> ${e.message}<br>
+      <span style="font-size:11px;color:var(--text3);">Check browser console for details</span>
+    </div>`;
+  }
 }
 
 function renderLeadershipDashboard(){
@@ -3361,7 +3370,7 @@ function renderPanel(pid){
             <span style="font-weight:500;color:var(--text);">${svc.type||'Service Call'}</span>
             <span style="color:${statusColor[svc.status]||'var(--text3)'};font-size:10px;text-transform:capitalize;">${(svc.status||'').replace('_',' ')}</span>
           </div>
-          <div style="color:var(--text2);">${svc.issue?svc.issue.slice(0,60)+(svc.issue.length>60?'…':''):''}</div>
+          <div style="color:var(--text2);">${svc.issue?svc.issue.slice(0,60)+(svc.issue.length>60?'...':''):''}</div>
           ${svc.date?`<div style="color:var(--text3);font-size:10px;">${svc.date}</div>`:''}
         </div>`).join('')}
       </div>`;
