@@ -465,6 +465,9 @@ select.np-input{cursor:pointer;}
 .chat-send{font-size:11px;padding:5px 14px;border-radius:var(--radius);border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:500;}
 .chat-send:hover{opacity:.88;}
 .mention-dropdown{position:absolute;bottom:calc(100% + 4px);left:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;min-width:180px;overflow:hidden;display:none;}
+.admin-nav-item{padding:9px 16px;font-size:12px;cursor:pointer;color:var(--text2);border-left:3px solid transparent;}
+.admin-nav-item:hover{background:var(--bg2);color:var(--text);}
+.admin-nav-item.active{color:var(--green);font-weight:500;border-left-color:var(--green);background:var(--bg2);}
 .ahj-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;max-height:200px;overflow-y:auto;display:none;}
 .ahj-item{padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:0.5px solid var(--border);}
 .ahj-item:hover,.ahj-item.active{background:var(--bg2);}
@@ -738,6 +741,31 @@ select.np-input{cursor:pointer;}
     <img class="user-chip-avatar" id="user-avatar-img" style="display:none;" alt="">
     <span class="user-chip-name" id="user-chip-name"></span>
     <span class="user-chip-out" onclick="signOut()" title="Sign out">✕</span>
+  </div>
+  <button id="btn-admin" onclick="openAdmin()" title="Settings & Admin"
+    style="display:none;background:none;border:0.5px solid var(--border2);border-radius:var(--radius);padding:4px 8px;cursor:pointer;font-size:14px;color:var(--text2);">⚙</button>
+</div>
+
+<!-- ADMIN / SETTINGS OVERLAY -->
+<div id="admin-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;overflow-y:auto;">
+  <div style="background:var(--bg);border-radius:12px;max-width:900px;margin:40px auto;padding:0;position:relative;min-height:500px;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:0.5px solid var(--border2);">
+      <div style="font-size:16px;font-weight:600;color:var(--text);">⚙ Settings & Admin</div>
+      <button onclick="closeAdmin()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);">✕</button>
+    </div>
+    <div style="display:flex;flex:1;">
+      <!-- Sidebar -->
+      <div style="width:180px;border-right:0.5px solid var(--border2);padding:12px 0;flex-shrink:0;">
+        <div class="admin-nav-item active" id="anav-ahj" onclick="setAdminTab('ahj')">AHJ Manager</div>
+        <div class="admin-nav-item" id="anav-users" onclick="setAdminTab('users')">Users</div>
+        <div class="admin-nav-item" id="anav-sla" onclick="setAdminTab('sla')">SLA Thresholds</div>
+        <div class="admin-nav-item" id="anav-info" onclick="setAdminTab('info')">CRM Info</div>
+      </div>
+      <!-- Content -->
+      <div style="flex:1;padding:20px 24px;overflow-y:auto;max-height:70vh;" id="admin-content">
+        <div style="color:var(--text3);font-size:13px;">Loading...</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -3882,6 +3910,9 @@ function showUserChip(){
   } else {
     fb.textContent=(currentUser.name||'?').slice(0,2).toUpperCase();fb.style.display='flex';img.style.display='none';
   }
+  // Show gear icon for admins only
+  const adminBtn=document.getElementById('btn-admin');
+  if(adminBtn) adminBtn.style.display=isAdmin()?'block':'none';
   chip.style.display='flex';
 }
 
@@ -4006,10 +4037,279 @@ function chatKeydown(e,pid){
     if(e.key==='ArrowDown'){e.preventDefault();mentionSelectedIdx=Math.min(mentionSelectedIdx+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('active',i===mentionSelectedIdx));return;}
     if(e.key==='ArrowUp'){e.preventDefault();mentionSelectedIdx=Math.max(mentionSelectedIdx-1,0);items.forEach((el,i)=>el.classList.toggle('active',i===mentionSelectedIdx));return;}
     if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();const active=dd.querySelector('.mention-item.active');if(active) active.dispatchEvent(new MouseEvent('mousedown'));return;}
-    if(e.key==='Escape'){dd.style.display='none';mentionActive=false;return;}
+    if(e.key==='Escape'){
+    if(document.getElementById('admin-overlay').style.display!=='none'){closeAdmin();return;}dd.style.display='none';mentionActive=false;return;}
   }
   // Enter sends, Shift+Enter = newline
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat(pid);}
+}
+
+// ── ADMIN / SETTINGS ─────────────────────────────────────────────────────────
+const ADMIN_USERS = ['greg kelsch', 'heidi guevara', 'heidi hildreth'];
+let _adminTab = 'ahj';
+
+function isAdmin() {
+  const name = (currentUser.name || '').toLowerCase();
+  return ADMIN_USERS.some(u => name.includes(u.split(' ')[0]) || u.includes(name.split(' ')[0]));
+}
+
+function openAdmin() {
+  if (!isAdmin()) { showToast('Admin access restricted'); return; }
+  document.getElementById('admin-overlay').style.display = 'block';
+  setAdminTab(_adminTab);
+}
+
+function closeAdmin() {
+  document.getElementById('admin-overlay').style.display = 'none';
+}
+
+function setAdminTab(tab) {
+  _adminTab = tab;
+  document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
+  const navEl = document.getElementById('anav-' + tab);
+  if (navEl) navEl.classList.add('active');
+  renderAdminTab(tab);
+}
+
+async function renderAdminTab(tab) {
+  const el = document.getElementById('admin-content');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--text3);padding:20px;">Loading...</div>';
+
+  if (tab === 'ahj') await renderAdminAHJ(el);
+  else if (tab === 'users') renderAdminUsers(el);
+  else if (tab === 'sla') renderAdminSLA(el);
+  else if (tab === 'info') renderAdminInfo(el);
+}
+
+// ── AHJ MANAGER ───────────────────────────────────────────────────────────────
+let _ahjSearch = '', _ahjPage = 0, _ahjEditId = null;
+const AHJ_PAGE_SIZE = 20;
+
+async function renderAdminAHJ(el, search, page) {
+  if (search !== undefined) _ahjSearch = search;
+  if (page !== undefined) _ahjPage = page;
+
+  const q = sb.from('ahjs').select('id,name,state,permit_phone,permit_website,max_duration,electric_code', {count:'exact'})
+    .order('name');
+  if (_ahjSearch) q.ilike('name', `%${_ahjSearch}%`);
+  const from = _ahjPage * AHJ_PAGE_SIZE;
+  q.range(from, from + AHJ_PAGE_SIZE - 1);
+
+  const { data, error, count } = await q;
+  if (error) { el.innerHTML = `<div style="color:var(--red);">Error: ${error.message}</div>`; return; }
+
+  const totalPages = Math.ceil(count / AHJ_PAGE_SIZE);
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+      <input type="text" value="${escapeHtml(_ahjSearch)}" placeholder="Search AHJs..."
+        oninput="renderAdminAHJ(document.getElementById('admin-content'),this.value,0)"
+        style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);">
+      <span style="font-size:11px;color:var(--text3);">${count} AHJs</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Name</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Electric Code</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Phone</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Turnaround</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);"></th>
+      </tr></thead>
+      <tbody>
+        ${(data||[]).map((a,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
+          <td style="padding:8px 10px;font-weight:500;">${escapeHtml(a.name)}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${a.electric_code||'—'}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${a.permit_phone||'—'}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${a.max_duration?a.max_duration+'d':'—'}</td>
+          <td style="padding:8px 10px;">
+            <button onclick="openAhjEdit('${a.id}')"
+              style="font-size:10px;padding:3px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;color:var(--text);">Edit</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    ${totalPages > 1 ? `<div style="display:flex;gap:6px;margin-top:12px;align-items:center;justify-content:center;">
+      <button onclick="renderAdminAHJ(document.getElementById('admin-content'),undefined,${_ahjPage-1})"
+        ${_ahjPage===0?'disabled':''} style="padding:4px 10px;font-size:11px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;">← Prev</button>
+      <span style="font-size:11px;color:var(--text3);">Page ${_ahjPage+1} of ${totalPages}</span>
+      <button onclick="renderAdminAHJ(document.getElementById('admin-content'),undefined,${_ahjPage+1})"
+        ${_ahjPage>=totalPages-1?'disabled':''} style="padding:4px 10px;font-size:11px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;">Next →</button>
+    </div>` : ''}
+    <div id="ahj-edit-panel" style="display:none;margin-top:20px;padding:16px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);"></div>
+  `;
+}
+
+async function openAhjEdit(id) {
+  _ahjEditId = id;
+  const panel = document.getElementById('ahj-edit-panel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="color:var(--text3);font-size:12px;">Loading...</div>';
+
+  const { data, error } = await sb.from('ahjs').select('*').eq('id', id).single();
+  if (error || !data) { panel.innerHTML = '<div style="color:var(--red);">Error loading AHJ</div>'; return; }
+
+  const field = (key, label, type='text') => `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
+      ${type === 'textarea'
+        ? `<textarea id="ahjedit-${key}" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text);resize:vertical;min-height:80px;box-sizing:border-box;">${escapeHtml(data[key]||'')}</textarea>`
+        : `<input type="${type}" id="ahjedit-${key}" value="${escapeHtml(String(data[key]||''))}"
+            style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;">`
+      }
+    </div>`;
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">${escapeHtml(data.name)}</div>
+      <button onclick="document.getElementById('ahj-edit-panel').style.display='none'"
+        style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--text2);">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;">
+      ${field('permit_phone','Permit Phone')}
+      ${field('permit_website','Permit Website')}
+      ${field('max_duration','Max Turnaround (days)','number')}
+      ${field('electric_code','Electric Code')}
+      ${field('building_code','Building Code')}
+      ${field('fire_code','Fire Code')}
+      ${field('permit_username','Portal Username')}
+      ${field('permit_password','Portal Password')}
+      ${field('inspection_portal','Inspection Portal')}
+      ${field('inspection_login','Inspection Login')}
+      ${field('inspection_password','Inspection Password')}
+      ${field('inspection_email','Inspection Email')}
+    </div>
+    <div style="grid-column:1/-1;">
+      ${field('permit_notes','Permit Notes','textarea')}
+      ${field('inspection_notes','Inspection Notes','textarea')}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button onclick="saveAhjEdit('${id}')"
+        style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">Save Changes</button>
+      <button onclick="document.getElementById('ahj-edit-panel').style.display='none'"
+        style="padding:8px 16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
+    </div>
+  `;
+}
+
+async function saveAhjEdit(id) {
+  const get = key => {
+    const el = document.getElementById('ahjedit-' + key);
+    return el ? el.value.trim() || null : null;
+  };
+  const update = {
+    permit_phone:        get('permit_phone'),
+    permit_website:      get('permit_website'),
+    max_duration:        get('max_duration') ? parseInt(get('max_duration')) : null,
+    electric_code:       get('electric_code'),
+    building_code:       get('building_code'),
+    fire_code:           get('fire_code'),
+    permit_username:     get('permit_username'),
+    permit_password:     get('permit_password'),
+    inspection_portal:   get('inspection_portal'),
+    inspection_login:    get('inspection_login'),
+    inspection_password: get('inspection_password'),
+    inspection_email:    get('inspection_email'),
+    permit_notes:        get('permit_notes'),
+    inspection_notes:    get('inspection_notes'),
+  };
+  const { error } = await sb.from('ahjs').update(update).eq('id', id);
+  if (error) { showToast('Save failed: ' + error.message); return; }
+
+  // Bust AHJ cache for this record
+  Object.keys(ahjCache).forEach(k => { if (ahjCache[k].id === id) delete ahjCache[k]; });
+  showToast('AHJ saved');
+  document.getElementById('ahj-edit-panel').style.display = 'none';
+}
+
+// ── USER MANAGER ──────────────────────────────────────────────────────────────
+function renderAdminUsers(el) {
+  el.innerHTML = `
+    <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:16px;">Team Members</div>
+    <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Current team (from CRM config):</div>
+      ${TEAM_COLORS.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border);">
+          <div style="width:28px;height:28px;border-radius:50%;background:${t.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex-shrink:0;">${teamInitials(t.name)}</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;color:var(--text);">${t.name}</div>
+            <div style="font-size:10px;color:var(--text3);">${TEAM_EMAILS[t.name]||'No email configured'}</div>
+          </div>
+          <div style="font-size:10px;padding:2px 8px;border-radius:8px;background:${ADMIN_USERS.some(u=>u.includes(t.name.toLowerCase().split(' ')[0]))?'var(--green-bg)':'var(--bg2)'};color:${ADMIN_USERS.some(u=>u.includes(t.name.toLowerCase().split(' ')[0]))?'var(--green)':'var(--text3)'};">
+            ${ADMIN_USERS.some(u=>u.includes(t.name.toLowerCase().split(' ')[0]))?'Admin':'Member'}
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--text3);padding:10px;background:var(--bg2);border-radius:var(--radius);">
+      Full user management with login control, role assignment, and permissions is coming in the next session.
+    </div>
+  `;
+}
+
+// ── SLA THRESHOLDS ────────────────────────────────────────────────────────────
+function renderAdminSLA(el) {
+  const SLA = {
+    evaluation: {sla:3,  risk:4,  crit:6,  label:'Evaluation'},
+    survey:     {sla:3,  risk:5,  crit:10, label:'Site Survey'},
+    design:     {sla:3,  risk:5,  crit:10, label:'Design'},
+    permit:     {sla:21, risk:30, crit:45, label:'Permitting'},
+    install:    {sla:5,  risk:7,  crit:10, label:'Installation'},
+    inspection: {sla:14, risk:21, crit:30, label:'Inspection'},
+    complete:   {sla:3,  risk:5,  crit:7,  label:'Completion'},
+  };
+  el.innerHTML = `
+    <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px;">SLA Thresholds</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:16px;">Days in stage before status changes color. Green → Amber → Orange → Red.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:var(--bg2);">
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Stage</th>
+        <th style="padding:8px 12px;text-align:center;font-weight:500;color:var(--green);">Target (green)</th>
+        <th style="padding:8px 12px;text-align:center;font-weight:500;color:var(--amber);">At Risk (amber)</th>
+        <th style="padding:8px 12px;text-align:center;font-weight:500;color:var(--red);">Critical (red)</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(SLA).map(([key,s],i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
+          <td style="padding:8px 12px;font-weight:500;">${s.label}</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--green);">${s.sla}d</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--amber);">${s.risk}d</td>
+          <td style="padding:8px 12px;text-align:center;color:var(--red);">${s.crit}d</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="font-size:11px;color:var(--text3);margin-top:12px;padding:10px;background:var(--bg2);border-radius:var(--radius);">
+      Editable SLA thresholds coming soon — will update in real time across all views.
+    </div>
+  `;
+}
+
+// ── CRM INFO ──────────────────────────────────────────────────────────────────
+function renderAdminInfo(el) {
+  const active = projects.filter(p=>p.stage!=='complete').length;
+  const completed = projects.filter(p=>p.stage==='complete').length;
+  const totalNotes = Object.values(notes).reduce((a,n)=>a+n.length,0);
+  const linked = Object.values(projectFolders).filter(f=>f.folderUrl).length;
+  el.innerHTML = `
+    <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:16px;">CRM Info</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      ${[
+        ['Total projects', projects.length],
+        ['Active', active],
+        ['Completed', completed],
+        ['Notes in DB', totalNotes.toLocaleString()],
+        ['Drive folders linked', linked + ' / ' + projects.length],
+        ['AHJs in database', '1,633 (TX)'],
+      ].map(([label,val])=>`<div style="padding:12px 14px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border2);">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">${label}</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);">${val}</div>
+      </div>`).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--text2);padding:12px;background:var(--bg2);border-radius:var(--radius);">
+      <div style="margin-bottom:6px;"><strong>Repo:</strong> github.com/microGRID26/trismart-crm</div>
+      <div style="margin-bottom:6px;"><strong>Supabase:</strong> hzymsezqfxzpbcqryeim.supabase.co</div>
+      <div><strong>Deployed:</strong> microgrid26.github.io/trismart-crm</div>
+    </div>
+  `;
 }
 
 // ── AHJ AUTOCOMPLETE ─────────────────────────────────────────────────────────
