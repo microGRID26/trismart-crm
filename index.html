@@ -3272,8 +3272,9 @@ function renderPMAnalytics(){
 // ── PANEL ─────────────────────────────────────────────────
 function renderPanel(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
-  if(p.ahj) loadAhjForProject(p.ahj);
-  if(p.utility) loadUtilityForProject(p.utility);
+  // Load AHJ and utility data async, then re-render permitting section
+  if(p.ahj) loadAhjForProject(p.ahj).then(()=>refreshPermittingSection(pid));
+  if(p.utility) loadUtilityForProject(p.utility).then(()=>refreshPermittingSection(pid));
   const sla=getSLA(p);const pr=getProgress(pid);
   const s=STAGES.find(x=>x.id===p.stage);const cycle=cycleDays(p);
   const pNotes=notes[pid]||[];const pHistory=stageHistory[pid]||[];
@@ -3341,7 +3342,7 @@ function renderPanel(pid){
       ${frow('ESID', p.esid)}
     </div>
     <div class="sec"><div class="sec-title">Permitting</div>
-      ${p.ahj ? `<div class="frow"><span class="flabel">AHJ</span><span class="fval">${isAdmin() && ahjCache[p.ahj.toLowerCase()] ? `<span onclick="openAdminToAHJ('${p.ahj.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open in Admin">${escapeHtml(p.ahj)}</span>` : escapeHtml(p.ahj)}</span></div>` : ''}
+      ${p.ahj ? `<div class="frow"><span class="flabel">AHJ</span><span class="fval">${isAdmin() ? `<span onclick="openAdminToAHJ('${p.ahj.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open in Admin">${escapeHtml(p.ahj)}</span>` : escapeHtml(p.ahj)}</span></div>` : ''}
       ${(()=>{
         const ahj=p.ahj?ahjCache[p.ahj.toLowerCase()]:null;
         if(!ahj) return '';
@@ -4007,7 +4008,17 @@ const TEAM=[
   {name:'Mark',   color:'#2C7A4B'},
   // Add new team members here — they'll appear in @mention autocomplete
 ];
-function teamColor(name){return (TEAM.find(t=>t.name===name)||{color:'#999'}).color;}
+function teamColor(name){
+  if(!name) return '#999';
+  // Exact match first
+  let t=TEAM.find(t=>t.name===name);
+  if(!t){
+    // First-name match (handles "Ari Ruelas" → "Ari")
+    const first=(name||'').split(' ')[0].toLowerCase();
+    t=TEAM.find(t=>t.name.toLowerCase()===first||t.name.toLowerCase().split(' ')[0]===first);
+  }
+  return (t||{color:'#999'}).color;
+}
 function teamInitials(name){return name.slice(0,2).toUpperCase();}
 
 function renderChatMessages(msgs){
@@ -4240,6 +4251,22 @@ async function openAhjEdit(id) {
     </div>
   `;
 }
+
+function refreshPermittingSection(pid) {
+  // Re-render only the panel left column after async AHJ/utility data loads
+  // Only if this project is still open
+  if (selectedId !== pid) return;
+  const p = projectMap[String(pid)];
+  if (!p) return;
+  // Re-render just the permitting frows by triggering a full panel re-render
+  // Use a flag to avoid infinite loop
+  if (_permittingRefreshTimer) return;
+  _permittingRefreshTimer = setTimeout(() => {
+    _permittingRefreshTimer = null;
+    if (selectedId === pid) renderPanel(pid);
+  }, 100);
+}
+let _permittingRefreshTimer = null;
 
 function closeAhjModal() {
   document.getElementById('ahj-edit-modal').style.display = 'none';
@@ -4926,14 +4953,20 @@ function closeUtilityDropdown() {
 async function loadUtilityForProject(utilityName) {
   if (!utilityName || utilityCache[utilityName.toLowerCase()]) return;
   try {
-    const res = await sb.from('utilities').select('*').ilike('name', utilityName).limit(1);
+    // Try exact, then starts-with, then contains
+    let res = await sb.from('utilities').select('*').ilike('name', utilityName).limit(1);
+    if (!res.data?.length) res = await sb.from('utilities').select('*').ilike('name', `${utilityName}%`).limit(1);
+    if (!res.data?.length) res = await sb.from('utilities').select('*').ilike('name', `%${utilityName}%`).limit(1);
     if (res.data?.length) utilityCache[utilityName.toLowerCase()] = res.data[0];
   } catch(e) {}
 }
 
 async function openAdminToUtility(utilityName) {
   if (!isAdmin()) return;
-  const { data } = await sb.from('utilities').select('id').ilike('name', utilityName).limit(1);
+  let data;
+  ({data} = await sb.from('utilities').select('id').ilike('name', utilityName).limit(1));
+  if (!data?.length) ({data} = await sb.from('utilities').select('id').ilike('name', `${utilityName}%`).limit(1));
+  if (!data?.length) ({data} = await sb.from('utilities').select('id').ilike('name', `%${utilityName}%`).limit(1));
   if (data?.length) openUtilityEdit(data[0].id);
   else showToast('Utility not found in database: ' + utilityName);
 }
@@ -4988,7 +5021,9 @@ function sendMentionEmails(pid, text, senderName) {
 
   mentioned.forEach(name => {
     // Case-insensitive match against team
-    const key = Object.keys(TEAM_EMAILS).find(k => k.toLowerCase() === name.toLowerCase());
+    // Exact match first, then first-name match
+    let key = Object.keys(TEAM_EMAILS).find(k => k.toLowerCase() === name.toLowerCase());
+    if (!key) key = Object.keys(TEAM_EMAILS).find(k => k.toLowerCase().split(' ')[0] === name.toLowerCase());
     if (!key) return;
     if (key === senderName) return; // don't email yourself
     const email = TEAM_EMAILS[key];
