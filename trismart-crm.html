@@ -2847,6 +2847,7 @@ function renderLeadershipDashboard(){
     </div>`;
 
   // Dealer breakdown row
+  const dealers=[...new Set(vis.map(p=>p.dealer).filter(Boolean))].sort();
   const dealerStats=dealers.map(d=>{
     const dp=vis.filter(p=>p.dealer===d);
     const val=dp.reduce((a,p)=>a+(Number(p.contract)||0),0);
@@ -2990,6 +2991,13 @@ function renderPipelineAnalytics(){
       <div class="kpi-trend ${avgCycle>60?'bad':avgCycle>45?'warn':'ok'}">${avgCycle>60?'Above benchmark':avgCycle>45?'Approaching benchmark':'Healthy pace'}</div>
     </div>
   </div>`;
+
+  // Interventions -- blocked + crit + at-risk projects
+  const interventions=vis.filter(p=>p.blocker||getSLA(p).status==='crit'||getSLA(p).status==='risk')
+    .sort((a,b)=>{
+      const rank=p=>p.blocker?0:getSLA(p).status==='crit'?1:2;
+      return rank(a)-rank(b)||(Number(b.contract)||0)-(Number(a.contract)||0);
+    });
 
   // Row 2: Revenue forecast
   const fcTotal=fc14Val+fc30Val+fc60Val;
