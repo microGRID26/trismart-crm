@@ -4076,21 +4076,13 @@ function isAdmin() {
 
 async function openAdminToAHJ(ahjName) {
   if (!isAdmin()) return;
-  document.getElementById('admin-overlay').style.display = 'block';
-  setAdminTab('ahj');
-  // Wait for tab to render then search and open the matching AHJ
-  setTimeout(async () => {
-    const searchInput = document.querySelector('#admin-content input[placeholder="Search AHJs..."]');
-    if (searchInput) {
-      searchInput.value = ahjName;
-      await renderAdminAHJ(document.getElementById('admin-content'), ahjName, 0);
-      // Auto-open edit if exactly one result
-      setTimeout(async () => {
-        const { data } = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1);
-        if (data?.length) openAhjEdit(data[0].id);
-      }, 300);
-    }
-  }, 200);
+  // Look up the AHJ and open the edit modal directly — no need to open admin panel
+  const { data } = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1);
+  if (data?.length) {
+    openAhjEdit(data[0].id);
+  } else {
+    showToast('AHJ not found in database: ' + ahjName);
+  }
 }
 
 function openAdmin() {
