@@ -4125,8 +4125,11 @@ async function openAdminToAHJ(ahjName) {
 
 function openAdmin() {
   if (!isAdmin()) { showToast('Admin access restricted'); return; }
+  // Reset search state so admin opens fresh each time
+  _ahjSearch = ''; _ahjPage = 0;
+  _utilitySearch = ''; _utilityPage = 0;
+  _usersData = null;
   document.getElementById('admin-overlay').style.display = 'block';
-  // Reset all nav items before setting active
   document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
   setAdminTab(_adminTab);
 }
@@ -4150,7 +4153,7 @@ async function renderAdminTab(tab) {
 
   if (tab === 'ahj') await renderAdminAHJ(el);
   else if (tab === 'utility') await renderAdminUtility(el);
-  else if (tab === 'users') renderAdminUsers(el);
+  else if (tab === 'users') await renderAdminUsers(el);
   else if (tab === 'crews') renderAdminCrews(el);
   else if (tab === 'sla') renderAdminSLA(el);
   else if (tab === 'info') renderAdminInfo(el);
@@ -4164,9 +4167,9 @@ async function renderAdminAHJ(el, search, page) {
   if (search !== undefined) _ahjSearch = search;
   if (page !== undefined) _ahjPage = page;
 
-  const q = sb.from('ahjs').select('id,name,state,permit_phone,permit_website,max_duration,electric_code', {count:'exact'})
+  const q = sb.from('ahjs').select('id,name,state,city,county,permit_phone,permit_website,max_duration,electric_code', {count:'exact'})
     .order('name');
-  if (_ahjSearch) q.ilike('name', `%${_ahjSearch}%`);
+  if (_ahjSearch) q.or(`name.ilike.%${_ahjSearch}%,city.ilike.%${_ahjSearch}%,county.ilike.%${_ahjSearch}%`);
   const from = _ahjPage * AHJ_PAGE_SIZE;
   q.range(from, from + AHJ_PAGE_SIZE - 1);
 
@@ -4185,6 +4188,7 @@ async function renderAdminAHJ(el, search, page) {
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Name</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">City</th>
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Phone</th>
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Portal</th>
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Days</th>
@@ -4194,6 +4198,7 @@ async function renderAdminAHJ(el, search, page) {
       <tbody>
         ${(data||[]).map((a,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
           <td style="padding:8px 10px;font-weight:500;">${escapeHtml(a.name)}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${a.city||a.county||'—'}</td>
           <td style="padding:8px 10px;color:var(--text2);">${a.permit_phone||'—'}</td>
           <td style="padding:8px 10px;">${a.permit_website?`<a href="${a.permit_website.match(/^https?:\/\//)?a.permit_website:'https://'+a.permit_website}" target="_blank" rel="noopener" style="color:var(--green);font-size:11px;">Open ↗</a>`:`—`}</td>
           <td style="padding:8px 10px;color:var(--text2);">${a.max_duration?a.max_duration+'d':'—'}</td>
@@ -4250,8 +4255,8 @@ async function openAhjEdit(id) {
   body.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;">
       <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);">Permit Info</div>
-      ${field('permit_phone','Permit Phone')}
-      ${field('permit_website','Permit Website')}
+      ${field('permit_phone','Permit Phone','tel')}
+      ${field('permit_website','Permit Website','url')}
       ${field('max_duration','Turnaround Days','number')}
       ${field('electric_code','Electric Code')}
       ${field('building_code','Building Code')}
@@ -4260,11 +4265,15 @@ async function openAhjEdit(id) {
       ${field('permit_password','Portal Password','password')}
       ${field('permit_notes','Permit Notes','textarea',true)}
       <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);margin-top:8px;">Inspection Info</div>
-      ${field('inspection_portal','Inspection Portal')}
+      ${field('inspection_portal','Inspection Portal','url')}
       ${field('inspection_login','Inspection Login')}
       ${field('inspection_password','Inspection Password','password')}
-      ${field('inspection_email','Inspection Email')}
+      ${field('inspection_email','Inspection Email','email')}
       ${field('inspection_notes','Inspection Notes','textarea',true)}
+      <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);margin-top:8px;">Requirements</div>
+      ${field('plans_on_site','Plans on Site')}
+      ${field('host_type_required','Host Type Required')}
+      ${field('how_to_request','How to Request','textarea',true)}
     </div>
   `;
 }
@@ -4434,8 +4443,8 @@ async function openUtilityEdit(id) {
       ${field('name','Name')}
       ${field('short_name','Short Name')}
       ${field('state','State(s)')}
-      ${field('phone','Phone')}
-      ${field('website','Website / Portal')}
+      ${field('phone','Phone','tel')}
+      ${field('website','Website / Portal','url')}
       ${field('notes','Notes','textarea',true)}
     </div>`;
 }
@@ -4559,9 +4568,9 @@ async function openUserModal(id) {
         ${opts.map(o=>`<option value="${o}"${data[key]===o?' selected':''}>${o}</option>`).join('')}
       </select></div>`;
 
-  const chk = (key, label) =>
+  const chk = (key, label, defaultOn=false) =>
     `<div style="display:flex;align-items:center;gap:8px;">
-      <input type="checkbox" id="ue-${key}" ${data[key]?' checked':''} style="width:16px;height:16px;cursor:pointer;">
+      <input type="checkbox" id="ue-${key}" ${(data[key]||(defaultOn&&!_userEditId))?' checked':''} style="width:16px;height:16px;cursor:pointer;">
       <div style="font-size:12px;color:var(--text);">${label}</div></div>`;
 
   document.getElementById('ahj-modal-body').innerHTML = `
@@ -4569,11 +4578,12 @@ async function openUserModal(id) {
       <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);">Personal Info</div>
       ${inp('name','Full Name')}
       ${inp('email','Email','email')}
-      ${inp('phone','Phone')}
+      ${inp('phone','Phone','tel')}
       <div style="margin-bottom:2px;">
         <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">Avatar Color</div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="color" id="ue-color" value="${data.color||'#1D9E75'}"
+            oninput="document.getElementById('ue-color-hex').value=this.value"
             style="width:40px;height:34px;padding:2px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);cursor:pointer;">
           <input type="text" id="ue-color-hex" value="${escapeHtml(data.color||'#1D9E75')}"
             oninput="document.getElementById('ue-color').value=this.value"
@@ -4585,7 +4595,7 @@ async function openUserModal(id) {
       ${sel('position','Position',POSITIONS)}
       <div style="grid-column:1/-1;display:flex;gap:24px;margin-top:4px;">
         ${chk('is_admin','Admin access (can access Settings)')}
-        ${chk('is_active','Active user')}
+        ${chk('is_active','Active user',true)}
       </div>
     </div>`;
 }
