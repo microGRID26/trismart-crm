@@ -2163,7 +2163,7 @@ function renderCommand(){
     if(!list.length) return '<div class="none-msg">None</div>';
     return list.map(p=>{
       const sla=getSLA(p);const s=STAGES.find(x=>x.id===p.stage);
-      const issue=p.blocker?p.blocker:sla.status==='crit'?`Past critical (${sla.crit}d)`:sla.status==='risk'?`Approaching critical at ${sla.crit}d`:sla.status==='warn'?`Past target of ${sla.sla}d`:`Stalled ${sla.days}d`;
+      const issue=p.blocker?escapeHtml(p.blocker):sla.status==='crit'?`Past critical (${sla.crit}d)`:sla.status==='risk'?`Approaching critical at ${sla.crit}d`:sla.status==='warn'?`Past target of ${sla.sla}d`:`Stalled ${sla.days}d`;
       const mentionBadge=hasMention(p.id)?'<span class="mention-badge">@you</span>':'';
       const nc=notesCount(p.id);
       const notesBadge=nc?`<span style="font-size:10px;background:var(--bg2);color:var(--text3);padding:1px 6px;border-radius:8px;flex-shrink:0;">💬 ${nc}</span>`:'';
@@ -2324,7 +2324,7 @@ function renderQueue(){
   function qcard({p,sla,tasks,hasOverdue,hasToday}){
     const cycle=cycleDays(p);
     const borderCls=p.blocker?'is-blocked':hasOverdue?'has-overdue':hasToday?'has-today':'';
-    const blockerHTML=p.blocker?`<div class="blocker-bar"><span class="blocker-label">Blocked:</span><span class="blocker-text">${p.blocker}</span></div>`:'';
+    const blockerHTML=p.blocker?`<div class="blocker-bar"><span class="blocker-label">Blocked:</span><span class="blocker-text">${escapeHtml(p.blocker)}</span></div>`:'';
     const taskHTML=tasks.length
       ?tasks.map(x=>taskRow(p.id,x)).join('')
       :`<div class="queue-empty-section">No active tasks — open project for full list</div>`;
@@ -3816,7 +3816,7 @@ const TEAM=[
   {name:'Heidi',  color:'#534AB7'},
   {name:'Ari',    color:'#0C447C'},
   {name:'Jen',    color:'#BA7517'},
-  {name:'Will',   color:'#0C447C'},
+  {name:'Will',   color:'#0D7377'},
   {name:'Taylor', color:'#7C3AED'},
   {name:'Aaron',  color:'#CF5A1A'},
   {name:'Zach',   color:'#E24B4A'},
@@ -4328,31 +4328,7 @@ function renderPanelSchedule(pid){
       <div style="display:flex;flex-direction:column;gap:4px;">${past.map((j,i)=>jobRow(j,i)).join('')}</div>`:''}
   </div>`;
 }
-function renderFilesSection(pid){
-  const container=document.getElementById('files-tab-container-'+pid);
-  if(container) renderFilesSectionInto(pid,container);
-}
-function renderFilesSectionInto(pid,container){
-  if(!container) return;
-  const folder=projectFolders[pid];
-  if(!folder||!folder.folderUrl){
-    container.innerHTML=`
-      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Paste a Google Drive folder URL to link files for this project.</div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input type="text" id="folder-url-input-${pid}" placeholder="https://drive.google.com/drive/folders/..."
-          style="flex:1;font-size:11px;padding:6px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);">
-        <button class="files-btn primary" onclick="saveFolderUrl('${pid}')">Save</button>
-      </div>
-      <div style="font-size:10px;color:var(--text3);margin-top:4px;">Create a folder in Drive → right-click → Share → Copy link → paste above.</div>`;
-  } else {
-    container.innerHTML=`
-      <div class="files-folder-bar">
-        <span class="files-folder-name">📁 Drive folder linked</span>
-        <a href="${folder.folderUrl}" target="_blank" class="files-btn">Open Folder ↗</a>
-        <button class="files-btn" onclick="clearFolderUrl('${pid}')" style="color:var(--text3);">✕ Remove</button>
-      </div>`;
-  }
-}
+// renderFilesSection / renderFilesSectionInto removed — superseded by renderPanelFiles()
 
 async function saveFolderUrl(pid){
   const inp=document.getElementById('folder-url-input-'+pid);
@@ -4360,7 +4336,7 @@ async function saveFolderUrl(pid){
   if(!url||!url.includes('drive.google.com')){showToast('Paste a valid Google Drive URL');return;}
   projectFolders[pid]={folderUrl:url,folderId:''};
   try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');stored[pid]=url;localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
-  renderFilesSection(pid);
+  renderPanelFiles(pid);
   showToast('Drive folder linked');
   post({action:'saveFolder',projectId:pid,folderUrl:url});
 }
@@ -4368,10 +4344,10 @@ function clearFolderUrl(pid){
   if(!confirm('Remove the Drive folder link for this project?')) return;
   delete projectFolders[pid];
   try{const stored=JSON.parse(localStorage.getItem('microgrid_folders')||'{}');delete stored[pid];localStorage.setItem('microgrid_folders',JSON.stringify(stored));}catch(e){}
-  renderFilesSection(pid);
+  renderPanelFiles(pid);
   post({action:'deleteFolder',projectId:pid});
 }
-async function loadProjectFiles(pid){}
+// loadProjectFiles() removed — file loading handled by renderPanelFiles()
 // ── TASK AUDIT ────────────────────────────────────────────
 function renderAudit(){
   const pg=document.getElementById('audit-page');if(!pg) return;
@@ -4648,7 +4624,7 @@ function renderSchedule(){
 
   // City list from projects that appear in schedule
   const schedPids=new Set(schedule.map(s=>String(s.projectId)));
-  const cities=[...new Set([...schedPids].map(pid=>{const p=projects.find(x=>String(x.id)===pid);return p?p.city:'';}).filter(Boolean))].sort();
+  const cities=[...new Set([...schedPids].map(pid=>{const p=projectMap[String(pid)];return p?p.city:'';}).filter(Boolean))].sort();
 
   // Master job filter
   // Build O(1) lookup map once: key = crewId+'|'+date -> sorted jobs array
@@ -4927,7 +4903,7 @@ function amSearchProjects(q){
     ? projects.filter(p=>{
         const hay=(p.name+' '+p.id+' '+p.city+' '+(p.pm||'')).toLowerCase();
         return terms.every(t=>hay.includes(t));
-      }).slice(0,20)
+      }).sort((a,b)=>(a.stage==='complete'?1:0)-(b.stage==='complete'?1:0)).slice(0,20)
     : projects.filter(p=>p.stage!=='complete').slice(0,20);
 
   if(!matches.length){
@@ -4951,10 +4927,7 @@ function amSearchKeydown(e){
   const opts=drop?drop.querySelectorAll('.am-search-opt'):[];
   if(e.key==='ArrowDown'){e.preventDefault();amSearchIdx=Math.min(amSearchIdx+1,opts.length-1);opts.forEach((o,i)=>o.classList.toggle('active',i===amSearchIdx));}
   else if(e.key==='ArrowUp'){e.preventDefault();amSearchIdx=Math.max(amSearchIdx-1,0);opts.forEach((o,i)=>o.classList.toggle('active',i===amSearchIdx));}
-  else if(e.key==='Enter'&&amSearchIdx>=0){e.preventDefault();const pid=projects.filter(p=>{
-    const q=document.getElementById('am-project-search').value.toLowerCase();
-    return (p.name+' '+p.id+' '+p.city).toLowerCase().includes(q);
-  })[amSearchIdx]?.id;if(pid) amSelectProject(pid);}
+  else if(e.key==='Enter'&&amSearchIdx>=0){e.preventDefault();const activeOpt=opts[amSearchIdx];if(activeOpt) activeOpt.dispatchEvent(new MouseEvent('mousedown'));}
   else if(e.key==='Escape'){if(drop) drop.style.display='none';}
 }
 
@@ -4984,7 +4957,7 @@ function amClearProject(){
 
 function updateAmProjectInfo(){
   const pid=document.getElementById('am-project-id').value;
-  const p=projects.find(x=>String(x.id)===String(pid));
+  const p=projectMap[String(pid)]||null;
   const el=document.getElementById('am-project-info');
   if(!el) return;
   if(!p){el.style.display='none';return;}
@@ -5017,7 +4990,7 @@ function openAssignModal(crewId,dateIso,schedId,preProjectId,preJobType){
   // Pre-fill project
   const fillPid=preProjectId||(existing?existing.projectId:null);
   if(fillPid){
-    const fp=projects.find(x=>String(x.id)===String(fillPid));
+    const fp=projectMap[String(fillPid)]||null;
     if(fp){
       pidInp.value=fp.id;
       if(selName) selName.textContent=`${fp.name} (${fp.id})`;
@@ -5546,15 +5519,14 @@ function getFundingStatus(pid, milestone) {
   // Auto-derive eligibility from task completion
   if (milestone === 'm2') {
     const installDone = ts(pid, 'install_done') === 'Complete';
-    // Also check milestone date as fallback for projects loaded without opening panel
-    const p2 = projects.find(x=>x.id===pid);
+    const p2 = projectMap[String(pid)];
     const hasInstallDate = p2 && p2.installCompleteDate;
     _fsCache[ckey] = (installDone || hasInstallDate) ? 'eligible' : 'not_eligible';
     return _fsCache[ckey];
   }
   if (milestone === 'm3') {
     const pto = ts(pid, 'pto') === 'Complete';
-    const p2 = projects.find(x=>x.id===pid);
+    const p2 = projectMap[String(pid)];
     const hasPtoDate = p2 && p2.ptoDate;
     _fsCache[ckey] = (pto || hasPtoDate) ? 'eligible' : 'not_eligible';
     return _fsCache[ckey];
@@ -6096,6 +6068,16 @@ const HELP_CONTENT = {
             "Pipeline Analytics tab no longer crashes when visited before Leadership tab (inRange scope fix)",
             "Completion modal now busts funding cache and syncs projectMap",
             "hasMention() memoized — Command Center renders 487x faster on @mention check",
+            "Drive folder link/unlink now correctly refreshes the Files tab (was silently failing)",
+            "Escape key now closes New Project modal and Funding modal",
+            "Removed 3 dead code stubs: loadProjectFiles, renderFilesSection, renderFilesSectionInto",
+            "Schedule assign modal project lookup uses O(1) projectMap instead of linear scan",
+            "Schedule assign modal Enter key now selects the correct highlighted result",
+            "Schedule project search now surfaces active projects before completed ones",
+            "Will avatar color fixed (was identical to Ari)",
+            "getFundingStatus now uses O(1) projectMap — eliminates linear scan on every funding eligibility check",
+            "Schedule assign modal and city list use projectMap instead of linear scan",
+            "Blocker text now HTML-escaped in Command Center and Queue view",
             "New project form now captures Dealer, Module, Inverter, Battery, Financing Type",
             "completedDate written to DB in ISO format (was locale string — caused sort/display issues)",
             "Date display in project panel no longer shifts one day back in US timezones",
@@ -6761,6 +6743,8 @@ document.addEventListener('keydown',function(e){
 
   // Escape — close panel or modal
   if(e.key==='Escape'){
+    if(document.getElementById('np-overlay').style.display!=='none'){closeNewProject();return;}
+    if(document.getElementById('funding-modal').style.display!=='none'){closeFundingModal();return;}
     if(document.getElementById('pmr-overlay').style.display!=='none'){closePMRebalance();return;}
     if(document.getElementById('svc-overlay').style.display!=='none'){closeSvcModal();return;}
     if(document.getElementById('assign-overlay').style.display!=='none'){closeAssignModal();return;}
