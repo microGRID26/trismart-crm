@@ -918,7 +918,7 @@ select.np-input{cursor:pointer;}
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="city" checked> City</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="phone"> Phone</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="email"> Email</label>
-        <label style="display:flex;align-items:center;gap=6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="stage" checked> Stage</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="stage" checked> Stage</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="pm" checked> PM</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="saleDate" checked> Sale Date</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="stageDate"> Stage Date</label>
@@ -947,6 +947,15 @@ select.np-input{cursor:pointer;}
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="dealer"> Dealer</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="mpu"> MPU</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="esid"> ESID</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="hoa"> HOA</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="inverter"> Inverter</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="inverterQty"> Inverter Qty</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="batteryQty"> Battery Qty</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="ntpDate"> NTP Date</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="surveyDate"> Survey Complete</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="cityInspectionDate"> City Inspection</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="utilityInspectionDate"> Utility Inspection</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="consultantEmail"> Consultant Email</label>
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
@@ -1676,6 +1685,7 @@ async function loadData(){
     // BOMs — latest per project
     projectBoms = {};
     bustFundingStatusCache(); // bust after full reload
+    bustMentionCache();          // bust after full reload — notes replaced
 
     // Documents — grouped by project
     projectDocuments = {};
@@ -5926,7 +5936,16 @@ const HELP_CONTENT = {
         cards: [
           {h:"Tabbed edit modal", p:"Click Edit in the project panel header. The modal has 4 tabs: Basic (core info), Equipment (modules, inverters, batteries, financing), Site and Permitting (electrical specs, permit numbers, dates), Milestones and Funding (key dates, M1/M2/M3)."},
           {h:"Stage is not editable in the modal", p:"Stage changes are intentionally excluded from the edit modal. Only Move Stage can change a project stage - this protects stage history integrity."},
-          {h:"Reassigning a PM", p:"In the project panel, use the Reassign dropdown next to the PM name. Changes are saved immediately."},
+          {h:"Reassigning a PM", p:"In the project panel, use the Reassign dropdown next to the PM name. Changes are saved immediately. The dropdown builds from all PMs in your project data — no configuration needed when team members are added."},
+        ]
+      },
+      {
+        title: "Documents and Files",
+        cards: [
+          {h:"Files tab", p:"Every project panel has a Files tab. It shows a required document checklist and all attached documents grouped by type. The status bar at the top turns green when all required documents are attached."},
+          {h:"Required documents", ul:["Contract","Installation Agreement","Planset / Engineering","Permit","Utility Application"]},
+          {h:"Adding a document", p:"Click + Add Document or the + next to any document type. Choose a type, enter a label, then either paste a URL (Google Drive, DocuSign, etc.) or upload a file directly. Files up to 50MB are stored in Supabase Storage."},
+          {h:"Google Drive folder", p:"Paste a Drive folder URL in the folder bar to link the project folder. Once linked, an Open button appears for quick access. The link is stored in the database and visible to all team members."},
         ]
       },
       {
@@ -5988,6 +6007,7 @@ const HELP_CONTENT = {
           {h:"90-day forecast", p:"Active projects bucketed by estimated days to installation based on current stage and historical stage duration data."},
           {h:"Monthly trend", p:"Last 6 months of install completions by count and contract value. Green bars show completed months."},
           {h:"PM breakdown", p:"Each PM active project count, portfolio value, critical/blocked counts, and installs in the selected period."},
+          {h:"Revenue by Dealer", p:"Below the PM breakdown, a table shows all dealers ranked by total portfolio value with install count for the selected period."},
         ]
       },
       {
@@ -6001,7 +6021,7 @@ const HELP_CONTENT = {
       {
         title: "Export",
         cards: [
-          {h:"Exporting project data", p:"Click Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. TSV pastes directly into Google Sheets with Ctrl+Shift+V. Available columns include Dealer and Inverter Qty."},
+          {h:"Exporting project data", p:"Click Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. TSV pastes directly into Google Sheets with Ctrl+Shift+V. 43 columns available including Dealer, all milestone dates, permit numbers, equipment, and inspector info."},
         ]
       },
     ]
@@ -6022,7 +6042,7 @@ const HELP_CONTENT = {
         title: "Project panel sections",
         cards: [
           {h:"Left panel sections", ul:["Contact - address, phone, email","Contract - amount, system size, financier, financing type, disposition","Equipment - module, inverter, battery, optimizer with quantities","Site and Electrical - meter/panel location, voltage, MSP rating, MPU, ESID, HOA","Permitting - AHJ, utility, permit numbers, fees, approval dates","Team - PM, advisor, consultant, site surveyor","Milestones - all key dates from NTP to in service","Funding - M1/M2/M3 amounts and dates (when data exists)","Timing - days in stage, total cycle, SLA thresholds","Stage history - timeline of all stage transitions"]},
-          {h:"Right panel tabs", ul:["Tasks - task checklist with status dropdowns and due dates","Notes - project chat with @mention support","Files - linked Google Drive folder","Schedule - crew job assignments for this project","BOM - auto-calculated bill of materials"]},
+          {h:"Right panel tabs", ul:["Tasks - task checklist with status dropdowns and due dates","Notes - project chat with @mention support","Files - required document checklist, file uploads, and Google Drive folder link","Schedule - crew job assignments for this project","BOM - auto-calculated bill of materials"]},
         ]
       },
       {
@@ -6044,63 +6064,79 @@ const HELP_CONTENT = {
     label: "What's New",
     sections: [
       {
-        title: "Session 2 — March 2026",
+        title: "Session 2 — March 2026 — 45 bugs fixed",
         cards: [
-          {h:"27 bugs fixed across 7 push batches", ul:[
-            "Funding events now sort newest-first correctly",
-            "Panel tab no longer resets to Tasks on every re-render",
-            "Panel tab only resets to Tasks when switching to a different project",
-            "Duplicate BOM pane in DOM removed",
-            "BOM version number now increments correctly on repeated saves",
+          {h:"Correctness fixes", ul:[
+            "Funding events sort newest-first correctly (comparator was inverted)",
+            "Funding event log fires on status-only changes — no note required",
             "Funding status cache now busts when saving from edit modal",
             "Funding status cache now busts when moving stage",
-            "deleteDocument no longer double-filters the array",
-            "Note input clears automatically after saving",
-            "Funding status cache now stores all result types — faster dashboard render",
-            "Search shows No projects match message when nothing found",
-            "Export CSV: Inverter Qty now has correct column header",
-            "Funding event log now correctly fires on status-only changes (no note required)",
-            "Dead addNote() function removed — sendChat() is the active notes path",
-            "Service calls default sort (Newest) was backwards — fixed",
-            "PM Rebalance now keeps projectMap in sync after moving projects",
-            "Duplicate Project no longer hardcodes Ari as fallback PM",
-            "generateProjectId now uses reduce instead of spread — safe at any scale",
-            "Pipeline Analytics tab no longer crashes when visited before Leadership tab (inRange scope fix)",
-            "Completion modal now busts funding cache and syncs projectMap",
-            "hasMention() memoized — Command Center renders 487x faster on @mention check",
-            "Drive folder link/unlink now correctly refreshes the Files tab (was silently failing)",
-            "Escape key now closes New Project modal and Funding modal",
-            "Removed 3 dead code stubs: loadProjectFiles, renderFilesSection, renderFilesSectionInto",
-            "Schedule assign modal project lookup uses O(1) projectMap instead of linear scan",
-            "Schedule assign modal Enter key now selects the correct highlighted result",
-            "Schedule project search now surfaces active projects before completed ones",
-            "Will avatar color fixed (was identical to Ari)",
-            "getFundingStatus now uses O(1) projectMap — eliminates linear scan on every funding eligibility check",
-            "Schedule assign modal and city list use projectMap instead of linear scan",
-            "Blocker text now HTML-escaped in Command Center and Queue view",
+            "Funding status cache now busts when marking project complete",
+            "Funding status cache now caches all result branches — not just not_eligible",
+            "Nonfunded codes are now tracked per milestone — M2 and M3 codes are independent",
+            "BOM version number increments correctly on repeated saves",
             "New project form now captures Dealer, Module, Inverter, Battery, Financing Type",
-            "completedDate written to DB in ISO format (was locale string — caused sort/display issues)",
-            "Date display in project panel no longer shifts one day back in US timezones",
-            "generateProjectId: replaced random offset with deterministic max+1 plus collision guard",
-            "Schedule edit now saves PM field — was silently dropped on updates",
-            "render() debounce fixed — last call in a burst wins, not first",
-            "saveEdit now keeps projectMap O(1) lookup in sync",
+            "Service calls default sort (Newest) was backwards — fixed",
+            "Drive folder link/unlink now correctly refreshes the Files tab (was silently failing)",
+            "Export: 9 missing columns added — Inverter, Inverter Qty, Battery Qty, HOA, NTP Date, Survey Date, City Inspection, Utility Inspection, Consultant Email",
+            "Export: Stage checkbox CSS typo fixed (gap was not rendering)",
           ]},
-          {h:"Dynamic PM dropdowns", p:"All PM filter and assignment dropdowns now build from live project data. Adding a new PM to any project makes them available everywhere automatically — no code changes needed."},
-          {h:"Nonfunded codes are now per-milestone", p:"M2 and M3 nonfunded codes are tracked independently. Setting codes on M3 no longer overwrites M2 codes. Requires schema-nonfunded-per-milestone.sql to be run in Supabase."},
-          {h:"Funding event audit trail fixed", p:"Status-only changes (no note typed) now correctly log to the funding event history. Previously only changes with a note were recorded."},
+          {h:"Cache and state fixes", ul:[
+            "hasMention() now memoized with cache busting at all mutation points",
+            "Mention cache busted on full data reload — stale @you badges no longer persist",
+            "projectMap kept in sync after saveEdit, executePMMove, confirmCompletion",
+            "PM Rebalance keeps projectMap in sync after bulk moves",
+            "deleteDocument no longer double-filters the in-memory array",
+          ]},
+          {h:"Crash and scope fixes", ul:[
+            "Pipeline Analytics tab no longer crashes when visited before Leadership tab — inRange() was scoped inside renderLeadershipDashboard",
+            "Panel tab no longer resets to Tasks on every re-render",
+            "Panel tab only resets to Tasks when actually switching to a different project",
+            "Duplicate BOM pane in DOM removed — caused unpredictable BOM tab behavior",
+            "Escape key now closes New Project modal and Funding modal",
+          ]},
+          {h:"Performance improvements (scale)", ul:[
+            "getFundingStatus uses O(1) projectMap — was O(n) linear scan, called hundreds of times per dashboard render",
+            "hasMention() memoized — eliminated ~4,400 string searches per Command Center render",
+            "Schedule assign modal, city list, and project info all use O(1) projectMap",
+            "render() debounce fixed — last call in a burst wins, not the first",
+            "generateProjectId uses reduce instead of spread — safe beyond 10,000 projects",
+          ]},
+          {h:"UX fixes", ul:[
+            "Note input clears automatically after saving",
+            "Search now shows No projects match message when nothing found",
+            "Duplicate Project no longer hardcodes Ari as fallback PM",
+            "All PM dropdowns now build dynamically from live data — no hardcoded Ari/Jen",
+            "Schedule assign modal Enter key selects the correct highlighted project",
+            "Schedule project search surfaces active projects before completed ones",
+            "Will avatar color fixed — was identical to Ari",
+            "Blocker text HTML-escaped in Command Center and Queue view",
+          ]},
+          {h:"Dead code removed", ul:[
+            "addNote() removed — superseded by sendChat()",
+            "loadProjectFiles() empty stub removed",
+            "renderFilesSection() and renderFilesSectionInto() removed — used non-existent container ID",
+            "getExportProjects() dead self-assignment branch removed",
+            "Duplicate !hits.length check in searchProjects removed",
+          ]},
+          {h:"Email and config", ul:[
+            "Team emails updated to @trismartsolar.com addresses",
+            "Will Carter and Taylor Pratt added to TEAM_EMAILS",
+            "Will added to daily digest recipients",
+            "Code.gs: Aaron removed (placeholder), all addresses verified",
+          ]},
         ]
       },
       {
         title: "Session 1 — Feb/Mar 2026",
         cards: [
-          {h:"Documents module", p:"Each project now has a Files tab with per-type document tracking, required document checklist, file upload to Supabase Storage (Project-documents bucket), and Google Drive folder linking."},
+          {h:"Documents module", p:"Each project has a Files tab with per-type document tracking, required document checklist (Contract, Installation Agreement, Planset, Permit, Utility Application), file upload to Supabase Storage, and Google Drive folder linking."},
           {h:"BOM generator", p:"Bill of Materials tab on every project. Auto-calculates from equipment data. Supports array/row/attachment inputs, orientation toggle, per-line overrides, save to database, and CSV export."},
-          {h:"Dealer field", p:"Dealer added to project data, panel display, edit modal, pipeline filter, export columns, search, and Leadership Analytics Revenue by Dealer table."},
+          {h:"Dealer field", p:"Dealer added to project data, panel display, edit modal, pipeline filter, export, search, and Leadership Analytics Revenue by Dealer table."},
           {h:"Installation Agreement document type", p:"Added as a required document type in the Files tab checklist."},
-          {h:"Performance improvements", p:"Memoized getFundingStatus, pre-computed ALL_REQ_TASKS constant, debounced render(), and single-pass leadership dashboard computation. Noticeably faster on 400+ project datasets."},
+          {h:"Performance improvements", p:"Memoized getFundingStatus, pre-computed ALL_REQ_TASKS constant, debounced render(), and single-pass leadership dashboard computation."},
           {h:"Drive folder auto-link", p:"Script linked 270 of 487 projects to their Google Drive folders automatically."},
-          {h:"Dealer import", p:"All 487 projects updated with dealer assignments from 16,269-row export."},
+          {h:"Dealer import", p:"All 487 projects updated with dealer assignments from a 16,269-row export."},
           {h:"40+ bug fixes", p:"deleteDocument async, funding cache busting on save, events sort direction, doc CSS conflict, and many more across 9 fix batches."},
         ]
       },
