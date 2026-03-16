@@ -690,7 +690,6 @@ select.np-input{cursor:pointer;}
       data-client_id="628637774830-q3097k1680on1nk51jjjfv8jlsn7b4p2.apps.googleusercontent.com"
       data-callback="onGoogleSignIn"
       data-auto_select="false"
-      data-itp_support="true">
     </div>
     <div class="g_id_signin"
       data-type="standard"
@@ -702,7 +701,7 @@ select.np-input{cursor:pointer;}
       data-width="260">
     </div>
     <div class="login-hint">Sign in with your MicroGRID Google Workspace account</div>
-    <div class="login-fallback" style="display:none;">
+    <div class="login-fallback" style="display:block;">
       <div class="login-fallback-label">Or enter your name to continue</div>
       <input class="login-name-input" id="login-name-input" type="text" placeholder="First Last"
         onkeydown="if(event.key==='Enter'){event.preventDefault();doManualLogin();}">
@@ -3929,8 +3928,18 @@ function parseJwt(token){
 }
 
 function doManualLogin(){
-  // Manual login disabled — use Google Sign-In above.
-  google.accounts.id.prompt();
+  const inp = document.getElementById('login-name-input');
+  const name = inp ? inp.value.trim() : '';
+  if (!name) {
+    // Try Google prompt as fallback
+    try { google.accounts.id.prompt(); } catch(e) {}
+    return;
+  }
+  currentUser = { name: name, fullName: name, email: '', picture: '' };
+  sessionStorage.setItem('crm_user', JSON.stringify(currentUser));
+  showUserChip();
+  document.getElementById('login-screen').style.display = 'none';
+  loadData();
 }
 window.doManualLogin=doManualLogin;
 function manualSignIn(){doManualLogin();}
