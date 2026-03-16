@@ -4096,13 +4096,12 @@ function isAdmin() {
 
 async function openAdminToAHJ(ahjName) {
   if (!isAdmin()) return;
-  // Look up the AHJ and open the edit modal directly — no need to open admin panel
-  const { data } = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1);
-  if (data?.length) {
-    openAhjEdit(data[0].id);
-  } else {
-    showToast('AHJ not found in database: ' + ahjName);
-  }
+  let data;
+  ({data} = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1));
+  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `${ahjName}%`).limit(1));
+  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `%${ahjName}%`).limit(1));
+  if (data?.length) openAhjEdit(data[0].id);
+  else showToast('AHJ not found in database: ' + ahjName);
 }
 
 function openAdmin() {
@@ -4828,8 +4827,8 @@ async function ahjAutocomplete(input) {
   // Query Supabase ahjs table
   try {
     const res = await sb.from('ahjs')
-      .select('name,state,city,permit_phone,permit_website,max_duration,permit_notes,permit_username,electric_code,inspection_portal,inspection_login,inspection_password,inspection_email,inspection_notes,plans_on_site,host_type_required,how_to_request')
-      .ilike('name', `${q}%`)
+      .select('name,state,city,permit_phone,permit_website,max_duration,permit_notes,permit_username,electric_code,inspection_portal,inspection_login,inspection_password,inspection_email,inspection_notes,plans_on_site,host_type_required,how_to_request,short_name')
+      .or(`name.ilike.${q}%,short_name.ilike.${q}%`)
       .eq('state', 'TX')
       .limit(8);
     if (res.error || !res.data?.length) {
@@ -4943,10 +4942,20 @@ async function openAdminToUtility(utilityName) {
 async function loadAhjForProject(ahjName) {
   if (!ahjName || ahjCache[ahjName.toLowerCase()]) return;
   try {
-    const res = await sb.from('ahjs')
-      .select('*')
-      .ilike('name', ahjName)
-      .limit(1);
+    // 1. Exact name match
+    let res = await sb.from('ahjs').select('*').ilike('name', ahjName).limit(1);
+    // 2. Match short_name (normalized, no city/town suffix)
+    if (!res.data?.length) {
+      res = await sb.from('ahjs').select('*').ilike('short_name', ahjName).limit(1);
+    }
+    // 3. Name starts with search term
+    if (!res.data?.length) {
+      res = await sb.from('ahjs').select('*').ilike('name', `${ahjName}%`).limit(1);
+    }
+    // 4. Partial match
+    if (!res.data?.length) {
+      res = await sb.from('ahjs').select('*').ilike('name', `%${ahjName}%`).limit(1);
+    }
     if (res.data?.length) {
       ahjCache[ahjName.toLowerCase()] = res.data[0];
     }
