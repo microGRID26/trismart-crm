@@ -946,6 +946,7 @@ select.np-input{cursor:pointer;}
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="module"> Module</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="moduleQty"> Module Qty</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="siteSurveyor"> Site Surveyor</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="dealer"> Dealer</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="mpu"> MPU</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" value="esid"> ESID</label>
       </div>
@@ -987,7 +988,9 @@ select.np-input{cursor:pointer;}
           <option value="Sale">Sale</option>
           <option value="Loyalty">Loyalty</option>
         </select>
-        <select class="pf-sel" id="pf-dealer" onchange="renderPipeline()"><option value="">All dealers</option></select>
+        <select class="pf-sel" id="pf-dealer" onchange="renderPipeline()">
+          <option value="">All dealers</option>
+        </select>
         <input class="pf-input" id="pf-city" type="text" placeholder="City..." oninput="renderPipeline()">
       </div>
       <div class="pf-group">
@@ -2795,24 +2798,26 @@ function renderLeadershipDashboard(){
       </div>
     </div>`;
 
+  // Dealer breakdown row
   const dealerRow = dealerStats.length ? `<div class="an-row-2"><div class="an-card">
     <div class="an-title">Revenue by Dealer</div>
-    <div class="an-sub">All active projects sorted by contract value</div>
+    <div class="an-sub">All active projects · sorted by contract value</div>
     <table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:11px;">
       <thead><tr style="border-bottom:1px solid var(--border2);">
         <th style="padding:5px 8px;text-align:left;font-weight:500;color:var(--text3);">Dealer</th>
         <th style="padding:5px 8px;text-align:right;font-weight:500;color:var(--text3);">Projects</th>
         <th style="padding:5px 8px;text-align:right;font-weight:500;color:var(--text3);">Portfolio</th>
-        <th style="padding:5px 8px;text-align:right;font-weight:500;color:var(--text3);">Installs</th>
+        <th style="padding:5px 8px;text-align:right;font-weight:500;color:var(--text3);">Installs ${periodLabels[period]}</th>
       </tr></thead>
-      <tbody>${dealerStats.map((d,i)=>`<tr style="background:${i%2===0?'var(--bg)':'var(--bg2)'}">
+      <tbody>${dealerStats.map((d,i)=>`<tr style="background:${i%2===0?'var(--bg)':'var(--bg2)'};">
         <td style="padding:5px 8px;font-weight:500;">${d.name}</td>
         <td style="padding:5px 8px;text-align:right;color:var(--text2);">${d.count}</td>
         <td style="padding:5px 8px;text-align:right;color:var(--text2);">${fmtK(d.val)}</td>
-        <td style="padding:5px 8px;text-align:right;color:var(--green);font-weight:${d.installs?'600':'400'}">${d.installs||'—'}</td>
+        <td style="padding:5px 8px;text-align:right;color:var(--green);font-weight:${d.installs?'600':'400'};">${d.installs||'—'}</td>
       </tr>`).join('')}</tbody>
     </table>
   </div></div>` : '';
+
   pg.innerHTML = periodSelector + row1 + row2 + row3 + row4 + dealerRow;
 }
 
@@ -3999,6 +4004,7 @@ function openEditProject(pid){
   document.getElementById('np-utility').value=p.utility||'';
   document.getElementById('np-advisor').value=p.advisor||'';
   document.getElementById('np-consultant').value=p.consultant||'';
+  document.getElementById('np-dealer').value=p.dealer||'';
 
   // Tab 2: Equipment
   document.getElementById('np-module').value=p.module||'';
@@ -4111,7 +4117,7 @@ async function submitNewProject(){
     pm:get('np-pm'),stageDate:dateStr,saleDate:get('np-saledate'),
     disposition:get('np-disposition'),contract:Number(get('np-contract')),
     systemkw:Number(get('np-systemkw')),ahj:get('np-ahj'),utility:get('np-utility'),
-    advisor:get('np-advisor'),consultant:get('np-consultant'),dealer:get('np-dealer'),
+    advisor:get('np-advisor'),consultant:get('np-consultant'),
     financier:get('np-financier'),blocker:'',
   };
   projects.unshift(newProject);
@@ -4154,7 +4160,7 @@ async function submitEditProject(){
     disposition:get('np-disposition'),contract:num(get('np-contract'))||p.contract,
     systemkw:num(get('np-systemkw'))||p.systemkw,financier:get('np-financier'),
     ahj:get('np-ahj'),utility:get('np-utility'),advisor:get('np-advisor'),
-    consultant:get('np-consultant'),
+    consultant:get('np-consultant'),dealer:get('np-dealer'),
     // Equipment
     module:str(get('np-module')),moduleQty:str(get('np-module-qty')),
     inverter:str(get('np-inverter')),inverterQty:str(get('np-inverter-qty')),
@@ -4456,7 +4462,7 @@ const EXPORT_HEADERS={
   ntpDate:'NTP Date',surveyDate:'Survey Date',installCompleteDate:'Install Complete',
   cityInspectionDate:'City Inspection',utilityInspectionDate:'Utility Inspection',
   ptoDate:'PTO Date',inServiceDate:'In Service Date',
-  module:'Module',moduleQty:'Module Qty',inverter:'Inverter',batteryQty:'Battery Qty',
+  module:'Module',moduleQty:'Module Qty',inverter:'Inverter',batteryQty:'Battery Qty',dealer:'Dealer',
   hoa:'HOA',esid:'ESID',mpu:'MPU',cycleDays:'Total Cycle Days',tasksComplete:'Tasks Complete',
 };
 function getRowValue(p,col){
@@ -5661,7 +5667,7 @@ async function quickFundAction(pid, milestone, newStatus) {
 
   if (!projectFunding[pid]) projectFunding[pid] = {};
   Object.assign(projectFunding[pid], update);
-  if(typeof bustFundingStatusCache==='function') bustFundingStatusCache(pid);
+  bustFundingStatusCache(pid);
   renderFunding();
   showToast(milestone.toUpperCase() + ' marked ' + newStatus);
 
@@ -5801,7 +5807,7 @@ async function saveFundingModal() {
   if (!projectFunding[pid]) projectFunding[pid] = {};
   Object.assign(projectFunding[pid], update);
   closeFundingModal();
-  if(typeof bustFundingStatusCache==='function') bustFundingStatusCache(pid);
+  bustFundingStatusCache(pid);
   renderFunding();
   showToast('Funding updated');
 
@@ -6139,7 +6145,7 @@ function renderFilesContent(pid, p) {
           <input type="file" id="doc-file-input-${pid}" style="display:none;"
             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.heic"
             onchange="handleDocFileSelect(event,'${pid}')">
-          <div id="doc-file-selected-${pid}" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);display:flex;align-items:center;gap:8px;">
+          <div id="doc-file-selected-${pid}" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);align-items:center;gap:8px;">
             <span id="doc-file-name-${pid}" style="font-size:11px;flex:1;"></span>
             <button onclick="clearDocFile('${pid}')" style="background:none;border:none;cursor:pointer;color:var(--text3);">✕</button>
           </div>
@@ -6332,7 +6338,7 @@ async function saveDocument(pid) {
   showToast('Document saved');
 }
 
-async async function deleteDocument(pid, docId) {
+async function deleteDocument(pid, docId) {
   if (!confirm('Remove this document link?')) return;
   if (!projectDocuments[pid]) return;
   projectDocuments[pid] = projectDocuments[pid].filter(d => d.id !== docId);
