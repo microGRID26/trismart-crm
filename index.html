@@ -6959,6 +6959,7 @@ const HELP_CONTENT = {
           {h:"Tabbed edit modal", p:"Click Edit in the project panel header. The modal has 4 tabs: Basic (core info), Equipment (modules, inverters, batteries, financing), Site and Permitting (electrical specs, permit numbers, dates), Milestones and Funding (key dates, M1/M2/M3)."},
           {h:"Stage is not editable in the modal", p:"Stage changes are intentionally excluded from the edit modal. Only Move Stage can change a project stage - this protects stage history integrity."},
           {h:"Reassigning a PM", p:"In the project panel, use the Reassign dropdown next to the PM name. Changes are saved immediately. The dropdown builds from all PMs in your project data — no configuration needed when team members are added."},
+          {h:"AHJ info in project panel", p:"When a project has an AHJ that matches the database, the Permitting section automatically shows the permit phone, portal link, turnaround days, and permit notes. For admins, the AHJ name is a clickable link that opens the AHJ edit form directly."},
         ]
       },
       {
@@ -7082,6 +7083,63 @@ const HELP_CONTENT = {
       },
     ]
   },
+  admin: {
+    label: "For Admins",
+    sections: [
+      {
+        title: "Getting started",
+        cards: [
+          {h:"Who has admin access", p:"Currently Greg Kelsch and Heidi Hildreth have admin access. The gear icon (⚙) appears in the top right corner next to your avatar when you are signed in as an admin. Regular team members do not see the gear icon."},
+          {h:"Opening Settings", p:"Click the ⚙ gear icon in the top right corner. The Settings panel opens with a sidebar on the left and content on the right. Use the sidebar to switch between modules. Press Escape or click ✕ to close."},
+          {h:"Admin access is role-based", p:"Admin access is currently controlled by name matching (Greg Kelsch and Heidi Hildreth). Full role-based access control with a UI for granting and revoking access is on the roadmap."},
+        ]
+      },
+      {
+        title: "AHJ Manager",
+        cards: [
+          {h:"What is the AHJ Manager", p:"The AHJ (Authority Having Jurisdiction) Manager lets you search, view, and edit all 1,633 Texas AHJ records imported from NetSuite. Each AHJ record contains permit contact info, portal links, turnaround days, usernames, passwords, and permit/inspection notes."},
+          {h:"Searching AHJs", p:"Type in the search bar at the top of the AHJ Manager to filter by name. Results update as you type. The table shows 50 AHJs per page with a page navigator at the bottom."},
+          {h:"Editing an AHJ", p:"Click Edit on any AHJ row to open the edit modal. Fields are organized into two sections: Permit Info (phone, website, codes, username, password, notes) and Inspection Info (portal, login, password, email, notes). Click Save Changes in the header or press Escape to cancel."},
+          {h:"AHJ link in project panel", p:"When a project has an AHJ that matches a record in the database, the AHJ name in the project panel Permitting section appears as a green underlined link. Clicking it opens the Admin panel directly to that AHJ's edit form."},
+          {h:"AHJ autocomplete", p:"When editing or creating a project, typing in the AHJ field shows a dropdown of matching AHJ names from the database. Use arrow keys to navigate, Enter to select. The project panel will then automatically show permit phone, portal link, turnaround days, and notes for that AHJ."},
+          {h:"Adding more AHJs", p:"To add AHJs from other states, update the import script (import_ahjs.py) to remove the Texas filter and re-run it. The script is safe to run multiple times — it will not create duplicates for existing records."},
+          {h:"Updating AHJ data in bulk", p:"Export a fresh spreadsheet from NetSuite, run the import script again. To update existing records rather than insert new ones, the import script will need an upsert flag added — request this when you have an updated export ready."},
+        ]
+      },
+      {
+        title: "Crews",
+        cards: [
+          {h:"Viewing crews", p:"The Crews tab in Settings shows all active crews with their warehouse, total job count, and active status. This is the source of truth for crew assignments across the Schedule tab and Service Calls."},
+          {h:"Adding a crew", p:"Click + Add Crew, enter a Crew ID (e.g. hou3), a display name (e.g. HOU 3), and select a warehouse (Houston or DFW). Click Add Crew. The new crew is available immediately in the Schedule and Service tabs."},
+          {h:"Crew IDs", p:"Crew IDs are short lowercase identifiers used internally (hou1, hou2, dfw1, dfw2). Once set they cannot be changed without a data migration. Choose them carefully. The display name can always be updated."},
+        ]
+      },
+      {
+        title: "SLA Thresholds",
+        cards: [
+          {h:"What SLA thresholds control", p:"SLA thresholds define how many days a project can spend in each stage before its status badge changes color. Green = on track, Amber = at risk, Red = critical. These thresholds affect the Pipeline view, Command Center, Leadership Analytics, and daily digest emails."},
+          {h:"Editing thresholds", p:"Each stage has three editable fields: Target (green), At Risk (amber), and Critical (red). Click any number field and type a new value. Click Save Thresholds when done — changes apply immediately across all views without a page refresh."},
+          {h:"Resetting to defaults", p:"Click Reset to Defaults to restore the original values built into the system. This also takes effect immediately."},
+          {h:"Thresholds are stored locally", p:"SLA thresholds are currently stored in your browser's localStorage. This means each device has its own thresholds. Full server-side SLA config is on the roadmap so all users see the same thresholds."},
+        ]
+      },
+      {
+        title: "Users",
+        cards: [
+          {h:"Current user list", p:"The Users tab shows all team members configured in the CRM with their name, email address, and admin status. This reflects the hardcoded TEAM list in the CRM code."},
+          {h:"Adding or removing team members", p:"Currently, adding or removing team members requires a code change to the TEAM array and TEAM_EMAILS object in the CRM. Full user management with a UI for adding, editing, and deactivating users is on the roadmap for the next session."},
+          {h:"Granting admin access", p:"Admin access is currently determined by name matching against a list in the code (Greg Kelsch, Heidi Hildreth). To grant admin access to additional users, the ADMIN_USERS array in the CRM needs to be updated. This will be moved to the Users UI in the next session."},
+        ]
+      },
+      {
+        title: "CRM Info",
+        cards: [
+          {h:"What CRM Info shows", p:"The CRM Info tab shows live stats: total projects, active vs completed count, total notes in the database, how many projects have Drive folders linked, AHJ database size, and links to the GitHub repo and Supabase project."},
+          {h:"Database stats", p:"Stats are pulled live from the loaded data on each open of the admin panel. Project and note counts reflect what is currently loaded in memory — force a data refresh (click the green dot in the top bar) before opening admin for the most current numbers."},
+        ]
+      },
+    ]
+  },
   changelog: {
     label: "What's New",
     sections: [
@@ -7092,6 +7150,7 @@ const HELP_CONTENT = {
           {h:"@mention email notifications", p:"When you @mention a teammate in a project note, they receive an email immediately with the message and a link to the project. Sent via Apps Script."},
           {h:"Service calls in project panel", p:"The project panel left column now shows any service calls linked to that project — status, type, issue description, and date — without opening the Service tab."},
           {h:"Task Audit — inline status changes", p:"Task chips in the Audit view are now clickable. Change a task status directly from the audit table without opening the full project panel."},
+          {h:"Settings & Admin portal", p:"Gear icon (⚙) in the top right for Greg and Heidi. Includes AHJ Manager (search, edit all 1,633 TX AHJs), Crews module, editable SLA Thresholds, User list, and CRM Info dashboard. AHJ names in project panels link directly to the edit form."},
           {h:"Funding tab improvements", ul:[
             "Submitted rows now show days waiting (amber at 14+, red at 30+)",
             "New Pending Amount metric card showing total estimated value of eligible + submitted milestones",
