@@ -758,6 +758,7 @@ select.np-input{cursor:pointer;}
       <div style="width:180px;border-right:0.5px solid var(--border2);padding:12px 0;flex-shrink:0;">
         <div class="admin-nav-item active" id="anav-ahj" onclick="setAdminTab('ahj')">AHJ Manager</div>
         <div class="admin-nav-item" id="anav-users" onclick="setAdminTab('users')">Users</div>
+        <div class="admin-nav-item" id="anav-crews" onclick="setAdminTab('crews')">Crews</div>
         <div class="admin-nav-item" id="anav-sla" onclick="setAdminTab('sla')">SLA Thresholds</div>
         <div class="admin-nav-item" id="anav-info" onclick="setAdminTab('info')">CRM Info</div>
       </div>
@@ -1511,12 +1512,14 @@ function getSLA(p){
   if(_slaCache[key]) return _slaCache[key];
   const s=STAGES.find(x=>x.id===p.stage);
   if(!s){const r={days:0,status:'ok',pct:0,sla:3,risk:5,crit:7};_slaCache[key]=r;return r;}
+  // Use admin-configured thresholds if available, fall back to STAGES defaults
+  const t=(typeof SLA_THRESHOLDS!=='undefined'&&SLA_THRESHOLDS[p.stage])||s;
   const days=daysAgo(p.stageDate);
   let status='ok';
-  if(days>=s.crit) status='crit';
-  else if(days>=s.risk) status='risk';
-  else if(days>=s.sla) status='warn';
-  const r={days,status,pct:Math.min(100,Math.round(days/s.crit*100)),sla:s.sla,risk:s.risk,crit:s.crit};
+  if(days>=t.crit) status='crit';
+  else if(days>=t.risk) status='risk';
+  else if(days>=t.sla) status='warn';
+  const r={days,status,pct:Math.min(100,Math.round(days/t.crit*100)),sla:t.sla,risk:t.risk,crit:t.crit};
   _slaCache[key]=r;
   return r;
 }
@@ -4078,13 +4081,14 @@ async function renderAdminTab(tab) {
 
   if (tab === 'ahj') await renderAdminAHJ(el);
   else if (tab === 'users') renderAdminUsers(el);
+  else if (tab === 'crews') renderAdminCrews(el);
   else if (tab === 'sla') renderAdminSLA(el);
   else if (tab === 'info') renderAdminInfo(el);
 }
 
 // ── AHJ MANAGER ───────────────────────────────────────────────────────────────
 let _ahjSearch = '', _ahjPage = 0, _ahjEditId = null;
-const AHJ_PAGE_SIZE = 20;
+const AHJ_PAGE_SIZE = 50;
 
 async function renderAdminAHJ(el, search, page) {
   if (search !== undefined) _ahjSearch = search;
@@ -4111,17 +4115,19 @@ async function renderAdminAHJ(el, search, page) {
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Name</th>
-        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Electric Code</th>
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Phone</th>
-        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Turnaround</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Portal</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Days</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Notes</th>
         <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);"></th>
       </tr></thead>
       <tbody>
         ${(data||[]).map((a,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
           <td style="padding:8px 10px;font-weight:500;">${escapeHtml(a.name)}</td>
-          <td style="padding:8px 10px;color:var(--text2);">${a.electric_code||'—'}</td>
           <td style="padding:8px 10px;color:var(--text2);">${a.permit_phone||'—'}</td>
+          <td style="padding:8px 10px;">${a.permit_website?`<a href="${a.permit_website}" target="_blank" style="color:var(--green);font-size:11px;">Open ↗</a>`:'—'}</td>
           <td style="padding:8px 10px;color:var(--text2);">${a.max_duration?a.max_duration+'d':'—'}</td>
+          <td style="padding:8px 10px;color:var(--text2);font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.permit_notes?a.permit_notes.slice(0,60)+(a.permit_notes.length>60?'…':''):'—'}</td>
           <td style="padding:8px 10px;">
             <button onclick="openAhjEdit('${a.id}')"
               style="font-size:10px;padding:3px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;color:var(--text);">Edit</button>
@@ -4229,7 +4235,7 @@ function renderAdminUsers(el) {
     <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:16px;">Team Members</div>
     <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Current team (from CRM config):</div>
-      ${TEAM_COLORS.map(t => `
+      ${TEAM.map(t => `
         <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border);">
           <div style="width:28px;height:28px;border-radius:50%;background:${t.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex-shrink:0;">${teamInitials(t.name)}</div>
           <div style="flex:1;">
@@ -4248,19 +4254,81 @@ function renderAdminUsers(el) {
 }
 
 // ── SLA THRESHOLDS ────────────────────────────────────────────────────────────
+function renderAdminCrews(el) {
+  const crewList = schedule ? [...new Set(schedule.map(s=>s.crewId).filter(Boolean))] : [];
+  // Use the crews data from loaded schedule/crews
+  const allCrews = (typeof crews !== 'undefined' ? crews : []);
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:500;color:var(--text);">Crews</div>
+      <button onclick="openNewCrewForm()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">+ Add Crew</button>
+    </div>
+    <div id="new-crew-form" style="display:none;padding:14px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:500;margin-bottom:10px;">New Crew</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Crew ID</div>
+          <input id="new-crew-id" placeholder="e.g. hou3" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Name</div>
+          <input id="new-crew-name" placeholder="e.g. HOU 3" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Warehouse</div>
+          <select id="new-crew-wh" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
+            <option value="Houston">Houston</option>
+            <option value="DFW">DFW</option>
+          </select></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="submitNewCrew()" style="padding:6px 16px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">Add Crew</button>
+        <button onclick="document.getElementById('new-crew-form').style.display='none'" style="padding:6px 12px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Crew</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Warehouse</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Jobs (all time)</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Status</th>
+      </tr></thead>
+      <tbody>
+        ${allCrews.length ? allCrews.map((c,i) => {
+          const jobCount = (typeof schedule !== 'undefined' ? schedule : []).filter(s=>s.crewId===c.id).length;
+          return `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
+            <td style="padding:9px 12px;font-weight:500;">${c.name||c.id}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${c.warehouse||'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${jobCount}</td>
+            <td style="padding:9px 12px;">
+              <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${c.active!=='false'?'var(--green-bg)':'var(--bg2)'};color:${c.active!=='false'?'var(--green)':'var(--text3)'};">
+                ${c.active!=='false'?'Active':'Inactive'}
+              </span>
+            </td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text3);">No crews found. Add one above.</td></tr>'}
+      </tbody>
+    </table>
+  `;
+}
+
+function openNewCrewForm() {
+  document.getElementById('new-crew-form').style.display = 'block';
+  document.getElementById('new-crew-id').focus();
+}
+
+async function submitNewCrew() {
+  const id   = document.getElementById('new-crew-id').value.trim().toLowerCase();
+  const name = document.getElementById('new-crew-name').value.trim();
+  const wh   = document.getElementById('new-crew-wh').value;
+  if (!id || !name) { showToast('Crew ID and name required'); return; }
+  await post({action:'addCrew', crewId:id, name, warehouse:wh});
+  showToast('Crew added — reloading data...');
+  document.getElementById('new-crew-form').style.display = 'none';
+  await reloadData();
+  renderAdminCrews(document.getElementById('admin-content'));
+}
+
 function renderAdminSLA(el) {
-  const SLA = {
-    evaluation: {sla:3,  risk:4,  crit:6,  label:'Evaluation'},
-    survey:     {sla:3,  risk:5,  crit:10, label:'Site Survey'},
-    design:     {sla:3,  risk:5,  crit:10, label:'Design'},
-    permit:     {sla:21, risk:30, crit:45, label:'Permitting'},
-    install:    {sla:5,  risk:7,  crit:10, label:'Installation'},
-    inspection: {sla:14, risk:21, crit:30, label:'Inspection'},
-    complete:   {sla:3,  risk:5,  crit:7,  label:'Completion'},
-  };
   el.innerHTML = `
     <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px;">SLA Thresholds</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:16px;">Days in stage before status changes color. Green → Amber → Orange → Red.</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:16px;">Days in stage before status changes color. Green → Amber → Orange → Red. Changes apply immediately across the CRM.</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:var(--bg2);">
         <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Stage</th>
@@ -4269,18 +4337,73 @@ function renderAdminSLA(el) {
         <th style="padding:8px 12px;text-align:center;font-weight:500;color:var(--red);">Critical (red)</th>
       </tr></thead>
       <tbody>
-        ${Object.entries(SLA).map(([key,s],i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
+        ${Object.entries(SLA_THRESHOLDS).map(([key,s],i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
           <td style="padding:8px 12px;font-weight:500;">${s.label}</td>
-          <td style="padding:8px 12px;text-align:center;color:var(--green);">${s.sla}d</td>
-          <td style="padding:8px 12px;text-align:center;color:var(--amber);">${s.risk}d</td>
-          <td style="padding:8px 12px;text-align:center;color:var(--red);">${s.crit}d</td>
+          <td style="padding:8px 12px;text-align:center;">
+            <input type="number" id="sla-${key}-sla" value="${s.sla}" min="1" max="999"
+              style="width:50px;padding:4px;text-align:center;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;color:var(--green);background:var(--bg);">
+          </td>
+          <td style="padding:8px 12px;text-align:center;">
+            <input type="number" id="sla-${key}-risk" value="${s.risk}" min="1" max="999"
+              style="width:50px;padding:4px;text-align:center;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;color:var(--amber);background:var(--bg);">
+          </td>
+          <td style="padding:8px 12px;text-align:center;">
+            <input type="number" id="sla-${key}-crit" value="${s.crit}" min="1" max="999"
+              style="width:50px;padding:4px;text-align:center;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;color:var(--red);background:var(--bg);">
+          </td>
         </tr>`).join('')}
       </tbody>
     </table>
-    <div style="font-size:11px;color:var(--text3);margin-top:12px;padding:10px;background:var(--bg2);border-radius:var(--radius);">
-      Editable SLA thresholds coming soon — will update in real time across all views.
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <button onclick="saveSLAThresholds()"
+        style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">Save Thresholds</button>
+      <button onclick="resetSLAThresholds()"
+        style="padding:8px 16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Reset to Defaults</button>
     </div>
   `;
+}
+
+const SLA_DEFAULTS = {
+  evaluation: {sla:3,  risk:4,  crit:6,  label:'Evaluation'},
+  survey:     {sla:3,  risk:5,  crit:10, label:'Site Survey'},
+  design:     {sla:3,  risk:5,  crit:10, label:'Design'},
+  permit:     {sla:21, risk:30, crit:45, label:'Permitting'},
+  install:    {sla:5,  risk:7,  crit:10, label:'Installation'},
+  inspection: {sla:14, risk:21, crit:30, label:'Inspection'},
+  complete:   {sla:3,  risk:5,  crit:7,  label:'Completion'},
+};
+
+// Load from localStorage or use defaults
+let SLA_THRESHOLDS = (() => {
+  try {
+    const saved = localStorage.getItem('crm_sla_thresholds');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge with defaults to ensure all keys exist
+      return Object.fromEntries(Object.entries(SLA_DEFAULTS).map(([k,v]) => [k, {...v, ...(parsed[k]||{})}]));
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(SLA_DEFAULTS));
+})();
+
+function saveSLAThresholds() {
+  Object.keys(SLA_THRESHOLDS).forEach(key => {
+    const sla  = parseInt(document.getElementById(`sla-${key}-sla`)?.value) || SLA_DEFAULTS[key].sla;
+    const risk = parseInt(document.getElementById(`sla-${key}-risk`)?.value) || SLA_DEFAULTS[key].risk;
+    const crit = parseInt(document.getElementById(`sla-${key}-crit`)?.value) || SLA_DEFAULTS[key].crit;
+    SLA_THRESHOLDS[key] = {...SLA_THRESHOLDS[key], sla, risk, crit};
+  });
+  localStorage.setItem('crm_sla_thresholds', JSON.stringify(SLA_THRESHOLDS));
+  showToast('SLA thresholds saved');
+  render(); // refresh all views immediately
+}
+
+function resetSLAThresholds() {
+  SLA_THRESHOLDS = JSON.parse(JSON.stringify(SLA_DEFAULTS));
+  localStorage.removeItem('crm_sla_thresholds');
+  renderAdminSLA(document.getElementById('admin-content'));
+  showToast('SLA thresholds reset to defaults');
+  render();
 }
 
 // ── CRM INFO ──────────────────────────────────────────────────────────────────
