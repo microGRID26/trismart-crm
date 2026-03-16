@@ -3922,9 +3922,18 @@ function _doRender(){
 }
 // ── GOOGLE AUTH ──────────────────────────────────────────
 let currentUser={name:'',email:'',picture:''};
+let cmdFilter=null;
 
 function parseJwt(token){
   try{return JSON.parse(atob(token.split('.')[1]));}catch(e){return {};}
+}
+
+const ADMIN_USERS = ['greg kelsch', 'heidi guevara', 'heidi hildreth'];
+let _adminTab = 'ahj';
+
+function isAdmin() {
+  const name = (currentUser.name || '').toLowerCase();
+  return ADMIN_USERS.some(u => name.includes(u.split(' ')[0]) || u.includes(name.split(' ')[0]));
 }
 
 function doManualLogin(){
@@ -4101,14 +4110,6 @@ function chatKeydown(e,pid){
 }
 
 // ── ADMIN / SETTINGS ─────────────────────────────────────────────────────────
-const ADMIN_USERS = ['greg kelsch', 'heidi guevara', 'heidi hildreth'];
-let _adminTab = 'ahj';
-
-function isAdmin() {
-  const name = (currentUser.name || '').toLowerCase();
-  return ADMIN_USERS.some(u => name.includes(u.split(' ')[0]) || u.includes(name.split(' ')[0]));
-}
-
 async function openAdminToAHJ(ahjName) {
   if (!isAdmin()) return;
   let data;
@@ -5523,7 +5524,6 @@ async function submitEditProject(){
 
 // ── FILES / DRIVE ─────────────────────────────────────────
 let currentPanelTab='tasks';
-let cmdFilter=null;
 function cmdDrilldown(filter){
   cmdFilter=cmdFilter===filter||filter==='all'?null:filter;
   renderCommand();
