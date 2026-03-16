@@ -718,10 +718,8 @@ select.np-input{cursor:pointer;}
     <input class="search-input" type="text" placeholder="Search projects..." oninput="searchProjects(this.value)" onblur="setTimeout(closeSearch,200)">
     <div class="search-results" id="search-results" style="display:none;"></div>
   </div>
-  <select class="pm-sel" onchange="setPM(this.value)">
+  <select class="pm-sel" id="pm-sel-global" onchange="setPM(this.value)">
     <option value="all">All PMs</option>
-    <option value="Ari">Ari</option>
-    <option value="Jen">Jen</option>
   </select>
   <span class="saving-badge" id="saving-badge">Saving...</span>
   <button class="nav-btn" style="background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:500;" onclick="openNewProject()">+ New Project</button>
@@ -782,7 +780,7 @@ select.np-input{cursor:pointer;}
         </select>
       </div>
       <div><div class="np-label">Project Manager</div>
-        <select class="np-input" id="np-pm"><option value="Ari">Ari</option><option value="Jen">Jen</option></select>
+        <select class="np-input" id="np-pm"><option value="">Select PM...</option></select>
       </div>
       <div><div class="np-label">Disposition</div>
         <select class="np-input" id="np-disposition"><option value="Sale">Sale</option><option value="Loyalty">Loyalty</option><option value="Cancelled">Cancelled</option></select>
@@ -1732,6 +1730,7 @@ async function loadData(){
     document.getElementById('cmd-content').style.display='block';
     setTimeout(()=>setLoadingBar(0),400);
     render();
+    syncPMDropdowns();
     // Start realtime subscriptions after data is loaded
     setupRealtime();
   }catch(err){
@@ -3216,8 +3215,7 @@ function renderPanel(pid){
       <div class="frow"><span class="flabel">PM</span><span class="fval" style="display:flex;align-items:center;gap:6px;">${p.pm}
         <select onchange="reassignPM('${pid}',this.value)" style="font-size:10px;padding:2px 4px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;">
           <option value="">Reassign...</option>
-          <option value="Ari"${p.pm==='Ari'?' disabled':''}>Ari</option>
-          <option value="Jen"${p.pm==='Jen'?' disabled':''}>Jen</option>
+          ${[...new Set(projects.map(x=>x.pm).filter(Boolean))].sort().map(pm=>`<option value="${pm}"${pm===p.pm?' disabled':''}>${pm}</option>`).join('')}
         </select>
       </span></div>
       ${frow('Advisor', p.advisor)}
@@ -3639,6 +3637,17 @@ function setView(v,btn){
   render();
 }
 function setPM(v){currentPM=v;render();}
+function syncPMDropdowns(){
+  // Build sorted unique PM list from all projects
+  const pms=[...new Set(projects.map(p=>p.pm).filter(Boolean))].sort();
+  const opts=pms.map(pm=>`<option value="${pm}">${pm}</option>`).join('');
+  // Top-bar global PM selector
+  const gSel=document.getElementById('pm-sel-global');
+  if(gSel){const cur=gSel.value;gSel.innerHTML='<option value="all">All PMs</option>'+opts;gSel.value=pms.includes(cur)?cur:'all';}
+  // New project modal PM selector
+  const npPm=document.getElementById('np-pm');
+  if(npPm){const cur=npPm.value;npPm.innerHTML='<option value="">Select PM...</option>'+opts;if(pms.includes(cur)) npPm.value=cur;}
+}
 function syncMobileNav(v){
   document.querySelectorAll('.mn-btn').forEach(b=>b.classList.remove('active'));
   const el=document.getElementById('mn-'+v);
@@ -3684,8 +3693,9 @@ function fmtTimestamp(raw){
 }
 let _renderTimer=null;
 function render(){
-  // Debounce: coalesce rapid successive render calls into one
-  if(_renderTimer) return;
+  // Debounce: cancel any pending render and schedule a fresh one
+  // (clearTimeout pattern ensures the LAST call in a burst wins, not the first)
+  clearTimeout(_renderTimer);
   _renderTimer=setTimeout(()=>{
     _renderTimer=null;
     _doRender();
@@ -4119,6 +4129,12 @@ async function submitNewProject(){
     systemkw:Number(get('np-systemkw')),ahj:get('np-ahj'),utility:get('np-utility'),
     advisor:get('np-advisor'),consultant:get('np-consultant'),
     financier:get('np-financier'),blocker:'',
+    dealer:get('np-dealer'),
+    financingType:get('np-financing-type'),
+    module:get('np-module'),moduleQty:get('np-module-qty'),
+    inverter:get('np-inverter'),inverterQty:get('np-inverter-qty'),
+    battery:get('np-battery'),batteryQty:get('np-battery-qty'),
+    optimizer:get('np-optimizer'),optimizerQty:get('np-optimizer-qty'),
   };
   projects.unshift(newProject);
   projectMap[String(newProject.id)]=newProject; // keep map in sync
@@ -4209,6 +4225,7 @@ async function submitEditProject(){
 
   // Optimistic update in memory
   Object.assign(p,editable);
+  projectMap[String(p.id)]=p; // keep O(1) lookup in sync
   if(hasFunding){
     projectFunding[p.id]=projectFunding[p.id]||{};
     Object.assign(projectFunding[p.id],fundingRow);
@@ -4394,8 +4411,7 @@ function renderAudit(){
       </select>
       <select class="pf-sel" id="audit-pm-sel" onchange="renderAudit()">
         <option value="all">All PMs</option>
-        <option value="Ari"${auditPM==='Ari'?' selected':''}>Ari</option>
-        <option value="Jen"${auditPM==='Jen'?' selected':''}>Jen</option>
+        ${[...new Set(projects.map(p=>p.pm).filter(Boolean))].sort().map(pm=>`<option value="${pm}"${pm===auditPM?' selected':''}>${pm}</option>`).join('')}
       </select>
       <select class="pf-sel" id="audit-sort-sel" onchange="renderAudit()">
         <option value="count"${auditSort==='count'?' selected':''}>Most issues first</option>
@@ -5139,7 +5155,7 @@ function renderService(){
     if(svcSort==='priority'){const p={high:0,medium:1,low:2};return (p[a.priority]||1)-(p[b.priority]||1);}
     if(svcSort==='date') return (a.date||'9999')>(b.date||'9999')?1:-1;
     if(svcSort==='customer') return (a.customer||'').localeCompare(b.customer||'');
-    return (b.created||'')>(a.created||'')?-1:1; // newest first (desc)
+    return (b.created||'')>(a.created||'')?1:-1; // newest first (desc)
   });
 
   const counts={all:serviceCalls.length,open:0,scheduled:0,inprog:0,closed:0};
@@ -5879,7 +5895,7 @@ const HELP_CONTENT = {
       {
         title: "Notes and communication",
         cards: [
-          {h:"Adding notes", p:"Open a project panel, click the Notes tab. Type your note and press Enter or click Send. Notes are timestamped and attributed to you. All team members see notes in real time."},
+          {h:"Adding notes", p:"Open a project panel, click the Notes tab. Type your note and press Enter or click Send. Notes are timestamped and attributed to your login name. All team members see notes in real time without refreshing."},
           {h:"Project Chat Import", p:"Historical messages from BluChat are imported under the author name with pm set to Project Chat Import. These are read-only and cannot be edited."},
           {h:"Blockers", p:"Use the Blocker field in the project panel to flag a project that cannot progress. Describe the blocker clearly - it shows on the Command Center. Clear it by deleting the text and saving."},
         ]
@@ -5926,7 +5942,7 @@ const HELP_CONTENT = {
         title: "Nonfunded codes",
         cards: [
           {h:"What nonfunded codes mean", p:"Edge returns a code when they cannot fund a milestone. 190 codes across 13 categories - Photos (79), Installation Issues (43), Contract Error (25) are the most common. Each code has a responsible party."},
-          {h:"Assigning codes", p:"Open the funding row, set status to Nonfunded, select up to 3 codes from the dropdown. The full description and responsible party appear automatically. Add a note, then save."},
+          {h:"Assigning codes", p:"Open the funding row, set status to Nonfunded, select up to 3 codes from the dropdown. The full description and responsible party appear automatically. Add a note, then save. Codes are saved per milestone — M2 and M3 nonfunded codes are tracked independently."},
           {h:"Event history", p:"Every status change is logged at the bottom of the funding modal - who changed it, when, and any notes. This is your audit trail for Edge disputes."},
         ]
       },
@@ -5964,7 +5980,7 @@ const HELP_CONTENT = {
       {
         title: "Export",
         cards: [
-          {h:"Exporting project data", p:"Click Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. TSV pastes directly into Google Sheets with Ctrl+Shift+V."},
+          {h:"Exporting project data", p:"Click Export in the top bar. Choose scope (all projects, current PM filter, by stage, or blocked/critical only), select columns, and download as CSV or TSV. TSV pastes directly into Google Sheets with Ctrl+Shift+V. Available columns include Dealer and Inverter Qty."},
         ]
       },
     ]
@@ -5976,7 +5992,7 @@ const HELP_CONTENT = {
         title: "Navigation",
         cards: [
           {h:"Keyboard shortcuts", ul:["1 - Command Center","2 - My Queue","3 - Pipeline","4 - Analytics","5 - Task Audit","6 - Schedule","7 - Service Calls","8 - Funding","9 - Help","/ - Focus search","N - New project","Esc - Close panel or modal"]},
-          {h:"Search", p:"Press / or click the search bar to search across all projects by name, ID, city, financier, AHJ, utility, advisor, or consultant. Click a result to open the project panel."},
+          {h:"Search", p:"Press / or click the search bar to search across all projects by name, ID, city, financier, AHJ, utility, advisor, consultant, or dealer. Click a result to open the project panel."},
           {h:"Real-time updates", p:"Changes made by other team members appear on your screen automatically. Task status changes, new notes, and stage moves all propagate in real time without refreshing."},
           {h:"Data freshness", p:"The green dot and timestamp in the top bar shows when data was last loaded. Click it to force a refresh."},
         ]
@@ -5999,6 +6015,52 @@ const HELP_CONTENT = {
         title: "Service Calls",
         cards: [
           {h:"Creating a service call", p:"Click + New Service Call in the Service tab. Fill in customer info, issue type, priority, and assign a crew if known. Service calls track through Open, Scheduled, In Progress, Closed."},
+        ]
+      },
+    ]
+  },
+  changelog: {
+    label: "What's New",
+    sections: [
+      {
+        title: "Session 2 — March 2026",
+        cards: [
+          {h:"23 bugs fixed across 6 push batches", ul:[
+            "Funding events now sort newest-first correctly",
+            "Panel tab no longer resets to Tasks on every re-render",
+            "Panel tab only resets to Tasks when switching to a different project",
+            "Duplicate BOM pane in DOM removed",
+            "BOM version number now increments correctly on repeated saves",
+            "Funding status cache now busts when saving from edit modal",
+            "Funding status cache now busts when moving stage",
+            "deleteDocument no longer double-filters the array",
+            "Note input clears automatically after saving",
+            "Funding status cache now stores all result types — faster dashboard render",
+            "Search shows No projects match message when nothing found",
+            "Export CSV: Inverter Qty now has correct column header",
+            "Funding event log now correctly fires on status-only changes (no note required)",
+            "Dead addNote() function removed — sendChat() is the active notes path",
+            "Service calls default sort (Newest) was backwards — fixed",
+            "New project form now captures Dealer, Module, Inverter, Battery, Financing Type",
+            "render() debounce fixed — last call in a burst wins, not first",
+            "saveEdit now keeps projectMap O(1) lookup in sync",
+          ]},
+          {h:"Dynamic PM dropdowns", p:"All PM filter and assignment dropdowns now build from live project data. Adding a new PM to any project makes them available everywhere automatically — no code changes needed."},
+          {h:"Nonfunded codes are now per-milestone", p:"M2 and M3 nonfunded codes are tracked independently. Setting codes on M3 no longer overwrites M2 codes. Requires schema-nonfunded-per-milestone.sql to be run in Supabase."},
+          {h:"Funding event audit trail fixed", p:"Status-only changes (no note typed) now correctly log to the funding event history. Previously only changes with a note were recorded."},
+        ]
+      },
+      {
+        title: "Session 1 — Feb/Mar 2026",
+        cards: [
+          {h:"Documents module", p:"Each project now has a Files tab with per-type document tracking, required document checklist, file upload to Supabase Storage (Project-documents bucket), and Google Drive folder linking."},
+          {h:"BOM generator", p:"Bill of Materials tab on every project. Auto-calculates from equipment data. Supports array/row/attachment inputs, orientation toggle, per-line overrides, save to database, and CSV export."},
+          {h:"Dealer field", p:"Dealer added to project data, panel display, edit modal, pipeline filter, export columns, search, and Leadership Analytics Revenue by Dealer table."},
+          {h:"Installation Agreement document type", p:"Added as a required document type in the Files tab checklist."},
+          {h:"Performance improvements", p:"Memoized getFundingStatus, pre-computed ALL_REQ_TASKS constant, debounced render(), and single-pass leadership dashboard computation. Noticeably faster on 400+ project datasets."},
+          {h:"Drive folder auto-link", p:"Script linked 270 of 487 projects to their Google Drive folders automatically."},
+          {h:"Dealer import", p:"All 487 projects updated with dealer assignments from 16,269-row export."},
+          {h:"40+ bug fixes", p:"deleteDocument async, funding cache busting on save, events sort direction, doc CSS conflict, and many more across 9 fix batches."},
         ]
       },
     ]
