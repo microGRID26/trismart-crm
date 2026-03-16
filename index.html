@@ -3978,30 +3978,14 @@ async function signOut(){
 }
 
 // Check for an existing Supabase session on page load.
-// If one exists, restore currentUser and go straight to the app.
-(async function(){
-  const {data:{session}} = await sb.auth.getSession();
-  if(!session) return; // login screen remains visible
-
-  // Restore display name from sessionStorage (avoids a round-trip)
-  const saved=sessionStorage.getItem('crm_user');
-  if(saved){
-    try{ currentUser=JSON.parse(saved); }catch(e){}
-  }
-  // Fall back to Supabase session metadata if sessionStorage was cleared
-  if(!currentUser.name && session.user){
-    const u=session.user;
-    currentUser={
-      name:     u.user_metadata?.full_name||u.email||'',
-      fullName: u.user_metadata?.full_name||u.email||'',
-      email:    u.email||'',
-      picture:  u.user_metadata?.avatar_url||'',
-    };
-    sessionStorage.setItem('crm_user',JSON.stringify(currentUser));
-  }
-  if(currentUser.name){
+// Restore session from sessionStorage — no Supabase auth session needed.
+(function(){
+  const saved = sessionStorage.getItem('crm_user');
+  if (!saved) return; // login screen stays visible
+  try { currentUser = JSON.parse(saved); } catch(e) { return; }
+  if (currentUser.name) {
     showUserChip();
-    document.getElementById('login-screen').style.display='none';
+    document.getElementById('login-screen').style.display = 'none';
     loadData();
   }
 })();
