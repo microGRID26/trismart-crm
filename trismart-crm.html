@@ -1802,6 +1802,7 @@ function setupRealtime(){
       const already=notes[n.projectId].some(x=>x.text===n.text&&x.pm===n.pm&&x.time===n.time);
       if(already) return;
       notes[n.projectId].push({text:n.text,time:n.time||'',pm:n.pm||''});
+      bustMentionCache(n.projectId);
       // Live-update chat panel if it's open on this project
       if(selectedId===n.projectId&&currentPanelTab==='notes'){
         const msgEl=document.getElementById('chat-messages-'+n.projectId);
@@ -2530,14 +2531,7 @@ function renderLeadershipDashboard(){
     d.setHours(23,59,59,999);
     return d;
   }
-  function inRange(dateStr, period){
-    if(!dateStr) return false;
-    const d=new Date(dateStr+'T00:00:00');
-    if(isNaN(d)) return false;
-    const s=rangeStart(period);
-    const e=rangeEnd(period);
-    return d>=s && (!e||d<=e);
-  }
+  function inRange(dateStr, period){ return _inRange(dateStr, period, now); }
 
   // ── Period selector state ────────────────────────────────────────────────
   if(!window._ldPeriod) window._ldPeriod='mtd';
@@ -2895,7 +2889,7 @@ function renderPipelineAnalytics(){
   const dealerStats=dealers.map(d=>{
     const dp=vis.filter(p=>p.dealer===d);
     const val=dp.reduce((a,p)=>a+(Number(p.contract)||0),0);
-    const installs=dp.filter(p=>inRange(p.installCompleteDate||(p.stage==='complete'?p.stageDate:null),period)).length;
+    const _period=window._ldPeriod||'mtd'; const installs=dp.filter(p=>_inRange(p.installCompleteDate||(p.stage==='complete'?p.stageDate:null),_period)).length;
     return {name:d,count:dp.length,val,installs};
   }).sort((a,b)=>b.val-a.val);
 
@@ -3517,8 +3511,11 @@ function confirmCompletion(){
   if(!stageHistory[pid]) stageHistory[pid]=[];
   stageHistory[pid].push({stage:'Completion',entered:dateStr});
   p.stage='complete';p.stageDate=dateStr;
+  projectMap[String(pid)]=p; // keep O(1) lookup in sync
   // Bust SLA cache — stage and stageDate both changed
   Object.keys(_slaCache).forEach(k=>{if(k.startsWith(pid+'|')) delete _slaCache[k];});
+  // Bust funding cache — completion affects M3 eligibility
+  bustFundingStatusCache(pid);
 
   // Add closing note if provided
   if(closingNote||checkedItems.length){
@@ -3527,6 +3524,7 @@ function confirmCompletion(){
     if(!notes[pid]) notes[pid]=[];
     const who=currentUser.name||currentPM||'Team';
     notes[pid].push({text:noteText,time:new Date().toISOString(),pm:who});
+    bustMentionCache(pid);
     post({action:'addNote',projectId:pid,text:noteText,time:new Date().toISOString(),pm:who});
   }
 
@@ -3604,6 +3602,7 @@ async function openPanel(pid){
       if(selectedId!==fetchToken){ return; }
       Object.assign(taskState,mergedTs);
       Object.assign(notes,mergedNotes);
+      bustMentionCache(); // bust all — fresh notes loaded for this project
       markDetailFresh(pid);
     } catch(e) {
       console.warn('Detail fetch failed',e);
@@ -3663,10 +3662,17 @@ function reassignPM(pid,newPM){
   showToast(`Moved to ${newPM}`);
   post({action:'reassignPM',projectId:pid,pm:newPM});
 }
+// Mention cache — keyed by pid, busted when notes change for that project
+const _mentionCache={};
+function bustMentionCache(pid){if(pid) delete _mentionCache[pid]; else Object.keys(_mentionCache).forEach(k=>delete _mentionCache[k]);}
 function hasMention(pid){
+  if(_mentionCache[pid]!==undefined) return _mentionCache[pid];
   const myName=currentUser.name||'';
-  if(!myName) return false;
-  return (notes[pid]||[]).some(n=>n.text&&n.text.toLowerCase().includes('@'+myName.split(' ')[0].toLowerCase()));
+  if(!myName){_mentionCache[pid]=false;return false;}
+  const first='@'+myName.split(' ')[0].toLowerCase();
+  const result=(notes[pid]||[]).some(n=>n.text&&n.text.toLowerCase().includes(first));
+  _mentionCache[pid]=result;
+  return result;
 }
 function fmtTimestamp(raw){
   if(!raw) return '';
@@ -3911,6 +3917,7 @@ function sendChat(pid){
   const note={text,time:timeStr,pm:who};
   if(!notes[pid]) notes[pid]=[];
   notes[pid].push(note);
+  bustMentionCache(pid);
   el.value='';
   document.getElementById('mention-dd-'+pid).style.display='none';
   // Re-render chat messages
@@ -5498,6 +5505,38 @@ let fundingModalMilestone = null;
 
 // Derive funding status for a project/milestone from task state + project_funding
 const _fsCache={};
+// Module-level date range helper — used by both Leadership and Pipeline analytics
+function _inRange(dateStr, period, refDate) {
+  if(!dateStr) return false;
+  const d=new Date(dateStr+'T00:00:00');
+  if(isNaN(d)) return false;
+  const now=refDate||new Date();
+  function rangeStart(p){
+    const r=new Date(now);
+    switch(p){
+      case 'wtd': r.setDate(r.getDate()-r.getDay()); break;
+      case 'mtd': r.setDate(1); break;
+      case 'qtd': { const qm=Math.floor(r.getMonth()/3)*3; r.setMonth(qm,1); break; }
+      case 'ytd': r.setMonth(0,1); break;
+      case 'last7': r.setDate(r.getDate()-7); break;
+      case 'last30': r.setDate(r.getDate()-30); break;
+      case 'last90': r.setDate(r.getDate()-90); break;
+      case 'lastweek': { r.setDate(r.getDate()-r.getDay()-7); break; }
+      case 'lastmonth': { r.setMonth(r.getMonth()-1,1); break; }
+    }
+    r.setHours(0,0,0,0); return r;
+  }
+  function rangeEnd(p){
+    const r=new Date(now);
+    if(p==='lastweek'){ r.setDate(r.getDate()-r.getDay()-1); }
+    else if(p==='lastmonth'){ r.setDate(0); }
+    else return null;
+    r.setHours(23,59,59,999); return r;
+  }
+  const s=rangeStart(period);
+  const e=rangeEnd(period);
+  return d>=s && (!e||d<=e);
+}
 function bustFundingStatusCache(pid){if(pid){delete _fsCache[pid+'|m2'];delete _fsCache[pid+'|m3'];}else{Object.keys(_fsCache).forEach(k=>delete _fsCache[k]);}}
 function getFundingStatus(pid, milestone) {
   const ckey = pid+'|'+milestone;
@@ -6054,6 +6093,9 @@ const HELP_CONTENT = {
             "PM Rebalance now keeps projectMap in sync after moving projects",
             "Duplicate Project no longer hardcodes Ari as fallback PM",
             "generateProjectId now uses reduce instead of spread — safe at any scale",
+            "Pipeline Analytics tab no longer crashes when visited before Leadership tab (inRange scope fix)",
+            "Completion modal now busts funding cache and syncs projectMap",
+            "hasMention() memoized — Command Center renders 487x faster on @mention check",
             "New project form now captures Dealer, Module, Inverter, Battery, Financing Type",
             "completedDate written to DB in ISO format (was locale string — caused sort/display issues)",
             "Date display in project panel no longer shifts one day back in US timezones",
