@@ -764,7 +764,7 @@ select.np-input{cursor:pointer;}
         <div class="admin-nav-item" id="anav-info" onclick="setAdminTab('info')">CRM Info</div>
       </div>
       <!-- Content -->
-      <div style="flex:1;padding:20px 24px;overflow-y:auto;max-height:70vh;" id="admin-content">
+      <div style="flex:1;padding:20px 24px;overflow-y:auto;max-height:calc(90vh - 120px);" id="admin-content">
         <div style="color:var(--text3);font-size:13px;">Loading...</div>
       </div>
     </div>
@@ -4109,7 +4109,9 @@ async function openAdminToAHJ(ahjName) {
   if (!isAdmin()) return;
   let data;
   ({data} = await sb.from('ahjs').select('id').ilike('name', ahjName).limit(1));
+  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('short_name', ahjName).limit(1));
   if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `${ahjName}%`).limit(1));
+  if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('short_name', `${ahjName}%`).limit(1));
   if (!data?.length) ({data} = await sb.from('ahjs').select('id').ilike('name', `%${ahjName}%`).limit(1));
   if (data?.length) openAhjEdit(data[0].id);
   else showToast('AHJ not found in database: ' + ahjName);
@@ -4209,7 +4211,11 @@ async function renderAdminAHJ(el, search, page) {
 
 async function openAhjEdit(id) {
   _ahjEditId = id;
+  _utilityEditId = null;
+  _userEditId = null;
   const modal = document.getElementById('ahj-edit-modal');
+  const saveBtn = modal.querySelector('button');
+  if (saveBtn) saveBtn.setAttribute('onclick','saveAhjModal()');
   const body  = document.getElementById('ahj-modal-body');
   modal.style.display = 'block';
   body.innerHTML = '<div style="color:var(--text3);padding:20px;">Loading...</div>';
@@ -4225,6 +4231,11 @@ async function openAhjEdit(id) {
       <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
       ${type === 'textarea'
         ? `<textarea id="ahjedit-${key}" rows="4" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);resize:vertical;box-sizing:border-box;">${escapeHtml(data[key]||'')}</textarea>`
+        : type === 'password'
+        ? `<div style="position:relative;"><input type="password" id="ahjedit-${key}" value="${escapeHtml(String(data[key]||''))}"
+            style="width:100%;padding:7px 32px 7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);box-sizing:border-box;">
+            <span onclick="const i=document.getElementById('ahjedit-${key}');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🔒'"
+              style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:13px;user-select:none;">👁</span></div>`
         : `<input type="${type}" id="ahjedit-${key}" value="${escapeHtml(String(data[key]||''))}"
             style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);box-sizing:border-box;">`
       }
@@ -4240,12 +4251,12 @@ async function openAhjEdit(id) {
       ${field('building_code','Building Code')}
       ${field('fire_code','Fire Code')}
       ${field('permit_username','Portal Username')}
-      ${field('permit_password','Portal Password')}
+      ${field('permit_password','Portal Password','password')}
       ${field('permit_notes','Permit Notes','textarea',true)}
       <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);margin-top:8px;">Inspection Info</div>
       ${field('inspection_portal','Inspection Portal')}
       ${field('inspection_login','Inspection Login')}
-      ${field('inspection_password','Inspection Password')}
+      ${field('inspection_password','Inspection Password','password')}
       ${field('inspection_email','Inspection Email')}
       ${field('inspection_notes','Inspection Notes','textarea',true)}
     </div>
@@ -4389,8 +4400,10 @@ async function renderAdminUtility(el, search, page) {
 
 async function openUtilityEdit(id) {
   _utilityEditId = id;
+  _ahjEditId = null;
+  _userEditId = null;
   const modal = document.getElementById('ahj-edit-modal');
-  const saveBtn = modal.querySelector('button[onclick="saveAhjModal()"]');
+  const saveBtn = modal.querySelector('button');
   if (saveBtn) saveBtn.setAttribute('onclick','saveUtilityModal()');
   const body = document.getElementById('ahj-modal-body');
   modal.style.display = 'block';
@@ -4546,7 +4559,16 @@ async function openUserModal(id) {
       ${inp('name','Full Name')}
       ${inp('email','Email','email')}
       ${inp('phone','Phone')}
-      ${inp('color','Avatar Color (hex)')}
+      <div style="margin-bottom:2px;">
+        <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">Avatar Color</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="color" id="ue-color" value="${data.color||'#1D9E75'}"
+            style="width:40px;height:34px;padding:2px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);cursor:pointer;">
+          <input type="text" id="ue-color-hex" value="${escapeHtml(data.color||'#1D9E75')}"
+            oninput="document.getElementById('ue-color').value=this.value"
+            style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);">
+        </div>
+      </div>
       <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);margin-top:8px;">Role & Access</div>
       ${sel('department','Department',DEPARTMENTS)}
       ${sel('position','Position',POSITIONS)}
@@ -4692,6 +4714,11 @@ async function flushCrewChanges() {
   }
   await reloadData();
   showToast('Crew saved');
+  // Re-render crews tab if still open
+  const el = document.getElementById('admin-content');
+  if (el && document.getElementById('admin-overlay').style.display !== 'none' && _adminTab === 'crews') {
+    await renderAdminCrews(el);
+  }
 }
 
 async function updateCrewName(crewId, name) {
@@ -4815,7 +4842,7 @@ function resetSLAThresholds() {
 }
 
 // ── CRM INFO ──────────────────────────────────────────────────────────────────
-function renderAdminInfo(el) {
+async function renderAdminInfo(el) {
   const active = projects.filter(p=>p.stage!=='complete').length;
   const completed = projects.filter(p=>p.stage==='complete').length;
   const totalNotes = Object.values(notes).reduce((a,n)=>a+n.length,0);
@@ -4829,7 +4856,8 @@ function renderAdminInfo(el) {
         ['Completed', completed],
         ['Notes in DB', totalNotes.toLocaleString()],
         ['Drive folders linked', linked + ' / ' + projects.length],
-        ['AHJs in database', '1,633 (TX)'],
+        ['Utilities in database', await sb.from('utilities').select('id',{count:'exact',head:true}).then(r=>(r.count||0).toLocaleString())],
+        ['AHJs in database', await sb.from('ahjs').select('id',{count:'exact',head:true}).then(r=>(r.count||0).toLocaleString()+' (TX)')],
       ].map(([label,val])=>`<div style="padding:12px 14px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border2);">
         <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">${label}</div>
         <div style="font-size:20px;font-weight:700;color:var(--text);">${val}</div>
@@ -4854,7 +4882,7 @@ async function ahjAutocomplete(input) {
   // Query Supabase ahjs table
   try {
     const res = await sb.from('ahjs')
-      .select('name,state,city,permit_phone,permit_website,max_duration,permit_notes,permit_username,electric_code,inspection_portal,inspection_login,inspection_password,inspection_email,inspection_notes,plans_on_site,host_type_required,how_to_request,short_name')
+      .select('name,state,city,permit_phone,permit_website,max_duration,permit_notes,permit_username,electric_code,inspection_portal,inspection_login,inspection_email,inspection_notes,plans_on_site,host_type_required,how_to_request,short_name')
       .or(`name.ilike.${q}%,short_name.ilike.${q}%`)
       .eq('state', 'TX')
       .limit(8);
