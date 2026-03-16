@@ -28,7 +28,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .nav-btn:hover{background:var(--bg2);}
 .search-wrap{position:relative;}
 .search-input{font-size:12px;padding:5px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);width:200px;}
-.search-results{position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);width:280px;max-height:240px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+.search-results{position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);width:320px;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);}
 .sr-item{padding:8px 12px;cursor:pointer;border-bottom:0.5px solid var(--border);}
 .sr-item:last-child{border-bottom:none;}
 .sr-item:hover{background:var(--bg2);}
@@ -1884,6 +1884,44 @@ function setupRealtime(){
       if(currentView==='funding') renderFunding();
       if(selectedId===r.projectId) renderPanel(r.projectId);
     })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'project_documents'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!projectDocuments[r.projectId]) projectDocuments[r.projectId]=[];
+      // Skip own writes (optimistically inserted already)
+      const already=projectDocuments[r.projectId].some(x=>x.id===r.id);
+      if(already) return;
+      projectDocuments[r.projectId].unshift(r);
+      if(selectedId===r.projectId) renderPanelFiles(r.projectId);
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'project_documents'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      if(!projectDocuments[r.projectId]) projectDocuments[r.projectId]=[];
+      const idx=projectDocuments[r.projectId].findIndex(x=>x.id===r.id);
+      if(idx>=0) projectDocuments[r.projectId][idx]=r;
+      else projectDocuments[r.projectId].unshift(r);
+      if(selectedId===r.projectId) renderPanelFiles(r.projectId);
+    })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'project_documents'}, payload=>{
+      const r=snakeToCamel(payload.old);
+      if(!r.projectId) return;
+      if(projectDocuments[r.projectId])
+        projectDocuments[r.projectId]=projectDocuments[r.projectId].filter(x=>x.id!==r.id);
+      if(selectedId===r.projectId) renderPanelFiles(r.projectId);
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'project_folders'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      projectFolders[r.projectId]={folderId:r.folderId||'',folderUrl:r.folderUrl||''};
+      if(selectedId===r.projectId) renderPanelFiles(r.projectId);
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'project_folders'}, payload=>{
+      const r=snakeToCamel(payload.new);
+      if(!r.projectId) return;
+      projectFolders[r.projectId]={folderId:r.folderId||'',folderUrl:r.folderUrl||''};
+      if(selectedId===r.projectId) renderPanelFiles(r.projectId);
+    })
 
     .subscribe(status=>{
       // Update the freshness dot to indicate live connection
@@ -3311,6 +3349,23 @@ function renderPanel(pid){
         return html;
       })()}
     </div>
+    ${(()=>{
+      const projSvcs=(serviceCalls||[]).filter(s=>String(s.projectId)===String(pid));
+      if(!projSvcs.length) return '';
+      const open=projSvcs.filter(s=>s.status!=='closed').length;
+      const statusColor={open:'var(--red)',scheduled:'var(--amber)',in_progress:'var(--orange)',closed:'var(--text3)'};
+      return `<div class="sec"><div class="sec-title">Service Calls <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${open?'var(--red-bg)':'var(--bg2)'};color:${open?'var(--red)':'var(--text3)'};">${projSvcs.length}</span></div>
+        ${projSvcs.map(svc=>`
+        <div style="padding:6px 0;border-bottom:0.5px solid var(--border);font-size:11px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <span style="font-weight:500;color:var(--text);">${svc.type||'Service Call'}</span>
+            <span style="color:${statusColor[svc.status]||'var(--text3)'};font-size:10px;text-transform:capitalize;">${(svc.status||'').replace('_',' ')}</span>
+          </div>
+          <div style="color:var(--text2);">${svc.issue?svc.issue.slice(0,60)+(svc.issue.length>60?'…':''):''}</div>
+          ${svc.date?`<div style="color:var(--text3);font-size:10px;">${svc.date}</div>`:''}
+        </div>`).join('')}
+      </div>`;
+    })()}
     <div class="sec"><div class="sec-title">Move stage</div>
       <div class="stage-move">
         <select id="stage-sel" style="font-size:11px;flex:1;border-radius:var(--radius);border:0.5px solid var(--border2);padding:4px 6px;background:var(--bg2);color:var(--text);">
@@ -3909,6 +3964,54 @@ function chatKeydown(e,pid){
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat(pid);}
 }
 
+// Team email map for @mention notifications
+const TEAM_EMAILS = {
+  'Greg':   'gkelsch@trismartsolar.com',
+  'Mark':   'mark@trismartsolar.com',
+  'Zach':   'zhall@trismartsolar.com',
+  'Heidi':  'hguevara@trismartsolar.com',
+  'Will':   'wcarter@trismartsolar.com',
+  'Ari':    'aruelas@trismartsolar.com',
+  'Jen':    'jharper1@trismartsolar.com',
+  'Taylor': 'tpratt@trismartsolar.com',
+};
+
+// Apps Script web app URL for sending mention emails
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPLACEHOLDER/exec';
+
+function sendMentionEmails(pid, text, senderName) {
+  // Extract @mentions from text
+  const matches = text.match(/@([A-Za-z]+)/g) || [];
+  const mentioned = [...new Set(matches.map(m => m.slice(1)))];
+  if (!mentioned.length) return;
+
+  const p = projectMap[String(pid)];
+  const projectName = p ? p.name : pid;
+
+  mentioned.forEach(name => {
+    // Case-insensitive match against team
+    const key = Object.keys(TEAM_EMAILS).find(k => k.toLowerCase() === name.toLowerCase());
+    if (!key) return;
+    if (key === senderName) return; // don't email yourself
+    const email = TEAM_EMAILS[key];
+
+    // Fire via Apps Script
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        action: 'sendMention',
+        to: email,
+        toName: key,
+        from: senderName,
+        projectId: pid,
+        projectName,
+        text,
+      }),
+    }).catch(e => console.warn('Mention email failed:', e));
+  });
+}
+
 function sendChat(pid){
   const el=document.getElementById('chat-input-'+pid);
   const whoEl=document.getElementById('chat-who-'+pid);
@@ -3935,6 +4038,8 @@ function sendChat(pid){
   if(msgEl){msgEl.innerHTML=renderChatMessages(notes[pid]);msgEl.scrollTop=msgEl.scrollHeight;}
   markDetailStale(pid); // other PMs will re-fetch this on next open
   post({action:'addNote',projectId:pid,text:note.text,time:note.time,pm:note.pm});
+  // Fire mention emails if any @mentions in text
+  sendMentionEmails(pid, text, who);
 }
 
 // ── NEW / EDIT PROJECT ───────────────────────────────────
@@ -4435,11 +4540,56 @@ function renderAudit(){
           <td>${slaBadge(sla.status,sla.days)}</td>
           <td><div class="audit-task-chips">${flagged.map(f=>{
             const cls=f.status==='Pending Resolution'?'atc-pending':f.status==='Revision Required'?'atc-revision':f.status==='In Progress'?'atc-inprogress':'atc-scheduled';
-            return `<span class="atc ${cls}">${f.task.name}</span>`;
+            const QUICK_STATUSES=['In Progress','Complete','Pending Resolution','Revision Required','Ready To Start'];
+            return `<span class="atc ${cls}" title="Click to change status" onclick="event.stopPropagation();auditQuickStatus('${p.id}','${f.task.id}',this)" style="cursor:pointer;">${f.task.name} ▾</span>`;
           }).join('')}</div></td>
         </tr>`;
       }).join('')}</tbody>
     </table>`}`;
+}
+
+// ── AUDIT QUICK STATUS ────────────────────────────────────
+// Inline status change from Task Audit view without opening the panel
+function auditQuickStatus(pid, taskId, chipEl) {
+  // Remove any existing popup
+  document.querySelectorAll('.audit-status-popup').forEach(el => el.remove());
+
+  const STATUSES = ['Ready To Start','In Progress','Scheduled','Pending Resolution','Revision Required','Complete'];
+  const current = ts(pid, taskId);
+
+  const popup = document.createElement('div');
+  popup.className = 'audit-status-popup';
+  popup.style.cssText = 'position:fixed;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:999;min-width:180px;overflow:hidden;';
+
+  popup.innerHTML = STATUSES.map(s => `
+    <div onclick="auditSetStatus('${pid}','${taskId}','${s}',this)"
+         style="padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;
+                background:${s===current?'var(--bg2)':'var(--bg)'};color:var(--text);"
+         onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='${s===current?'var(--bg2)':'var(--bg)'}'">
+      ${s===current?'<span style="color:var(--green);">✓</span>':'<span style="width:10px;display:inline-block;"></span>'}
+      ${s}
+    </div>`).join('');
+
+  // Position near chip
+  const rect = chipEl.getBoundingClientRect();
+  popup.style.top = (rect.bottom + 4) + 'px';
+  popup.style.left = rect.left + 'px';
+  document.body.appendChild(popup);
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function close() {
+      popup.remove();
+      document.removeEventListener('click', close);
+    }, {once:true});
+  }, 10);
+}
+
+function auditSetStatus(pid, taskId, status, el) {
+  el.closest('.audit-status-popup').remove();
+  setStatus(pid, taskId, status);
+  // Re-render audit after a short delay to let the state update
+  setTimeout(renderAudit, 300);
 }
 
 // ── EXPORT ───────────────────────────────────────────────
@@ -5630,6 +5780,23 @@ function renderFunding() {
         <div class="metric-label">Nonfunded</div>
         <div class="metric-value mv-red">${totalNF}</div>
       </div>
+      <div class="metric" style="cursor:default;">
+        <div class="metric-label">Pending amount</div>
+        <div class="metric-value" style="color:var(--amber);">$${(()=>{
+          let tot=0;
+          projects.forEach(p=>{
+            ['m2','m3'].forEach(ms=>{
+              const s=getFundingStatus(p.id,ms);
+              if(s==='eligible'||s==='submitted'){
+                const f=projectFunding[p.id]||{};
+                const est=ms==='m2'?Number(p.contract)*0.65:Number(p.contract)*0.35;
+                tot+=f[ms+'Amount']?Number(f[ms+'Amount']):est;
+              }
+            });
+          });
+          return Math.round(tot/1000)+'k';
+        })()}</div>
+      </div>
     </div>
 
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
@@ -5648,7 +5815,8 @@ function renderFunding() {
       <input class="search-input" type="text" placeholder="Search projects..."
         value="${fundingSearch}"
         oninput="fundingSearch=this.value;renderFunding()"
-        style="width:180px;margin-left:auto;">
+        style="width:180px;">
+      ${totalEligible>0?`<button class="action-btn" style="margin:0;font-size:11px;padding:5px 12px;margin-left:auto;" onclick="bulkSubmitEligible()">Submit All Eligible (${totalEligible})</button>`:'<div style="margin-left:auto;"></div>'}
     </div>
 
     ${!rows.length ? `<div style="padding:40px;text-align:center;color:var(--text3);">No projects match this filter.</div>` : `
@@ -5691,7 +5859,14 @@ function renderFunding() {
             </td>
             <td style="padding:9px 12px;color:var(--text2);">${p.contract?'$'+Number(p.contract).toLocaleString():'—'}</td>
             <td style="padding:9px 12px;color:var(--text2);">${row.amount?'$'+Number(row.amount).toLocaleString():'—'}</td>
-            <td style="padding:9px 12px;color:var(--text3);font-size:11px;">${row.submittedDate?new Date(row.submittedDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td>
+            <td style="padding:9px 12px;color:var(--text3);font-size:11px;">${(()=>{
+              if(!row.submittedDate) return '—';
+              const d=new Date(row.submittedDate+'T00:00:00');
+              const days=Math.floor((new Date()-d)/86400000);
+              const dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+              const color=days>=30?'var(--red)':days>=14?'var(--amber)':'var(--text3)';
+              return `${dateStr} <span style="color:${color};font-weight:${days>=14?'600':'400'};">(${days}d)</span>`;
+            })()}</td>
             <td style="padding:9px 12px;">${nfHtml||'—'}</td>
             <td style="padding:9px 12px;" onclick="event.stopPropagation()">
               ${row.status === 'eligible' ? `<button class="action-btn" style="margin:0;font-size:10px;padding:3px 8px;" onclick="quickFundAction('${p.id}','${ms}','submitted')">Mark Submitted</button>` : ''}
@@ -5704,6 +5879,41 @@ function renderFunding() {
     </table>
     </div>`}
   `;
+}
+
+// Bulk submit all eligible milestones
+async function bulkSubmitEligible() {
+  const eligible = [];
+  projects.forEach(p => {
+    ['m2','m3'].forEach(ms => {
+      if (getFundingStatus(p.id, ms) === 'eligible') eligible.push({pid: p.id, ms});
+    });
+  });
+  if (!eligible.length) return;
+  if (!confirm(`Mark ${eligible.length} milestone(s) as Submitted?`)) return;
+
+  const today = new Date().toISOString().slice(0,10);
+  for (const {pid, ms} of eligible) {
+    if (!projectFunding[pid]) projectFunding[pid] = {};
+    projectFunding[pid][ms + 'Status'] = 'submitted';
+    projectFunding[pid][ms + 'SubmittedDate'] = today;
+    bustFundingStatusCache(pid);
+
+    const update = {projectId: pid};
+    update[ms + 'Status'] = 'submitted';
+    update[ms + 'SubmittedDate'] = today;
+    await sbRun(sb.from('project_funding').upsert(camelToSnake(update), {onConflict:'project_id'}));
+    await sbRun(sb.from('funding_events').insert({
+      project_id: pid,
+      milestone: ms,
+      event_type: 'submitted',
+      date: today,
+      notes: 'Bulk submitted',
+      created_by: currentUser.name || 'Taylor',
+    }));
+  }
+  renderFunding();
+  showToast(`Marked ${eligible.length} milestone(s) as Submitted`);
 }
 
 // Quick status change without opening modal (e.g. Mark Submitted)
@@ -5974,7 +6184,7 @@ const HELP_CONTENT = {
       {
         title: "Daily workflow",
         cards: [
-          {h:"Working the queue", ul:["Filter to Eligible - these are ready to submit to Edge","Click Mark Submitted on the row after submitting to Edge portal","After Edge processes it, open the row and record the funded amount and funded date","If Edge returns it nonfunded, open the row and assign the nonfunded code(s)"]},
+          {h:"Working the queue", ul:["Filter to Eligible - these are ready to submit to Edge","Use Submit All Eligible to bulk-mark all ready milestones in one click, or click Mark Submitted on individual rows","After Edge processes it, open the row and record the funded amount and funded date","If Edge returns it nonfunded, open the row and assign the nonfunded code(s)"]},
           {h:"Funding aging", p:"Sort the table by the Submitted date column to see which projects have been waiting longest. Projects submitted more than 30 days ago should be followed up with Edge."},
         ]
       },
@@ -6041,7 +6251,7 @@ const HELP_CONTENT = {
       {
         title: "Project panel sections",
         cards: [
-          {h:"Left panel sections", ul:["Contact - address, phone, email","Contract - amount, system size, financier, financing type, disposition","Equipment - module, inverter, battery, optimizer with quantities","Site and Electrical - meter/panel location, voltage, MSP rating, MPU, ESID, HOA","Permitting - AHJ, utility, permit numbers, fees, approval dates","Team - PM, advisor, consultant, site surveyor","Milestones - all key dates from NTP to in service","Funding - M1/M2/M3 amounts and dates (when data exists)","Timing - days in stage, total cycle, SLA thresholds","Stage history - timeline of all stage transitions"]},
+          {h:"Left panel sections", ul:["Contact - address, phone, email","Contract - amount, system size, financier, financing type, disposition","Equipment - module, inverter, battery, optimizer with quantities","Site and Electrical - meter/panel location, voltage, MSP rating, MPU, ESID, HOA","Permitting - AHJ, utility, permit numbers, fees, approval dates","Team - PM, advisor, consultant, site surveyor","Milestones - all key dates from NTP to in service","Funding - M1/M2/M3 amounts and dates (when data exists)","Service Calls - any service calls linked to this project with status and issue","Timing - days in stage, total cycle, SLA thresholds","Stage history - timeline of all stage transitions"]},
           {h:"Right panel tabs", ul:["Tasks - task checklist with status dropdowns and due dates","Notes - project chat with @mention support","Files - required document checklist, file uploads, and Google Drive folder link","Schedule - crew job assignments for this project","BOM - auto-calculated bill of materials"]},
         ]
       },
@@ -6063,6 +6273,21 @@ const HELP_CONTENT = {
   changelog: {
     label: "What's New",
     sections: [
+      {
+        title: "Session 3 — March 2026",
+        cards: [
+          {h:"Realtime for documents and folders", p:"Adding, updating, or deleting a document now appears instantly on all connected devices without refreshing. Drive folder links also sync in real time."},
+          {h:"@mention email notifications", p:"When you @mention a teammate in a project note, they receive an email immediately with the message and a link to the project. Sent via Apps Script."},
+          {h:"Service calls in project panel", p:"The project panel left column now shows any service calls linked to that project — status, type, issue description, and date — without opening the Service tab."},
+          {h:"Task Audit — inline status changes", p:"Task chips in the Audit view are now clickable. Change a task status directly from the audit table without opening the full project panel."},
+          {h:"Funding tab improvements", ul:[
+            "Submitted rows now show days waiting (amber at 14+, red at 30+)",
+            "New Pending Amount metric card showing total estimated value of eligible + submitted milestones",
+            "Bulk Submit All Eligible button — marks all ready milestones as submitted in one click",
+          ]},
+          {h:"Nonfunded code migration", p:"Existing shared nonfunded codes migrated to per-milestone M2 columns. Run migrate_nonfunded_codes.sql in Supabase SQL Editor to apply."},
+        ]
+      },
       {
         title: "Session 2 — March 2026 — 45 bugs fixed",
         cards: [
