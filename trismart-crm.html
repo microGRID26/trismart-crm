@@ -3252,10 +3252,18 @@ function renderPanel(pid){
         ${frow('Amount', funding.m3Amount ? '$'+Number(funding.m3Amount).toLocaleString() : null)}
         ${frow('Projected', funding.m3Projected ? '$'+Number(funding.m3Projected).toLocaleString() : null)}
         ${frow('Funded', fdate(funding.m3FundedDate))}` : ''}
-      ${funding.nonfundedCode1||funding.nonfundedCode2||funding.nonfundedCode3 ? `
-        ${frow('Nonfunded 1', funding.nonfundedCode1)}
-        ${frow('Nonfunded 2', funding.nonfundedCode2)}
-        ${frow('Nonfunded 3', funding.nonfundedCode3)}` : ''}
+      ${(funding.m2NonfundedCode1||funding.m2NonfundedCode2||funding.m2NonfundedCode3||funding.m3NonfundedCode1||funding.nonfundedCode1) ? `
+        ${funding.m2NonfundedCode1||funding.m2NonfundedCode2||funding.m2NonfundedCode3 ? '<div style="font-size:10px;font-weight:600;color:var(--text2);margin:4px 0 2px;">M2 Nonfunded</div>' : ''}
+        ${frow('Code 1', funding.m2NonfundedCode1)}
+        ${frow('Code 2', funding.m2NonfundedCode2)}
+        ${frow('Code 3', funding.m2NonfundedCode3)}
+        ${funding.m3NonfundedCode1||funding.m3NonfundedCode2||funding.m3NonfundedCode3 ? '<div style="font-size:10px;font-weight:600;color:var(--text2);margin:4px 0 2px;">M3 Nonfunded</div>' : ''}
+        ${frow('Code 1', funding.m3NonfundedCode1)}
+        ${frow('Code 2', funding.m3NonfundedCode2)}
+        ${frow('Code 3', funding.m3NonfundedCode3)}
+        ${(!funding.m2NonfundedCode1&&!funding.m3NonfundedCode1&&funding.nonfundedCode1) ? frow('Nonfunded 1', funding.nonfundedCode1) : ''}
+        ${(!funding.m2NonfundedCode2&&!funding.m3NonfundedCode2&&funding.nonfundedCode2) ? frow('Nonfunded 2', funding.nonfundedCode2) : ''}
+        ${(!funding.m2NonfundedCode3&&!funding.m3NonfundedCode3&&funding.nonfundedCode3) ? frow('Nonfunded 3', funding.nonfundedCode3) : ''}` : ''}
     </div>` : ''}
     <div class="sec"><div class="sec-title">Timing</div>
       <div class="frow"><span class="flabel">Days in stage</span><span class="fval">${sla.days}d ${slaBadge(sla.status,sla.days)}</span></div>
@@ -3459,8 +3467,10 @@ function moveStage(pid){
   if(!stageHistory[pid]) stageHistory[pid]=[];
   stageHistory[pid].push({stage:s.label,entered:dateStr});
   p.stage=newStage;p.stageDate=dateStr;
-  // Bust SLA cache for this project — stageDate changed
+  // Bust SLA cache — stageDate changed
   Object.keys(_slaCache).forEach(k=>{if(k.startsWith(pid+'|')) delete _slaCache[k];});
+  // Bust funding cache — stage change can affect M2/M3 eligibility
+  bustFundingStatusCache(pid);
   render();renderPanel(pid);showToast('Moved to '+s.label);
   post({action:'moveStage',projectId:pid,stage:newStage,stageDate:dateStr,stageLabel:s.label});
 }
@@ -3543,15 +3553,7 @@ function saveBlocker(pid){
   showToast(p.blocker?'Blocker saved':'Blocker cleared');
   post({action:'saveBlocker',projectId:pid,blocker:p.blocker});
 }
-function addNote(pid){
-  const p=projects.find(x=>x.id===pid);const inp=document.getElementById('note-input');
-  if(!p||!inp||!inp.value.trim()) return;
-  const note={text:inp.value.trim(),time:new Date().toISOString(),pm:currentUser.name||currentPM||'Team'};
-  if(!notes[pid]) notes[pid]=[];
-  notes[pid].push(note);inp.value='';renderPanel(pid);showToast('Note saved');
-  markDetailStale(pid); // force re-fetch next open so other PMs see this note
-  post({action:'addNote',projectId:pid,...note});
-}
+// addNote() removed — superseded by sendChat()
 // Detail cache: pid → timestamp of last fetch
 // Entries expire after DETAIL_TTL ms so server-side changes (from other PMs)
 // are picked up automatically without a full page reload.
@@ -5503,9 +5505,9 @@ function getFundingRow(pid, milestone) {
     fundedDate:    f[milestone + 'FundedDate'] || '',
     submittedDate: f[milestone + 'SubmittedDate'] || '',
     notes:         f[milestone + 'Notes'] || '',
-    nfCode1:       f['nonfundedCode1'] || '',
-    nfCode2:       f['nonfundedCode2'] || '',
-    nfCode3:       f['nonfundedCode3'] || '',
+    nfCode1:       f[milestone+'NonfundedCode1'] || f['nonfundedCode1'] || '',
+    nfCode2:       f[milestone+'NonfundedCode2'] || f['nonfundedCode2'] || '',
+    nfCode3:       f[milestone+'NonfundedCode3'] || f['nonfundedCode3'] || '',
   };
 }
 
@@ -5732,12 +5734,12 @@ function openFundingModal(pid, milestone) {
             <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Code ${n}</div>
             <select class="np-input" id="fm-nf-${n}" style="font-size:11px;">
               <option value="">— None —</option>
-              ${NONFUND_CODES.map(c => `<option value="${c.code}" ${(f['nonfundedCode'+n]||'')==c.code?'selected':''}>${c.code} — ${c.desc.slice(0,30)}</option>`).join('')}
+              ${NONFUND_CODES.map(c => `<option value="${c.code}" ${((f[milestone+'NonfundedCode'+n]||f['nonfundedCode'+n]||'')==c.code)?'selected':''}>${c.code} — ${c.desc.slice(0,30)}</option>`).join('')}
             </select>
           </div>`).join('')}
       </div>
       ${[1,2,3].map(n => {
-        const code = f['nonfundedCode'+n];
+        const code = f[milestone+'NonfundedCode'+n] || f['nonfundedCode'+n];
         const def = code ? NONFUND_CODES.find(x => x.code === code) : null;
         return def ? `<div id="nf-desc-${n}" style="font-size:10px;color:var(--text3);margin-top:4px;padding:4px 8px;background:var(--bg2);border-radius:4px;">${def.master} · ${def.desc} · Responsible: ${def.party}</div>` : `<div id="nf-desc-${n}"></div>`;
       }).join('')}
@@ -5791,6 +5793,9 @@ async function saveFundingModal() {
   const nf2           = get('fm-nf-2');
   const nf3           = get('fm-nf-3');
 
+  // Capture oldStatus BEFORE optimistic update — getFundingStatus reads from projectFunding
+  const oldStatus = getFundingStatus(pid, milestone);
+
   const update = {
     projectId: pid,
     [milestone+'Status']:        status,
@@ -5798,9 +5803,9 @@ async function saveFundingModal() {
     [milestone+'SubmittedDate']: submittedDate||null,
     [milestone+'FundedDate']:    fundedDate||null,
     [milestone+'Notes']:         notes||null,
-    nonfundedCode1: nf1||null,
-    nonfundedCode2: nf2||null,
-    nonfundedCode3: nf3||null,
+    [milestone+'NonfundedCode1']: nf1||null,
+    [milestone+'NonfundedCode2']: nf2||null,
+    [milestone+'NonfundedCode3']: nf3||null,
   };
 
   // Optimistic update
@@ -5814,8 +5819,7 @@ async function saveFundingModal() {
   // Persist
   await sbRun(sb.from('project_funding').upsert(camelToSnake(update), {onConflict:'project_id'}));
 
-  // Log event
-  const oldStatus = getFundingStatus(pid, milestone);
+  // Log event — oldStatus captured before optimistic update above
   if (status !== oldStatus || notes) {
     await sbRun(sb.from('funding_events').insert({
       project_id:  pid,
