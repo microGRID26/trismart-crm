@@ -4281,168 +4281,168 @@ const ROLE_COLORS = {
   funding:'#7C3AED', operations:'#0D7377', member:'var(--text3)'
 };
 
-let _editingUserId = null;
+// ── USER & POSITION CONSTANTS ─────────────────────────────────────────────────
+const DEPARTMENTS = ['Inside Operations','Sales','Executive','Field Operations','Funding','Payroll','HR','Accounting','Dealer'];
+const POSITIONS   = ['Admin','Project Manager','Sales','Site Surveyor','Energy Consultant','Energy Advisor','License Holder','Electrician','Solar Lead','Battery Lead','Installer','Battery Tech','Battery Apprentice','MPU Electrician'];
+const CREW_ROLE_POSITION = {"licenseHolder":"License Holder","electrician":"Electrician","solarLead":"Solar Lead","batteryLead":"Battery Lead","installer1":"Installer","installer2":"Installer","batteryTech1":"Battery Tech","batteryTech2":"Battery Tech","batteryApprentice":"Battery Apprentice","mpuElectrician":"MPU Electrician"};
+const CREW_ROLE_LABELS   = {"licenseHolder":"License Holder","electrician":"Electrician","solarLead":"Solar Lead","batteryLead":"Battery Lead","installer1":"Installer 1","installer2":"Installer 2","batteryTech1":"Battery Tech 1","batteryTech2":"Battery Tech 2","batteryApprentice":"Battery Apprentice","mpuElectrician":"MPU Electrician"};
+
+let _usersData = null;
+let _userEditId = null;
 
 async function renderAdminUsers(el) {
-  el.innerHTML = '<div style="color:var(--text3);padding:20px;font-size:12px;">Loading users...</div>';
-  const { data, error } = await sb.from('users').select('*').order('first_name');
-  if (error) { el.innerHTML = `<div style="color:var(--red);">Error: ${error.message}</div>`; return; }
+  el.innerHTML = '<div style="color:var(--text3);padding:20px;font-size:12px;">Loading...</div>';
+  const { data, error } = await sb.from('users').select('*').order('name');
+  if (error) {
+    el.innerHTML = `<div style="color:var(--red);padding:20px;font-size:13px;">Error: ${error.message}<br><small style="color:var(--text3);">Make sure you ran schema_users.sql in Supabase SQL Editor.</small></div>`;
+    return;
+  }
+  _usersData = data;
+  const deptFilter = document.getElementById('user-dept-filter')?.value || '';
+  const filtered = (data||[]).filter(u => !deptFilter || u.department === deptFilter);
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:500;color:var(--text);">Team Members</div>
-      <button onclick="openNewUserForm()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">+ Add User</button>
-    </div>
-
-    <div id="new-user-form" style="display:none;padding:14px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);margin-bottom:16px;">
-      <div style="font-size:12px;font-weight:500;margin-bottom:10px;">New User</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">First Name</div>
-          <input id="nu-first" placeholder="Greg" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Last Name</div>
-          <input id="nu-last" placeholder="Kelsch" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Display Name</div>
-          <input id="nu-display" placeholder="Greg" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Email</div>
-          <input id="nu-email" placeholder="greg@trismartsolar.com" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Role</div>
-          <select id="nu-role" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
-            ${USER_ROLES.map(r=>`<option value="${r.value}">${r.label}</option>`).join('')}
-          </select></div>
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Avatar Color</div>
-          <input id="nu-color" type="color" value="#1D9E75" style="width:100%;padding:2px;height:31px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;"></div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="submitNewUser()" style="padding:6px 16px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">Add User</button>
-        <button onclick="document.getElementById('new-user-form').style.display='none'" style="padding:6px 12px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
+      <div style="font-size:13px;font-weight:500;color:var(--text);">Users (${data.length})</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="user-dept-filter" onchange="renderAdminUsers(document.getElementById('admin-content'))"
+          style="padding:5px 8px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:11px;background:var(--bg2);color:var(--text);">
+          <option value="">All departments</option>
+          ${DEPARTMENTS.map(d=>`<option value="${d}">${d}</option>`).join('')}
+        </select>
+        <button onclick="openUserModal()"
+          style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">+ Add User</button>
       </div>
     </div>
-
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
         <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Name</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Display</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Department</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Position</th>
         <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Email</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Role</th>
         <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Status</th>
         <th style="padding:8px 12px;"></th>
       </tr></thead>
       <tbody>
-        ${(data||[]).map((u,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};" id="user-row-${u.id}">
-          <td style="padding:9px 12px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:${u.color||'#999'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${(u.first_name||'?').slice(0,1)}${(u.last_name||'?').slice(0,1)}</div>
-              <span style="font-weight:500;">${u.first_name} ${u.last_name}</span>
-            </div>
-          </td>
-          <td style="padding:9px 12px;color:var(--text2);">${u.display_name||'—'}</td>
-          <td style="padding:9px 12px;color:var(--text2);font-size:11px;">${u.email||'—'}</td>
-          <td style="padding:9px 12px;">
-            <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:var(--bg2);color:${ROLE_COLORS[u.role]||'var(--text3)'};">
-              ${USER_ROLES.find(r=>r.value===u.role)?.label||u.role||'Member'}
-            </span>
-          </td>
-          <td style="padding:9px 12px;">
-            <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${u.active?'var(--green-bg)':'var(--bg2)'};color:${u.active?'var(--green)':'var(--text3)'};">
-              ${u.active?'Active':'Inactive'}
-            </span>
-          </td>
-          <td style="padding:9px 12px;">
-            <button onclick="openUserEdit('${u.id}')" style="font-size:10px;padding:3px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;color:var(--text);">Edit</button>
-          </td>
-        </tr>`).join('')}
+        ${filtered.map((u,i) => `
+          <tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
+            <td style="padding:9px 12px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:26px;height:26px;border-radius:50%;background:${u.color||'#999'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;flex-shrink:0;">${(u.name||'?').slice(0,2).toUpperCase()}</div>
+                <span style="font-weight:500;">${escapeHtml(u.name||'')}</span>
+                ${u.is_admin?'<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:var(--green-bg);color:var(--green);">Admin</span>':''}
+              </div>
+            </td>
+            <td style="padding:9px 12px;color:var(--text2);">${u.department||'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);">${u.position||'—'}</td>
+            <td style="padding:9px 12px;color:var(--text2);font-size:11px;">${u.email||'—'}</td>
+            <td style="padding:9px 12px;">
+              <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${u.is_active?'var(--green-bg)':'var(--bg2)'};color:${u.is_active?'var(--green)':'var(--text3)'};">
+                ${u.is_active?'Active':'Inactive'}
+              </span>
+            </td>
+            <td style="padding:9px 12px;">
+              <button onclick="openUserModal('${u.id}')"
+                style="font-size:10px;padding:3px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;color:var(--text);">Edit</button>
+            </td>
+          </tr>`).join('')}
       </tbody>
-    </table>
-    <div id="user-edit-panel" style="display:none;margin-top:20px;padding:16px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);"></div>
-  `;
+    </table>`;
+  if (deptFilter) { const s=document.getElementById('user-dept-filter'); if(s) s.value=deptFilter; }
 }
 
-function openNewUserForm() {
-  document.getElementById('new-user-form').style.display = 'block';
-  document.getElementById('nu-first').focus();
+async function openUserModal(id) {
+  _userEditId = id || null;
+  let data = {};
+  if (id && _usersData) { data = _usersData.find(u=>u.id===id)||{}; }
+  else if (id) { const r=await sb.from('users').select('*').eq('id',id).single(); if(r.data) data=r.data; }
+
+  const modal = document.getElementById('ahj-edit-modal');
+  const saveBtn = modal.querySelector('button[onclick="saveAhjModal()"]');
+  if (saveBtn) saveBtn.setAttribute('onclick','saveUserModal()');
+  document.getElementById('ahj-modal-title').textContent = id ? 'Edit User' : 'Add User';
+  document.getElementById('ahj-modal-sub').textContent = data.email || '';
+  modal.style.display = 'block';
+
+  const inp = (key, label, type='text', fw=false) =>
+    `<div style="${fw?'grid-column:1/-1;':''}margin-bottom:2px;">
+      <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
+      <input type="${type}" id="ue-${key}" value="${escapeHtml(String(data[key]||''))}"
+        style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);box-sizing:border-box;"></div>`;
+
+  const sel = (key, label, opts, fw=false) =>
+    `<div style="${fw?'grid-column:1/-1;':''}margin-bottom:2px;">
+      <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
+      <select id="ue-${key}" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);">
+        <option value="">-- Select --</option>
+        ${opts.map(o=>`<option value="${o}"${data[key]===o?' selected':''}>${o}</option>`).join('')}
+      </select></div>`;
+
+  const chk = (key, label) =>
+    `<div style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="ue-${key}" ${data[key]?' checked':''} style="width:16px;height:16px;cursor:pointer;">
+      <div style="font-size:12px;color:var(--text);">${label}</div></div>`;
+
+  document.getElementById('ahj-modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;">
+      <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);">Personal Info</div>
+      ${inp('name','Full Name')}
+      ${inp('email','Email','email')}
+      ${inp('phone','Phone')}
+      ${inp('color','Avatar Color (hex)')}
+      <div style="grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:0.5px solid var(--border2);margin-top:8px;">Role & Access</div>
+      ${sel('department','Department',DEPARTMENTS)}
+      ${sel('position','Position',POSITIONS)}
+      <div style="grid-column:1/-1;display:flex;gap:24px;margin-top:4px;">
+        ${chk('is_admin','Admin access (can access Settings)')}
+        ${chk('is_active','Active user')}
+      </div>
+    </div>`;
 }
 
-async function submitNewUser() {
-  const first   = document.getElementById('nu-first').value.trim();
-  const last    = document.getElementById('nu-last').value.trim();
-  const display = document.getElementById('nu-display').value.trim() || first;
-  const email   = document.getElementById('nu-email').value.trim();
-  const role    = document.getElementById('nu-role').value;
-  const color   = document.getElementById('nu-color').value;
-  if (!first || !last) { showToast('First and last name required'); return; }
-  const { error } = await sb.from('users').insert({first_name:first, last_name:last, display_name:display, email, role, color, active:true});
-  if (error) { showToast('Error: ' + error.message); return; }
-  showToast('User added');
-  document.getElementById('new-user-form').style.display = 'none';
-  renderAdminUsers(document.getElementById('admin-content'));
-}
-
-async function openUserEdit(id) {
-  _editingUserId = id;
-  const panel = document.getElementById('user-edit-panel');
-  if (!panel) return;
-  panel.style.display = 'block';
-  panel.innerHTML = '<div style="font-size:12px;color:var(--text3);">Loading...</div>';
-  const { data, error } = await sb.from('users').select('*').eq('id', id).single();
-  if (error || !data) { panel.innerHTML = '<div style="color:var(--red);">Error loading user</div>'; return; }
-
-  panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div style="font-size:13px;font-weight:600;">${data.first_name} ${data.last_name}</div>
-      <button onclick="document.getElementById('user-edit-panel').style.display='none'" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--text2);">✕</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
-      ${[['ue-first','First Name',data.first_name],['ue-last','Last Name',data.last_name],['ue-display','Display Name',data.display_name],['ue-email','Email',data.email||'']].map(([id,label,val])=>`
-        <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">${label}</div>
-        <input id="${id}" value="${escapeHtml(val||'')}" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>`).join('')}
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Role</div>
-        <select id="ue-role" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
-          ${USER_ROLES.map(r=>`<option value="${r.value}"${r.value===data.role?' selected':''}>${r.label}</option>`).join('')}
-        </select></div>
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Avatar Color</div>
-        <input id="ue-color" type="color" value="${data.color||'#999999'}" style="width:100%;padding:2px;height:31px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;"></div>
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Status</div>
-        <select id="ue-active" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
-          <option value="true"${data.active?' selected':''}>Active</option>
-          <option value="false"${!data.active?' selected':''}>Inactive</option>
-        </select></div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="saveUserEdit('${id}')" style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">Save Changes</button>
-      <button onclick="document.getElementById('user-edit-panel').style.display='none'" style="padding:8px 16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
-    </div>
-  `;
-}
-
-async function saveUserEdit(id) {
-  const update = {
-    first_name:   document.getElementById('ue-first').value.trim(),
-    last_name:    document.getElementById('ue-last').value.trim(),
-    display_name: document.getElementById('ue-display').value.trim(),
-    email:        document.getElementById('ue-email').value.trim() || null,
-    role:         document.getElementById('ue-role').value,
-    color:        document.getElementById('ue-color').value,
-    active:       document.getElementById('ue-active').value === 'true',
+async function saveUserModal() {
+  const get = key => { const el=document.getElementById('ue-'+key); if(!el) return null; return el.type==='checkbox'?el.checked:(el.value.trim()||null); };
+  const record = {
+    name:get('name'),email:get('email'),phone:get('phone'),color:get('color'),
+    department:get('department'),position:get('position'),
+    is_admin:get('is_admin'),is_active:get('is_active'),
+    updated_at:new Date().toISOString(),
   };
-  if (!update.first_name || !update.last_name) { showToast('Name required'); return; }
-  const { error } = await sb.from('users').update(update).eq('id', id);
-  if (error) { showToast('Save failed: ' + error.message); return; }
-  showToast('User saved');
-  document.getElementById('user-edit-panel').style.display = 'none';
-  renderAdminUsers(document.getElementById('admin-content'));
+  if (!record.name) { showToast('Name is required'); return; }
+  let error;
+  if (_userEditId) { ({error}=await sb.from('users').update(record).eq('id',_userEditId)); }
+  else { ({error}=await sb.from('users').insert(record)); }
+  if (error) { showToast('Save failed: '+error.message); return; }
+  showToast(_userEditId?'User saved':'User added');
+  const saveBtn=document.getElementById('ahj-edit-modal')?.querySelector('button[onclick="saveUserModal()"]');
+  if(saveBtn) saveBtn.setAttribute('onclick','saveAhjModal()');
+  closeAhjModal();
+  _usersData=null;
+  await renderAdminUsers(document.getElementById('admin-content'));
 }
+
 
 // ── SLA THRESHOLDS ────────────────────────────────────────────────────────────
-function renderAdminCrews(el) {
+async function renderAdminCrews(el) {
+  el.innerHTML = '<div style="color:var(--text3);padding:20px;font-size:12px;">Loading...</div>';
   const allCrews = (typeof crews !== 'undefined' ? crews : []);
-  const sched = (typeof schedule !== 'undefined' ? schedule : []);
+  // Load users for position-based dropdowns
+  if (!_usersData) {
+    const res = await sb.from('users').select('id,name,position').eq('is_active',true).order('name');
+    _usersData = res.data || [];
+  }
+  const byPosition = {};
+  (_usersData||[]).forEach(u => {
+    if (!u.position) return;
+    if (!byPosition[u.position]) byPosition[u.position] = [];
+    byPosition[u.position].push(u);
+  });
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:500;color:var(--text);">Crews</div>
       <button onclick="openNewCrewForm()" style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;">+ Add Crew</button>
     </div>
-
     <div id="new-crew-form" style="display:none;padding:14px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius);margin-bottom:16px;">
       <div style="font-size:12px;font-weight:500;margin-bottom:10px;">New Crew</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -4461,114 +4461,51 @@ function renderAdminCrews(el) {
         <button onclick="document.getElementById('new-crew-form').style.display='none'" style="padding:6px 12px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
       </div>
     </div>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
-        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Crew</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Warehouse</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Jobs</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:500;color:var(--text2);">Status</th>
-        <th style="padding:8px 12px;"></th>
-      </tr></thead>
-      <tbody>
-        ${allCrews.length ? allCrews.map((c,i) => {
-          const jobCount = sched.filter(s=>s.crewId===c.id).length;
-          return `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
-            <td style="padding:9px 12px;font-weight:500;">${c.name||c.id}</td>
-            <td style="padding:9px 12px;color:var(--text2);">${c.warehouse||'—'}</td>
-            <td style="padding:9px 12px;color:var(--text2);">${jobCount}</td>
-            <td style="padding:9px 12px;">
-              <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${c.active!=='false'?'var(--green-bg)':'var(--bg2)'};color:${c.active!=='false'?'var(--green)':'var(--text3)'};">
-                ${c.active!=='false'?'Active':'Inactive'}
-              </span>
-            </td>
-            <td style="padding:9px 12px;">
-              <button onclick="openCrewEdit(${JSON.stringify(c).replace(/"/g,'&quot;')})"
-                style="font-size:10px;padding:3px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;color:var(--text);">Edit</button>
-            </td>
-          </tr>`;
-        }).join('') : '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text3);">No crews found.</td></tr>'}
-      </tbody>
-    </table>
-    <div id="crew-edit-panel" style="display:none;margin-top:20px;padding:16px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);"></div>
+    ${allCrews.length ? allCrews.map((c,i) => {
+      const jobCount = (typeof schedule !== 'undefined' ? schedule : []).filter(s=>s.crewId===c.id).length;
+      const roles = Object.keys(CREW_ROLE_LABELS);
+      return `<div style="margin-bottom:16px;border:0.5px solid var(--border2);border-radius:var(--radius);overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:0.5px solid var(--border2);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-weight:600;font-size:13px;">${c.name||c.id}</span>
+            <span style="font-size:10px;color:var(--text3);">${c.warehouse||''}</span>
+            <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:${c.active!=='false'?'var(--green-bg)':'var(--bg2)'};color:${c.active!=='false'?'var(--green)':'var(--text3)'};">${c.active!=='false'?'Active':'Inactive'}</span>
+          </div>
+          <span style="font-size:11px;color:var(--text3);">${jobCount} jobs</span>
+        </div>
+        <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          ${roles.map(role => {
+            const currentVal = c[role] || '';
+            const pos = CREW_ROLE_POSITION[role];
+            const users = byPosition[pos] || [];
+            return `<div>
+              <div style="font-size:10px;color:var(--text2);margin-bottom:3px;">${CREW_ROLE_LABELS[role]}</div>
+              ${users.length > 0
+                ? `<select onchange="updateCrewRole('${c.id}','${role}',this.value)"
+                    style="width:100%;padding:5px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
+                    <option value="">— None —</option>
+                    ${users.map(u=>`<option value="${escapeHtml(u.name)}"${currentVal===u.name?' selected':''}>${escapeHtml(u.name)}</option>`).join('')}
+                  </select>`
+                : `<input value="${escapeHtml(currentVal)}" onchange="updateCrewRole('${c.id}','${role}',this.value)"
+                    placeholder="No ${pos||role} users yet"
+                    style="width:100%;padding:5px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;">`
+              }
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('') : '<div style="padding:20px;text-align:center;color:var(--text3);">No crews found. Add one above.</div>'}
   `;
 }
 
-function openCrewEdit(c) {
-  const panel = document.getElementById('crew-edit-panel');
-  if (!panel) return;
-  panel.style.display = 'block';
-
-  const roleField = (id, label, val) => `
-    <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">${label}</div>
-    <input id="ce-${id}" value="${escapeHtml(val||'')}" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>`;
-
-  panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div style="font-size:13px;font-weight:600;">${c.name||c.id}</div>
-      <button onclick="document.getElementById('crew-edit-panel').style.display='none'" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--text2);">✕</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Crew Name</div>
-        <input id="ce-name" value="${escapeHtml(c.name||'')}" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Warehouse</div>
-        <select id="ce-warehouse" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
-          <option value="Houston"${c.warehouse==='Houston'?' selected':''}>Houston</option>
-          <option value="DFW"${c.warehouse==='DFW'?' selected':''}>DFW</option>
-        </select></div>
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Status</div>
-        <select id="ce-active" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);">
-          <option value="true"${c.active!=='false'?' selected':''}>Active</option>
-          <option value="false"${c.active==='false'?' selected':''}>Inactive</option>
-        </select></div>
-      <div><div style="font-size:10px;color:var(--text2);margin-bottom:3px;">Members</div>
-        <input id="ce-members" value="${escapeHtml(c.members||'')}" placeholder="Comma-separated names" style="width:100%;padding:6px 8px;border:0.5px solid var(--border2);border-radius:4px;font-size:12px;background:var(--bg);color:var(--text);box-sizing:border-box;"></div>
-    </div>
-    <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:8px;">Crew Roles</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      ${roleField('licenseHolder','License Holder',c.licenseHolder)}
-      ${roleField('electrician','Electrician',c.electrician)}
-      ${roleField('solarLead','Solar Lead',c.solarLead)}
-      ${roleField('batteryLead','Battery Lead',c.batteryLead)}
-      ${roleField('installer1','Installer 1',c.installer1)}
-      ${roleField('installer2','Installer 2',c.installer2)}
-      ${roleField('batteryTech1','Battery Tech 1',c.batteryTech1)}
-      ${roleField('batteryTech2','Battery Tech 2',c.batteryTech2)}
-      ${roleField('batteryApprentice','Battery Apprentice',c.batteryApprentice)}
-      ${roleField('mpuElectrician','MPU Electrician',c.mpuElectrician)}
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="saveCrewEdit('${c.id||c.crewId}')"
-        style="padding:8px 20px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">Save Changes</button>
-      <button onclick="document.getElementById('crew-edit-panel').style.display='none'"
-        style="padding:8px 16px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;cursor:pointer;color:var(--text);">Cancel</button>
-    </div>
-  `;
-}
-
-async function saveCrewEdit(crewId) {
-  const get = id => document.getElementById('ce-'+id)?.value.trim()||'';
-  const update = {
-    name:              get('name'),
-    warehouse:         get('warehouse'),
-    members:           get('members'),
-    active:            get('active'),
-    licenseHolder:     get('licenseHolder'),
-    electrician:       get('electrician'),
-    solarLead:         get('solarLead'),
-    batteryLead:       get('batteryLead'),
-    installer1:        get('installer1'),
-    installer2:        get('installer2'),
-    batteryTech1:      get('batteryTech1'),
-    batteryTech2:      get('batteryTech2'),
-    batteryApprentice: get('batteryApprentice'),
-    mpuElectrician:    get('mpuElectrician'),
-  };
-  await post({action:'updateCrew', crewId, ...update});
-  showToast('Crew saved — reloading...');
-  document.getElementById('crew-edit-panel').style.display = 'none';
+async function updateCrewRole(crewId, role, value) {
+  const crew = (typeof crews !== 'undefined' ? crews : []).find(c=>c.id===crewId);
+  if (!crew) return;
+  const roles = {};
+  roles[role] = value;
+  await post({action:'updateCrew', crewId, name:crew.name, warehouse:crew.warehouse, members:crew.members, ...roles});
   await reloadData();
-  renderAdminCrews(document.getElementById('admin-content'));
+  showToast('Crew updated');
 }
 
 function openNewCrewForm() {
@@ -4582,7 +4519,7 @@ async function submitNewCrew() {
   const wh   = document.getElementById('new-crew-wh').value;
   if (!id || !name) { showToast('Crew ID and name required'); return; }
   await post({action:'addCrew', crewId:id, name, warehouse:wh});
-  showToast('Crew added — reloading data...');
+  showToast('Crew added');
   document.getElementById('new-crew-form').style.display = 'none';
   await reloadData();
   renderAdminCrews(document.getElementById('admin-content'));
