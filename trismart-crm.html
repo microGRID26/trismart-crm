@@ -3381,7 +3381,7 @@ function renderPanel(pid){
         if(!util) return '';
         const parts=[];
         if(util.phone) parts.push(`<div class="frow"><span class="flabel">Utility phone</span><span class="fval"><a href="tel:${util.phone}" style="color:var(--green);text-decoration:none;">${util.phone}</a></span></div>`);
-        if(util.website) parts.push(`<div class="frow"><span class="flabel">Utility portal</span><span class="fval"><a href="${util.website}" target="_blank" style="color:var(--green);font-size:11px;">Open ↗</a></span></div>`);
+        if(util.website){const _uw=util.website.match(/^https?:\/\//)?util.website:'https://'+util.website;parts.push(`<div class="frow"><span class="flabel">Utility portal</span><span class="fval"><a href="${_uw}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-size:11px;">${util.website} ↗</a></span></div>`);}
         if(util.notes) parts.push(`<div style="margin:4px 0;padding:6px 8px;background:var(--bg2);border-radius:4px;font-size:10px;color:var(--text2);line-height:1.5;">${escapeHtml(util.notes).slice(0,200)}${util.notes.length>200?'…':''}</div>`);
         return parts.join('');
       })()}
@@ -4214,7 +4214,7 @@ async function renderAdminAHJ(el, search, page) {
         ${(data||[]).map((a,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
           <td style="padding:8px 10px;font-weight:500;">${escapeHtml(a.name)}</td>
           <td style="padding:8px 10px;color:var(--text2);">${a.permit_phone||'—'}</td>
-          <td style="padding:8px 10px;">${a.permit_website?`<a href="${a.permit_website}" target="_blank" style="color:var(--green);font-size:11px;">Open ↗</a>`:'—'}</td>
+          <td style="padding:8px 10px;">${a.permit_website?`<a href="${a.permit_website.match(/^https?:\/\//)?a.permit_website:'https://'+a.permit_website}" target="_blank" rel="noopener" style="color:var(--green);font-size:11px;">Open ↗</a>`:`—`}</td>
           <td style="padding:8px 10px;color:var(--text2);">${a.max_duration?a.max_duration+'d':'—'}</td>
           <td style="padding:8px 10px;color:var(--text2);font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.permit_notes?a.permit_notes.slice(0,60)+(a.permit_notes.length>60?'…':''):'—'}</td>
           <td style="padding:8px 10px;">
@@ -4406,7 +4406,7 @@ async function renderAdminUtility(el, search, page) {
       <tbody>
         ${(data||[]).map((u,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
           <td style="padding:8px 10px;font-weight:500;">${escapeHtml(u.name)}</td>
-          <td style="padding:8px 10px;">${u.website?`<a href="${u.website}" target="_blank" style="color:var(--green);font-size:11px;">Open ↗</a>`:'—'}</td>
+          <td style="padding:8px 10px;">${u.website?`<a href="${u.website.match(/^https?:\/\//)?u.website:'https://'+u.website}" target="_blank" rel="noopener" style="color:var(--green);font-size:11px;">Open ↗</a>`:`—`}</td>
           <td style="padding:8px 10px;color:var(--text2);">${u.state||'—'}</td>
           <td style="padding:8px 10px;color:var(--text2);font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.notes?u.notes.slice(0,60)+(u.notes.length>60?'…':''):'—'}</td>
           <td style="padding:8px 10px;">
@@ -4910,6 +4910,22 @@ async function openAhjByName(name) {
     if (!res.data?.length) res = await sb.from('ahjs').select('id').ilike('short_name', name).limit(1);
     if (!res.data?.length) res = await sb.from('ahjs').select('id').ilike('name', name + '%').limit(1);
     if (!res.data?.length) res = await sb.from('ahjs').select('id').ilike('name', '%' + name + '%').limit(1);
+    if (!res.data?.length) {
+      const stripped = name.replace(/^(city|town|village|county|township)\s+of\s+/i, '').trim();
+      if (stripped !== name) {
+        res = await sb.from('ahjs').select('id').ilike('name', stripped + '%').limit(1);
+        if (!res.data?.length) res = await sb.from('ahjs').select('id').ilike('short_name', stripped + '%').limit(1);
+        if (!res.data?.length) res = await sb.from('ahjs').select('id').ilike('name', '%' + stripped + '%').limit(1);
+      }
+    }
+    if (!res.data?.length) {
+      const tokens = name.replace(/[,().]/g, ' ').split(/\s+/)
+        .filter(t => t.length > 3 && !/^(city|town|county|village|of|the|tx|texas)$/i.test(t));
+      for (const token of tokens) {
+        res = await sb.from('ahjs').select('id').ilike('name', '%' + token + '%').limit(1);
+        if (res.data?.length) break;
+      }
+    }
     if (res.data?.length) id = res.data[0].id;
   } catch(e) { console.warn('AHJ lookup error:', e); }
   if (id) {
@@ -5072,22 +5088,38 @@ async function loadAhjForProject(ahjName) {
   try {
     // 1. Exact name match
     let res = await sb.from('ahjs').select('*').ilike('name', ahjName).limit(1);
-    // 2. Match short_name (normalized, no city/town suffix)
-    if (!res.data?.length) {
+    // 2. Match short_name
+    if (!res.data?.length)
       res = await sb.from('ahjs').select('*').ilike('short_name', ahjName).limit(1);
-    }
-    // 3. Name starts with search term
-    if (!res.data?.length) {
-      res = await sb.from('ahjs').select('*').ilike('name', `${ahjName}%`).limit(1);
-    }
+    // 3. Name starts with
+    if (!res.data?.length)
+      res = await sb.from('ahjs').select('*').ilike('name', ahjName + '%').limit(1);
     // 4. Partial match
+    if (!res.data?.length)
+      res = await sb.from('ahjs').select('*').ilike('name', '%' + ahjName + '%').limit(1);
+    // 5. Strip common prefixes ("City of X" → "X", "Town of X" → "X")
     if (!res.data?.length) {
-      res = await sb.from('ahjs').select('*').ilike('name', `%${ahjName}%`).limit(1);
+      const stripped = ahjName.replace(/^(city|town|village|county|township)\s+of\s+/i, '').trim();
+      if (stripped !== ahjName) {
+        res = await sb.from('ahjs').select('*').ilike('name', stripped + '%').limit(1);
+        if (!res.data?.length)
+          res = await sb.from('ahjs').select('*').ilike('short_name', stripped + '%').limit(1);
+        if (!res.data?.length)
+          res = await sb.from('ahjs').select('*').ilike('name', '%' + stripped + '%').limit(1);
+      }
     }
-    if (res.data?.length) {
+    // 6. Match on largest word token (e.g. "Sugar Land" from "City of Sugar Land TX")
+    if (!res.data?.length) {
+      const tokens = ahjName.replace(/[,().]/g, ' ').split(/\s+/)
+        .filter(t => t.length > 3 && !/^(city|town|county|village|of|the|tx|texas)$/i.test(t));
+      for (const token of tokens) {
+        res = await sb.from('ahjs').select('*').ilike('name', '%' + token + '%').limit(1);
+        if (res.data?.length) break;
+      }
+    }
+    if (res.data?.length)
       ahjCache[ahjName.toLowerCase()] = res.data[0];
-    }
-  } catch(e) {}
+  } catch(e) { console.warn('AHJ load error:', e); }
 }
 
 // Team email map for @mention notifications
