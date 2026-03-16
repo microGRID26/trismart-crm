@@ -757,6 +757,7 @@ select.np-input{cursor:pointer;}
       <!-- Sidebar -->
       <div style="width:180px;border-right:0.5px solid var(--border2);padding:12px 0;flex-shrink:0;">
         <div class="admin-nav-item active" id="anav-ahj" onclick="setAdminTab('ahj')">AHJ Manager</div>
+        <div class="admin-nav-item" id="anav-utility" onclick="setAdminTab('utility')">Utility Manager</div>
         <div class="admin-nav-item" id="anav-users" onclick="setAdminTab('users')">Users</div>
         <div class="admin-nav-item" id="anav-crews" onclick="setAdminTab('crews')">Crews</div>
         <div class="admin-nav-item" id="anav-sla" onclick="setAdminTab('sla')">SLA Thresholds</div>
@@ -848,7 +849,15 @@ select.np-input{cursor:pointer;}
           onkeydown="ahjKeydown(event)">
         <div class="ahj-dropdown" id="ahj-dropdown"></div>
       </div>
-      <div><div class="np-label">Utility</div><input class="np-input" id="np-utility" type="text" placeholder="Oncor"></div>
+      <div style="position:relative;">
+        <div class="np-label">Utility</div>
+        <input class="np-input" id="np-utility" type="text" placeholder="Oncor"
+          autocomplete="off"
+          oninput="utilityAutocomplete(this)"
+          onblur="setTimeout(()=>closeUtilityDropdown(),200)"
+          onkeydown="utilityKeydown(event)">
+        <div class="ahj-dropdown" id="utility-dropdown"></div>
+      </div>
       <div><div class="np-label">Energy Advisor</div><input class="np-input" id="np-advisor" type="text" placeholder="Full name"></div>
       <div><div class="np-label">Energy Consultant</div><input class="np-input" id="np-consultant" type="text" placeholder="Full name"></div>
       <div><div class="np-label">Dealer</div><input class="np-input" id="np-dealer" type="text" placeholder="Dealer / partner name"></div>
@@ -1488,6 +1497,7 @@ const TASKS={
 
 let projects=[],taskState={},notes={},stageHistory={},taskDueDates={},projectFolders={},projectFunding={},fundingEvents={},projectBoms={},projectDocuments={};
 let ahjCache={}; // name→AHJ record, loaded on demand
+let utilityCache={}; // name→utility record, loaded on demand
 let projectMap={}; // O(1) lookup by project ID — rebuilt after every data load
 let crewMap={};    // O(1) lookup by crew ID
 let crews=[];       // [{id,name,members,active}]
@@ -3263,6 +3273,7 @@ function renderPMAnalytics(){
 function renderPanel(pid){
   const p=projects.find(x=>x.id===pid);if(!p) return;
   if(p.ahj) loadAhjForProject(p.ahj);
+  if(p.utility) loadUtilityForProject(p.utility);
   const sla=getSLA(p);const pr=getProgress(pid);
   const s=STAGES.find(x=>x.id===p.stage);const cycle=cycleDays(p);
   const pNotes=notes[pid]||[];const pHistory=stageHistory[pid]||[];
@@ -3343,7 +3354,16 @@ function renderPanel(pid){
         if(ahj.permit_notes) parts.push(`<div style="margin:4px 0;padding:6px 8px;background:var(--bg2);border-radius:4px;font-size:10px;color:var(--text2);line-height:1.5;">${escapeHtml(ahj.permit_notes).slice(0,300)}${ahj.permit_notes.length>300?'…':''}</div>`);
         return parts.join('');
       })()}
-      ${frow('Utility', p.utility)}
+      ${p.utility ? `<div class="frow"><span class="flabel">Utility</span><span class="fval">${isAdmin() ? `<span onclick="openAdminToUtility('${p.utility.replace(/'/g,"\\'")}')" style="cursor:pointer;color:var(--green);text-decoration:underline;text-decoration-style:dotted;" title="Open in Admin">${escapeHtml(p.utility)}</span>` : escapeHtml(p.utility)}</span></div>` : ''}
+      ${(()=>{
+        const util=p.utility?utilityCache[p.utility.toLowerCase()]:null;
+        if(!util) return '';
+        const parts=[];
+        if(util.phone) parts.push(`<div class="frow"><span class="flabel">Utility phone</span><span class="fval"><a href="tel:${util.phone}" style="color:var(--green);text-decoration:none;">${util.phone}</a></span></div>`);
+        if(util.website) parts.push(`<div class="frow"><span class="flabel">Utility portal</span><span class="fval"><a href="${util.website}" target="_blank" style="color:var(--green);font-size:11px;">Open ↗</a></span></div>`);
+        if(util.notes) parts.push(`<div style="margin:4px 0;padding:6px 8px;background:var(--bg2);border-radius:4px;font-size:10px;color:var(--text2);line-height:1.5;">${escapeHtml(util.notes).slice(0,200)}${util.notes.length>200?'…':''}</div>`);
+        return parts.join('');
+      })()}
       ${frow('Permit #', p.permitNumber)}
       ${frow('Utility app #', p.utilityAppNumber)}
       ${frow('Permit fee', p.permitFee ? '$'+Number(p.permitFee).toLocaleString() : null)}
@@ -4109,6 +4129,7 @@ async function renderAdminTab(tab) {
   el.innerHTML = '<div style="color:var(--text3);padding:20px;">Loading...</div>';
 
   if (tab === 'ahj') await renderAdminAHJ(el);
+  else if (tab === 'utility') await renderAdminUtility(el);
   else if (tab === 'users') renderAdminUsers(el);
   else if (tab === 'crews') renderAdminCrews(el);
   else if (tab === 'sla') renderAdminSLA(el);
@@ -4272,6 +4293,113 @@ const ROLE_COLORS = {
   admin:'var(--green)', project_manager:'#0C447C', sales:'#E24B4A',
   funding:'#7C3AED', operations:'#0D7377', member:'var(--text3)'
 };
+
+// ── UTILITY MANAGER ──────────────────────────────────────────────────────────
+let _utilityEditId = null;
+let _utilityPage = 0;
+let _utilitySearch = '';
+const UTILITY_PAGE_SIZE = 50;
+
+async function renderAdminUtility(el, search, page) {
+  if (search !== undefined) _utilitySearch = search;
+  if (page !== undefined) _utilityPage = page;
+  el.innerHTML = '<div style="color:var(--text3);padding:20px;font-size:12px;">Loading...</div>';
+
+  const q = sb.from('utilities').select('id,name,short_name,state,phone,website,notes', {count:'exact'}).order('name');
+  if (_utilitySearch) q.ilike('name', `%${_utilitySearch}%`);
+  const from = _utilityPage * UTILITY_PAGE_SIZE;
+  q.range(from, from + UTILITY_PAGE_SIZE - 1);
+  const { data, error, count } = await q;
+  if (error) { el.innerHTML = `<div style="color:var(--red);padding:20px;">Error: ${error.message}</div>`; return; }
+  const totalPages = Math.ceil(count / UTILITY_PAGE_SIZE);
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+      <input type="text" value="${escapeHtml(_utilitySearch)}" placeholder="Search utilities..."
+        oninput="renderAdminUtility(document.getElementById('admin-content'),this.value,0)"
+        style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);">
+      <span style="font-size:11px;color:var(--text3);">${count} utilities</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border2);">
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Name</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Short Name</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">State</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Phone</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:500;color:var(--text2);">Notes</th>
+        <th style="padding:8px 10px;"></th>
+      </tr></thead>
+      <tbody>
+        ${(data||[]).map((u,i) => `<tr style="border-bottom:0.5px solid var(--border);background:${i%2===0?'var(--bg)':'var(--bg2)'};">
+          <td style="padding:8px 10px;font-weight:500;">${escapeHtml(u.name)}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${u.short_name||'—'}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${u.state||'—'}</td>
+          <td style="padding:8px 10px;color:var(--text2);">${u.phone||'—'}</td>
+          <td style="padding:8px 10px;color:var(--text2);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.notes?u.notes.slice(0,60)+(u.notes.length>60?'…':''):'—'}</td>
+          <td style="padding:8px 10px;">
+            <button onclick="openUtilityEdit('${u.id}')" style="font-size:10px;padding:3px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;color:var(--text);">Edit</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    ${totalPages > 1 ? `<div style="display:flex;gap:6px;margin-top:12px;align-items:center;justify-content:center;">
+      <button onclick="renderAdminUtility(document.getElementById('admin-content'),undefined,${_utilityPage-1})" ${_utilityPage===0?'disabled':''} style="padding:4px 10px;font-size:11px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;">← Prev</button>
+      <span style="font-size:11px;color:var(--text3);">Page ${_utilityPage+1} of ${totalPages}</span>
+      <button onclick="renderAdminUtility(document.getElementById('admin-content'),undefined,${_utilityPage+1})" ${_utilityPage>=totalPages-1?'disabled':''} style="padding:4px 10px;font-size:11px;border:0.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;">Next →</button>
+    </div>` : ''}
+  `;
+}
+
+async function openUtilityEdit(id) {
+  _utilityEditId = id;
+  const modal = document.getElementById('ahj-edit-modal');
+  const saveBtn = modal.querySelector('button[onclick="saveAhjModal()"]');
+  if (saveBtn) saveBtn.setAttribute('onclick','saveUtilityModal()');
+  const body = document.getElementById('ahj-modal-body');
+  modal.style.display = 'block';
+  body.innerHTML = '<div style="color:var(--text3);padding:20px;">Loading...</div>';
+  const { data, error } = await sb.from('utilities').select('*').eq('id', id).single();
+  if (error || !data) { body.innerHTML = '<div style="color:var(--red);padding:20px;">Error loading utility</div>'; return; }
+  document.getElementById('ahj-modal-title').textContent = data.name;
+  document.getElementById('ahj-modal-sub').textContent = [data.short_name, data.state].filter(Boolean).join(' · ');
+
+  const field = (key, label, type='text', fw=false) => `
+    <div style="${fw?'grid-column:1/-1;':''}margin-bottom:2px;">
+      <div style="font-size:10px;font-weight:500;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
+      ${type==='textarea'
+        ? `<textarea id="util-${key}" rows="4" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);resize:vertical;box-sizing:border-box;">${escapeHtml(data[key]||'')}</textarea>`
+        : `<input type="${type}" id="util-${key}" value="${escapeHtml(String(data[key]||''))}"
+            style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:12px;background:var(--bg2);color:var(--text);box-sizing:border-box;">`
+      }
+    </div>`;
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;">
+      ${field('name','Name')}
+      ${field('short_name','Short Name')}
+      ${field('state','State(s)')}
+      ${field('phone','Phone')}
+      ${field('website','Website / Portal')}
+      ${field('notes','Notes','textarea',true)}
+    </div>`;
+}
+
+async function saveUtilityModal() {
+  const id = _utilityEditId;
+  if (!id) return;
+  const get = key => { const el=document.getElementById('util-'+key); return el?el.value.trim()||null:null; };
+  const update = { name:get('name'), short_name:get('short_name'), state:get('state'), phone:get('phone'), website:get('website'), notes:get('notes') };
+  if (!update.name) { showToast('Name is required'); return; }
+  const { error } = await sb.from('utilities').update(update).eq('id', id);
+  if (error) { showToast('Save failed: '+error.message); return; }
+  Object.keys(utilityCache).forEach(k => { if (utilityCache[k]?.id===id) delete utilityCache[k]; });
+  showToast('Utility saved');
+  const saveBtn = document.getElementById('ahj-edit-modal')?.querySelector('button[onclick="saveUtilityModal()"]');
+  if (saveBtn) saveBtn.setAttribute('onclick','saveAhjModal()');
+  closeAhjModal();
+  const el = document.getElementById('admin-content');
+  if (el && document.getElementById('admin-overlay').style.display!=='none') await renderAdminUtility(el);
+}
 
 // ── USER & POSITION CONSTANTS ─────────────────────────────────────────────────
 const DEPARTMENTS = ['Inside Operations','Sales','Executive','Field Operations','Funding','Payroll','HR','Accounting','Dealer'];
@@ -4717,6 +4845,64 @@ function selectAhj(idx) {
 function closeAhjDropdown() {
   const dd = document.getElementById('ahj-dropdown');
   if (dd) dd.style.display='none';
+}
+
+// ── UTILITY AUTOCOMPLETE ──────────────────────────────────────────────────────
+let _utilResults=[], _utilIdx=-1;
+
+async function utilityAutocomplete(input) {
+  const q = input.value.trim();
+  const dd = document.getElementById('utility-dropdown');
+  if (!q || q.length < 2) { dd.style.display='none'; _utilResults=[]; return; }
+  try {
+    const res = await sb.from('utilities').select('name,state,short_name,phone,website,notes').ilike('name', `${q}%`).limit(8);
+    if (res.error || !res.data?.length) { dd.style.display='none'; _utilResults=[]; return; }
+    _utilResults = res.data;
+    _utilIdx = -1;
+    dd.innerHTML = res.data.map((u,i) => `
+      <div class="ahj-item" data-idx="${i}" onmousedown="selectUtility(${i})">
+        <div class="ahj-item-name">${escapeHtml(u.name)}</div>
+        <div class="ahj-item-sub">${[u.state, u.short_name].filter(Boolean).join(' · ')}</div>
+      </div>`).join('');
+    dd.style.display='block';
+  } catch(e) { dd.style.display='none'; }
+}
+
+function utilityKeydown(e) {
+  const dd = document.getElementById('utility-dropdown');
+  if (dd.style.display==='none') return;
+  if (e.key==='ArrowDown') { e.preventDefault(); _utilIdx=Math.min(_utilIdx+1,_utilResults.length-1); dd.querySelectorAll('.ahj-item').forEach((el,i)=>el.classList.toggle('active',i===_utilIdx)); }
+  else if (e.key==='ArrowUp') { e.preventDefault(); _utilIdx=Math.max(_utilIdx-1,0); dd.querySelectorAll('.ahj-item').forEach((el,i)=>el.classList.toggle('active',i===_utilIdx)); }
+  else if (e.key==='Enter'&&_utilIdx>=0) { e.preventDefault(); selectUtility(_utilIdx); }
+  else if (e.key==='Escape') { closeUtilityDropdown(); }
+}
+
+function selectUtility(idx) {
+  const u = _utilResults[idx];
+  if (!u) return;
+  document.getElementById('np-utility').value = u.name;
+  utilityCache[u.name.toLowerCase()] = u;
+  closeUtilityDropdown();
+}
+
+function closeUtilityDropdown() {
+  const dd = document.getElementById('utility-dropdown');
+  if (dd) dd.style.display='none';
+}
+
+async function loadUtilityForProject(utilityName) {
+  if (!utilityName || utilityCache[utilityName.toLowerCase()]) return;
+  try {
+    const res = await sb.from('utilities').select('*').ilike('name', utilityName).limit(1);
+    if (res.data?.length) utilityCache[utilityName.toLowerCase()] = res.data[0];
+  } catch(e) {}
+}
+
+async function openAdminToUtility(utilityName) {
+  if (!isAdmin()) return;
+  const { data } = await sb.from('utilities').select('id').ilike('name', utilityName).limit(1);
+  if (data?.length) openUtilityEdit(data[0].id);
+  else showToast('Utility not found in database: ' + utilityName);
 }
 
 // Pre-load AHJ data for the currently open project
