@@ -7771,44 +7771,10 @@ function renderFilesContent(pid, p) {
   const folderUrl = folder?.folderUrl || '';
 
   if (!folderUrl) {
-    return `<div style="padding:40px;text-align:center;color:var(--text3);">
-      <div style="font-size:28px;margin-bottom:8px;">📁</div>
-      <div style="font-size:12px;margin-bottom:12px;">No Drive folder linked to this project.</div>
-    </div>`;
+    return '<div style="padding:40px;text-align:center;color:var(--text3);"><div style="font-size:28px;margin-bottom:8px;">📁</div><div style="font-size:12px;">No Drive folder linked to this project.</div></div>';
   }
 
-  return `<div style="padding:16px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:0.5px solid var(--border);">
-      <span style="font-size:15px;">📁</span>
-      <span style="font-size:12px;font-weight:600;color:var(--text);flex:1;">${escapeHtml(p.name)} — Project Files</span>
-    </div>
-
-    <a href="${folderUrl}" target="_blank" rel="noopener"
-      style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;margin-bottom:12px;">
-      <img src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png"
-        style="width:32px;height:32px;flex-shrink:0;" alt="Drive">
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Open Project Folder in Google Drive</div>
-        <div style="font-size:10px;color:var(--text3);">View and manage all project documents, photos, and files</div>
-      </div>
-      <span style="font-size:18px;color:var(--green);">↗</span>
-    </a>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      ${[
-        {label:'Proposal',        icon:'📋'},
-        {label:'Site Survey',     icon:'📷'},
-        {label:'Permit',          icon:'🏛'},
-        {label:'Design / Plans',  icon:'📐'},
-        {label:'Install',         icon:'🔧'},
-        {label:'Inspection / PTO',icon:'✅'},
-      ].map(f => `<a href="${folderUrl}" target="_blank" rel="noopener"
-        style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;">
-        <span style="font-size:15px;">${f.icon}</span>
-        <span style="font-size:11px;font-weight:500;color:var(--text);">${f.label}</span>
-      </a>`).join('')}
-    </div>
-  </div>`;
+  return '<div style="padding:24px 16px;text-align:center;"><a href="' + folderUrl + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:12px;padding:14px 24px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;"><img src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png" style="width:24px;height:24px;" alt="Drive"><span style="font-size:13px;font-weight:600;color:var(--text);">Open in Google Drive ↗</span></a></div>';
 }
 
 // Track selected file per pid
