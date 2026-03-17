@@ -7818,97 +7818,71 @@ function renderFilesContent(pid, p) {
 const GDRIVE_CLIENT_ID = '628637774830-tlsfc1vrtv1529mm6cs51u33po6m8hje.apps.googleusercontent.com';
 const GDRIVE_SCOPES    = 'https://www.googleapis.com/auth/drive.readonly';
 let _gapiReady  = false;
-let _gapiLoading = false;
-let _driveToken = null;   // access token from GIS
+let _driveToken = null;
 let _driveTokenClient = null;
-let _driveCallbackQueue = []; // callbacks waiting for token
+let _drivePendingPid = null; // pid waiting for token after sign-in
 
-function ensureGapi(cb) {
-  if (_gapiReady) { cb(); return; }
-  if (_gapiLoading) { _driveCallbackQueue.push(cb); return; }
-  _gapiLoading = true;
-  _driveCallbackQueue.push(cb);
-
-  function initGapi() {
-    gapi.load('client', async () => {
-      await gapi.client.init({});
-      await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-      _gapiReady = true;
-      _gapiLoading = false;
-      _driveCallbackQueue.forEach(fn => fn());
-      _driveCallbackQueue = [];
-    });
+// Eagerly init gapi + token client as soon as scripts load — so button click fires immediately
+function _initDrive() {
+  if (typeof gapi === 'undefined' || typeof google === 'undefined') {
+    setTimeout(_initDrive, 200);
+    return;
   }
-
-  if (typeof gapi !== 'undefined') { initGapi(); return; }
-  // gapi not yet loaded — poll
-  const t = setInterval(() => {
-    if (typeof gapi !== 'undefined') { clearInterval(t); initGapi(); }
-  }, 100);
-}
-
-function ensureDriveToken(cb) {
-  if (_driveToken) { cb(_driveToken); return; }
-  if (!_driveTokenClient) {
+  gapi.load('client', async () => {
+    try {
+      await gapi.client.init({});
+      await gapi.client.load('drive', 'v3');
+      _gapiReady = true;
+    } catch(e) { console.warn('gapi init error', e); }
+  });
+  try {
     _driveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GDRIVE_CLIENT_ID,
       scope: GDRIVE_SCOPES,
+      use_fedcm_for_prompt: false,
       callback: (resp) => {
-        if (resp.error) { console.warn('Drive token error', resp); cb(null); return; }
+        if (resp.error) {
+          console.warn('Drive token error', resp);
+          const pid = _drivePendingPid;
+          if (pid) {
+            const el = document.getElementById('drive-browser-' + pid);
+            if (el) el.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:8px;">Sign-in failed — <a href="' + ((projectFolders[pid]||{}).folderUrl||'#') + '" target="_blank" style="color:var(--green);">Open in Drive ↗</a></div>';
+          }
+          return;
+        }
         _driveToken = resp.access_token;
         setTimeout(() => { _driveToken = null; }, (resp.expires_in - 60) * 1000);
-        cb(_driveToken);
+        const pid = _drivePendingPid;
+        _drivePendingPid = null;
+        if (pid) _doLoadDriveBrowser(pid);
       },
     });
-  }
+  } catch(e) { console.warn('token client init error', e); }
+}
+setTimeout(_initDrive, 500);
+
+function driveSignIn(pid) {
+  if (!_driveTokenClient) { showToast('Drive not ready yet — try again in a moment'); return; }
+  if (_driveToken) { _doLoadDriveBrowser(pid); return; }
+  _drivePendingPid = pid;
+  // requestAccessToken must be called directly from a user gesture — this is that call
   _driveTokenClient.requestAccessToken({prompt: ''});
 }
 
-function driveSignIn(pid) {
-  ensureGapi(() => {
-    ensureDriveToken((token) => {
-      const el = document.getElementById('drive-browser-' + pid);
-      if (!token) {
-        if (el) el.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:8px;">Sign-in failed. <a href="' + ((projectFolders[pid]||{}).folderUrl||'#') + '" target="_blank" style="color:var(--green);">Open in Drive</a></div>';
-        return;
-      }
-      gapi.client.setToken({access_token: token});
-      if (el) el.innerHTML = '<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading files...</div>';
-      fetchDriveFolder(projectFolders[pid].folderId, el, pid, 0);
-    });
-  });
-}
-
-function loadDriveBrowser(pid) {
-  const el = document.getElementById(`drive-browser-${pid}`);
+function _doLoadDriveBrowser(pid) {
+  const el = document.getElementById('drive-browser-' + pid);
   if (!el) return;
   const folder = projectFolders[pid];
-  if (!folder?.folderId) {
-    el.innerHTML = `<div style="font-size:11px;color:var(--text3);">No folder ID — <a href="${folder?.folderUrl}" target="_blank" style="color:var(--green);">open in Drive ↗</a></div>`;
-    return;
-  }
+  if (!folder || !folder.folderId) return;
+  if (!_driveToken || !_gapiReady) return;
+  gapi.client.setToken({access_token: _driveToken});
+  el.innerHTML = '<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading files...</div>';
+  fetchDriveFolder(folder.folderId, el, pid, 0);
+}
 
-  ensureGapi(() => {
-    ensureDriveToken((token, err) => {
-      if (!token) {
-        // Silent auth failed — show a sign-in button (requires direct user gesture)
-        el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border);">
-          <span style="font-size:20px;">🔒</span>
-          <div style="flex:1;">
-            <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px;">Sign in to view project files</div>
-            <div style="font-size:10px;color:var(--text3);">Connect your Google account to browse files inline</div>
-          </div>
-          <button onclick="driveSignIn('${pid}')"
-            style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">
-            Sign in with Google
-          </button>
-        </div>`;
-        return;
-      }
-      gapi.client.setToken({access_token: token});
-      fetchDriveFolder(folder.folderId, el, pid, 0);
-    });
-  });
+// Kept for backward compat — called when token already exists
+function loadDriveBrowser(pid) {
+  if (_driveToken && _gapiReady) { _doLoadDriveBrowser(pid); }
 }
 
 async function fetchDriveFolder(folderId, el, pid, depth) {
