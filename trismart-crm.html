@@ -7842,11 +7842,16 @@ function _initDrive() {
       use_fedcm_for_prompt: false,
       callback: (resp) => {
         if (resp.error) {
-          console.warn('Drive token error', resp);
+          console.warn('Drive token error:', resp.error, resp);
           const pid = _drivePendingPid;
+          _drivePendingPid = null;
           if (pid) {
             const el = document.getElementById('drive-browser-' + pid);
-            if (el) el.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:8px;">Sign-in failed — <a href="' + ((projectFolders[pid]||{}).folderUrl||'#') + '" target="_blank" style="color:var(--green);">Open in Drive ↗</a></div>';
+            const url = (projectFolders[pid]||{}).folderUrl||'#';
+            if (el) el.innerHTML = '<div style="font-size:11px;padding:10px 12px;background:#FEF2F2;border-radius:var(--radius);border:0.5px solid #FCA5A5;">'
+              + '<div style="font-weight:600;color:#A32D2D;margin-bottom:3px;">Drive error: ' + resp.error + '</div>'
+              + '<div style="color:var(--text3);font-size:10px;margin-bottom:6px;">If access_denied: add your Google account as a test user in Google Cloud Console.</div>'
+              + '<a href="' + url + '" target="_blank" style="color:var(--green);font-size:11px;font-weight:500;">Open in Drive ↗</a></div>';
           }
           return;
         }
@@ -7865,8 +7870,8 @@ function driveSignIn(pid) {
   if (!_driveTokenClient) { showToast('Drive not ready yet — try again in a moment'); return; }
   if (_driveToken) { _doLoadDriveBrowser(pid); return; }
   _drivePendingPid = pid;
-  // requestAccessToken must be called directly from a user gesture — this is that call
-  _driveTokenClient.requestAccessToken({prompt: ''});
+  // 'select_account' forces the account chooser popup — required for first-time auth
+  _driveTokenClient.requestAccessToken({prompt: 'select_account'});
 }
 
 function _doLoadDriveBrowser(pid) {
