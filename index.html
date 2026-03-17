@@ -7784,8 +7784,7 @@ function renderFilesContent(pid, p) {
     </div>
 
     <a href="${folderUrl}" target="_blank" rel="noopener"
-      style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;margin-bottom:12px;transition:border-color .15s;"
-      onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+      style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;margin-bottom:12px;">
       <img src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png"
         style="width:32px;height:32px;flex-shrink:0;" alt="Drive">
       <div style="flex:1;">
@@ -7797,15 +7796,14 @@ function renderFilesContent(pid, p) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       ${[
-        {label:'Proposal',        icon:'📋', q:'01'},
-        {label:'Site Survey',     icon:'📷', q:'02'},
-        {label:'Permit',          icon:'🏛', q:'04'},
-        {label:'Design / Plans',  icon:'📐', q:'05'},
-        {label:'Install',         icon:'🔧', q:'06'},
-        {label:'Inspection / PTO',icon:'✅', q:'07'},
+        {label:'Proposal',        icon:'📋'},
+        {label:'Site Survey',     icon:'📷'},
+        {label:'Permit',          icon:'🏛'},
+        {label:'Design / Plans',  icon:'📐'},
+        {label:'Install',         icon:'🔧'},
+        {label:'Inspection / PTO',icon:'✅'},
       ].map(f => `<a href="${folderUrl}" target="_blank" rel="noopener"
-        style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color .15s;"
-        onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+        style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);text-decoration:none;">
         <span style="font-size:15px;">${f.icon}</span>
         <span style="font-size:11px;font-weight:500;color:var(--text);">${f.label}</span>
       </a>`).join('')}
