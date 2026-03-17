@@ -4275,7 +4275,14 @@ async function openAhjEdit(id) {
       ${field('host_type_required','Host Type Required')}
       ${field('how_to_request','How to Request','textarea',true)}
     </div>
+    <div style="margin-top:20px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:8px;border-bottom:0.5px solid var(--border2);margin-bottom:12px;">Chat History</div>
+      <div id="ahj-messages-list" style="color:var(--text3);font-size:12px;">Loading messages...</div>
+    </div>
   `;
+
+  // Load messages async
+  loadEntityMessages('ahj_messages', 'ahj_id', id, 'ahj-messages-list');
 }
 
 function refreshPermittingSection(pid) {
@@ -4446,7 +4453,14 @@ async function openUtilityEdit(id) {
       ${field('phone','Phone','tel')}
       ${field('website','Website / Portal','url')}
       ${field('notes','Notes','textarea',true)}
+    </div>
+    <div style="margin-top:20px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding-bottom:8px;border-bottom:0.5px solid var(--border2);margin-bottom:12px;">Chat History</div>
+      <div id="util-messages-list" style="color:var(--text3);font-size:12px;">Loading messages...</div>
     </div>`;
+
+  // Load messages async
+  loadEntityMessages('utility_messages', 'utility_id', id, 'util-messages-list');
 }
 
 async function saveUtilityModal() {
@@ -4898,6 +4912,34 @@ async function renderAdminInfo(el) {
       <div><strong>Deployed:</strong> microgrid26.github.io/trismart-crm</div>
     </div>
   `;
+}
+
+// ── ENTITY MESSAGES (bluChat history) ────────────────────────────────────────
+async function loadEntityMessages(table, idCol, entityId, targetElId) {
+  const el = document.getElementById(targetElId);
+  if (!el) return;
+  const { data, error } = await sb
+    .from(table)
+    .select('author,message,message_date')
+    .eq(idCol, entityId)
+    .order('message_date', { ascending: true });
+  if (error) { el.innerHTML = '<span style="color:var(--text3);font-size:11px;">Could not load messages.</span>'; return; }
+  if (!data || !data.length) { el.innerHTML = '<span style="color:var(--text3);font-size:11px;">No chat history found.</span>'; return; }
+  el.innerHTML = data.map(m => {
+    const date = m.message_date ? new Date(m.message_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    const author = m.author || 'Unknown';
+    const initials = author.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+    return `<div style="display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex-shrink:0;">${initials}</div>
+      <div style="flex:1;">
+        <div style="display:flex;gap:8px;align-items:baseline;margin-bottom:3px;">
+          <span style="font-size:12px;font-weight:600;color:var(--text);">${escapeHtml(author)}</span>
+          <span style="font-size:10px;color:var(--text3);">${date}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.5;white-space:pre-wrap;">${escapeHtml(m.message)}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── AHJ / UTILITY — OPEN RECORD FROM PROJECT PANEL ───────────────────────────
