@@ -7765,6 +7765,10 @@ function renderPanelFiles(pid) {
   const p = projects.find(x => x.id === pid);
   if (!p) return;
   pane.innerHTML = renderFilesContent(pid, p);
+  // If we already have a token from this session, load files immediately
+  if (_driveToken && projectFolders[pid]?.folderId) {
+    setTimeout(() => loadDriveBrowser(pid), 0);
+  }
 }
 
 function renderFilesContent(pid, p) {
@@ -7779,11 +7783,8 @@ function renderFilesContent(pid, p) {
     </div>`;
   }
 
-  // Build the Drive folder embed URL
-  const embedUrl = `https://drive.google.com/embeddedfolderview?id=${folderId}#list`;
-
-  return `<div style="display:flex;flex-direction:column;height:100%;padding:14px 16px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:0.5px solid var(--border);">
+  return `<div style="padding:14px 16px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:0.5px solid var(--border);">
       <span style="font-size:15px;">📁</span>
       <span style="font-size:12px;font-weight:600;color:var(--text);flex:1;">${escapeHtml(p.name)} — Project Files</span>
       <a href="${folderUrl}" target="_blank" rel="noopener"
@@ -7791,13 +7792,24 @@ function renderFilesContent(pid, p) {
         Open in Drive ↗
       </a>
     </div>
-    <div style="flex:1;border-radius:var(--radius);overflow:hidden;border:0.5px solid var(--border);background:var(--bg2);">
-      <iframe
-        src="${embedUrl}"
-        style="width:100%;height:500px;border:none;background:var(--bg2);"
-        allowfullscreen
-        loading="lazy">
-      </iframe>
+    <div id="drive-browser-${pid}">
+      ${_driveToken
+        ? `<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span>
+            Loading files...
+           </div>`
+        : `<div style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border);">
+            <span style="font-size:22px;">📁</span>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px;">Browse project files</div>
+              <div style="font-size:10px;color:var(--text3);">Sign in with Google to view files inline</div>
+            </div>
+            <button onclick="driveSignIn('${pid}')"
+              style="padding:7px 16px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">
+              Connect Google Drive
+            </button>
+          </div>`
+      }
     </div>
   </div>`;
 }
@@ -7835,50 +7847,36 @@ function ensureGapi(cb) {
   }, 100);
 }
 
-function ensureDriveToken(cb, forceConsent) {
+function ensureDriveToken(cb) {
   if (_driveToken) { cb(_driveToken); return; }
-
-  const onToken = (resp) => {
-    if (resp.error) {
-      // Silently failed — show a manual sign-in button instead
-      _driveCallbackQueue = [];
-      // Signal callers with null so they can render the button
-      cb(null, resp.error);
-      return;
-    }
-    _driveToken = resp.access_token;
-    setTimeout(() => { _driveToken = null; }, (resp.expires_in - 60) * 1000);
-    _driveCallbackQueue.forEach(fn => fn(_driveToken));
-    _driveCallbackQueue = [];
-  };
-
   if (!_driveTokenClient) {
     _driveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GDRIVE_CLIENT_ID,
       scope: GDRIVE_SCOPES,
-      callback: onToken,
+      callback: (resp) => {
+        if (resp.error) { console.warn('Drive token error', resp); cb(null); return; }
+        _driveToken = resp.access_token;
+        setTimeout(() => { _driveToken = null; }, (resp.expires_in - 60) * 1000);
+        cb(_driveToken);
+      },
     });
-  } else {
-    // Update callback for this call
-    _driveTokenClient.callback = onToken;
   }
-
-  _driveCallbackQueue.push(cb);
-  // prompt:'none' tries silently first — no popup if user already consented
-  // prompt:'consent' is only used when user explicitly clicks the sign-in button
-  _driveTokenClient.requestAccessToken({prompt: forceConsent ? 'consent' : 'none'});
+  _driveTokenClient.requestAccessToken({prompt: ''});
 }
 
 function driveSignIn(pid) {
-  // Called by the manual sign-in button — uses consent prompt which is a direct user gesture
-  ensureDriveToken((token, err) => {
-    if (token) {
-      loadDriveBrowser(pid);
-    } else {
-      const el = document.getElementById(`drive-browser-${pid}`);
-      if (el) el.innerHTML = `<div style="font-size:11px;color:var(--red);">Sign-in failed. <a href="${(projectFolders[pid]||{}).folderUrl||'#'}" target="_blank" style="color:var(--green);">Open in Drive ↗</a></div>`;
-    }
-  }, true);
+  ensureGapi(() => {
+    ensureDriveToken((token) => {
+      const el = document.getElementById('drive-browser-' + pid);
+      if (!token) {
+        if (el) el.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:8px;">Sign-in failed. <a href="' + ((projectFolders[pid]||{}).folderUrl||'#') + '" target="_blank" style="color:var(--green);">Open in Drive</a></div>';
+        return;
+      }
+      gapi.client.setToken({access_token: token});
+      if (el) el.innerHTML = '<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px;padding:8px 0;"><span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span> Loading files...</div>';
+      fetchDriveFolder(projectFolders[pid].folderId, el, pid, 0);
+    });
+  });
 }
 
 function loadDriveBrowser(pid) {
