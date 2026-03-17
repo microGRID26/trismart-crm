@@ -7834,24 +7834,50 @@ function ensureGapi(cb) {
   }, 100);
 }
 
-function ensureDriveToken(cb) {
+function ensureDriveToken(cb, forceConsent) {
   if (_driveToken) { cb(_driveToken); return; }
+
+  const onToken = (resp) => {
+    if (resp.error) {
+      // Silently failed — show a manual sign-in button instead
+      _driveCallbackQueue = [];
+      // Signal callers with null so they can render the button
+      cb(null, resp.error);
+      return;
+    }
+    _driveToken = resp.access_token;
+    setTimeout(() => { _driveToken = null; }, (resp.expires_in - 60) * 1000);
+    _driveCallbackQueue.forEach(fn => fn(_driveToken));
+    _driveCallbackQueue = [];
+  };
+
   if (!_driveTokenClient) {
     _driveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GDRIVE_CLIENT_ID,
       scope: GDRIVE_SCOPES,
-      callback: (resp) => {
-        if (resp.error) { console.warn('Drive token error', resp); return; }
-        _driveToken = resp.access_token;
-        // Auto-clear token when it expires (~1hr)
-        setTimeout(() => { _driveToken = null; }, (resp.expires_in - 60) * 1000);
-        _driveCallbackQueue.forEach(fn => fn(_driveToken));
-        _driveCallbackQueue = [];
-      },
+      callback: onToken,
     });
+  } else {
+    // Update callback for this call
+    _driveTokenClient.callback = onToken;
   }
+
   _driveCallbackQueue.push(cb);
-  _driveTokenClient.requestAccessToken({prompt: ''});
+  // prompt:'none' tries silently first — no popup if user already consented
+  // prompt:'consent' is only used when user explicitly clicks the sign-in button
+  _driveTokenClient.requestAccessToken({prompt: forceConsent ? 'consent' : 'none'});
+}
+
+function driveSignIn(pid) {
+  // Called by the manual sign-in button — uses consent prompt which is a direct user gesture
+  ensureDriveToken((token, err) => {
+    if (token) {
+      loadDriveBrowser(pid);
+    } else {
+      const el = document.getElementById(`drive-browser-${pid}`);
+      if (el) el.innerHTML = `<div style="font-size:11px;color:var(--red);">Sign-in failed. <a href="${(projectFolders[pid]||{}).folderUrl||'#'}" target="_blank" style="color:var(--green);">Open in Drive ↗</a></div>`;
+    }
+  }, true);
 }
 
 function loadDriveBrowser(pid) {
@@ -7864,8 +7890,22 @@ function loadDriveBrowser(pid) {
   }
 
   ensureGapi(() => {
-    ensureDriveToken(token => {
-      if (!token) { el.innerHTML = `<div style="font-size:11px;color:var(--text3);">Sign in to view files.</div>`; return; }
+    ensureDriveToken((token, err) => {
+      if (!token) {
+        // Silent auth failed — show a sign-in button (requires direct user gesture)
+        el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border);">
+          <span style="font-size:20px;">🔒</span>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px;">Sign in to view project files</div>
+            <div style="font-size:10px;color:var(--text3);">Connect your Google account to browse files inline</div>
+          </div>
+          <button onclick="driveSignIn('${pid}')"
+            style="padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;">
+            Sign in with Google
+          </button>
+        </div>`;
+        return;
+      }
       gapi.client.setToken({access_token: token});
       fetchDriveFolder(folder.folderId, el, pid, 0);
     });
