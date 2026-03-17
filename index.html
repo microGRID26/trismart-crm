@@ -4282,7 +4282,7 @@ async function openAhjEdit(id) {
   `;
 
   // Load messages async
-  loadEntityMessages('ahj_messages', 'ahj_id', id, 'ahj-messages-list');
+  loadEntityMessages('ahj_messages', 'ahj_id', id, 'ahj-messages-list', data.name);
 }
 
 function refreshPermittingSection(pid) {
@@ -4460,7 +4460,7 @@ async function openUtilityEdit(id) {
     </div>`;
 
   // Load messages async
-  loadEntityMessages('utility_messages', 'utility_id', id, 'util-messages-list');
+  loadEntityMessages('utility_messages', 'utility_id', id, 'util-messages-list', data.name);
 }
 
 async function saveUtilityModal() {
@@ -4915,14 +4915,26 @@ async function renderAdminInfo(el) {
 }
 
 // ── ENTITY MESSAGES (bluChat history) ────────────────────────────────────────
-async function loadEntityMessages(table, idCol, entityId, targetElId) {
+async function loadEntityMessages(table, idCol, entityId, targetElId, entityName) {
   const el = document.getElementById(targetElId);
   if (!el) return;
-  const { data, error } = await sb
+
+  // Try by ID first, fall back to ns_name if no results (handles import ID mismatches)
+  let { data, error } = await sb
     .from(table)
     .select('author,message,message_date')
     .eq(idCol, entityId)
     .order('message_date', { ascending: true });
+
+  if ((!data || !data.length) && entityName) {
+    const fallback = await sb
+      .from(table)
+      .select('author,message,message_date')
+      .ilike('ns_name', entityName)
+      .order('message_date', { ascending: true });
+    if (fallback.data?.length) data = fallback.data;
+  }
+
   if (error) { el.innerHTML = '<span style="color:var(--text3);font-size:11px;">Could not load messages.</span>'; return; }
   if (!data || !data.length) { el.innerHTML = '<span style="color:var(--text3);font-size:11px;">No chat history found.</span>'; return; }
   el.innerHTML = data.map(m => {
