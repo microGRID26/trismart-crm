@@ -4167,7 +4167,7 @@ async function renderAdminAHJ(el, search, page) {
   if (search !== undefined) _ahjSearch = search;
   if (page !== undefined) _ahjPage = page;
 
-  const q = sb.from('ahjs').select('id,name,state,city,county,permit_phone,permit_website,max_duration,electric_code', {count:'exact'})
+  const q = sb.from('ahjs').select('id,name,state,city,county,permit_phone,permit_website,max_duration,permit_notes', {count:'exact'})
     .order('name');
   if (_ahjSearch) q.or(`name.ilike.%${_ahjSearch}%,city.ilike.%${_ahjSearch}%,county.ilike.%${_ahjSearch}%`);
   const from = _ahjPage * AHJ_PAGE_SIZE;
@@ -4333,6 +4333,9 @@ async function saveAhjModal() {
     inspection_email:    get('inspection_email'),
     permit_notes:        get('permit_notes'),
     inspection_notes:    get('inspection_notes'),
+    plans_on_site:       get('plans_on_site'),
+    host_type_required:  get('host_type_required'),
+    how_to_request:      get('how_to_request'),
   };
   const { error } = await sb.from('ahjs').update(update).eq('id', id);
   if (error) { showToast('Save failed: ' + error.message); return; }
