@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MicroGRID CRM</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://apis.google.com/js/api.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -7764,131 +7765,218 @@ function renderPanelFiles(pid) {
   const p = projects.find(x => x.id === pid);
   if (!p) return;
   pane.innerHTML = renderFilesContent(pid, p);
+  // Trigger Drive browser load after DOM is ready
+  if (projectFolders[pid]?.folderUrl) {
+    setTimeout(() => loadDriveBrowser(pid), 0);
+  }
 }
 
 function renderFilesContent(pid, p) {
-  const docs = projectDocuments[pid] || [];
   const folder = projectFolders[pid];
+  const folderUrl = folder?.folderUrl || '';
+  const folderId  = folder?.folderId  || '';
 
-  const byType = {};
-  docs.forEach(d => {
-    if (!byType[d.docType]) byType[d.docType] = [];
-    byType[d.docType].push(d);
-  });
-
-  const required = DOC_TYPES.filter(t => t.required);
-  const missing  = required.filter(t => !byType[t.id]?.length);
-  const complete = required.filter(t =>  byType[t.id]?.length > 0);
-
-  const statusBar = `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:${missing.length===0?'#E8F5EE':'#FFF8E8'};border-radius:var(--radius);margin-bottom:14px;border:0.5px solid ${missing.length===0?'#A8D5B8':'#F5CBA7'};">
-      <span style="font-size:16px;">${missing.length===0?'✅':'⚠️'}</span>
-      <div>
-        <div style="font-size:11px;font-weight:600;color:${missing.length===0?'#1B6B47':'#7D5A00'};">${missing.length===0?'All required documents attached':`${missing.length} required document${missing.length>1?'s':''} missing`}</div>
-        ${missing.length>0?`<div style="font-size:10px;color:var(--text3);margin-top:2px;">${missing.map(t=>t.label).join(', ')}</div>`:''}
-      </div>
-      <div style="margin-left:auto;font-size:10px;color:var(--text3);">${complete.length}/${required.length} required</div>
+  if (!folderUrl) {
+    return `<div style="padding:40px;text-align:center;color:var(--text3);">
+      <div style="font-size:24px;margin-bottom:8px;">📁</div>
+      <div style="font-size:12px;">No Drive folder linked to this project.</div>
     </div>`;
-
-  const folderBar = folder?.folderUrl ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;border:0.5px solid var(--border);">
-      <span>📁</span><span style="font-size:11px;color:var(--text2);flex:1;">Google Drive project folder</span>
-      <a href="${folder.folderUrl}" target="_blank" style="font-size:11px;color:var(--green);text-decoration:none;font-weight:500;">Open ↗</a>
-      <button onclick="clearFolderUrl('${pid}')" style="background:none;border:none;cursor:pointer;color:var(--text3);">✕</button>
-    </div>` : `<div style="padding:8px 12px;background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;border:0.5px dashed var(--border2);">
-      <div style="display:flex;gap:6px;align-items:center;">
-        <span style="font-size:11px;color:var(--text3);">📁 Link Drive folder (optional):</span>
-        <input type="text" id="folder-url-input-${pid}" placeholder="https://drive.google.com/drive/folders/..."
-          style="flex:1;font-size:10px;padding:4px 8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);">
-        <button onclick="saveFolderUrl('${pid}')" style="font-size:10px;padding:4px 10px;border-radius:var(--radius);background:var(--green);color:#fff;border:none;cursor:pointer;">Link</button>
-      </div>
-    </div>`;
-
-  const addForm = `<div id="doc-add-form-${pid}" style="display:none;padding:12px;background:var(--bg2);border-radius:var(--radius);border:0.5px solid var(--border);margin-bottom:12px;">
-      <div style="font-size:11px;font-weight:600;margin-bottom:8px;">Add Document</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Type</div>
-          <select id="doc-type-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;">
-            ${DOC_TYPES.map(t=>`<option value="${t.id}">${t.icon} ${t.label}</option>`).join('')}
-          </select></div>
-        <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Label / File name</div>
-          <input type="text" id="doc-label-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="e.g. Signed contract v2"></div>
-      </div>
-      <div style="margin-bottom:8px;">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;">Source — pick one:</div>
-        <div style="display:flex;gap:6px;margin-bottom:6px;">
-          <button id="doc-src-url-btn-${pid}" onclick="switchDocSource('${pid}','url')"
-            style="font-size:10px;padding:3px 10px;border-radius:var(--radius);border:0.5px solid var(--green);background:var(--green);color:#fff;cursor:pointer;">🔗 URL / Link</button>
-          <button id="doc-src-file-btn-${pid}" onclick="switchDocSource('${pid}','file')"
-            style="font-size:10px;padding:3px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;">📤 Upload file</button>
-        </div>
-        <div id="doc-src-url-${pid}">
-          <input type="text" id="doc-url-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="https://drive.google.com/... or any URL">
-        </div>
-        <div id="doc-src-file-${pid}" style="display:none;">
-          <div id="doc-drop-${pid}"
-            ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
-            ondragleave="this.style.borderColor='var(--border2)'"
-            ondrop="handleDocDrop(event,'${pid}')"
-            style="border:1.5px dashed var(--border2);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;"
-            onclick="document.getElementById('doc-file-input-${pid}').click()">
-            <div style="font-size:13px;margin-bottom:4px;">📁</div>
-            <div style="font-size:11px;color:var(--text2);">Click to browse or drag file here</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:2px;">PDF, images, Word, Excel — max 50MB</div>
-          </div>
-          <input type="file" id="doc-file-input-${pid}" style="display:none;"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.heic"
-            onchange="handleDocFileSelect(event,'${pid}')">
-          <div id="doc-file-selected-${pid}" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border);align-items:center;gap:8px;">
-            <span id="doc-file-name-${pid}" style="font-size:11px;flex:1;"></span>
-            <button onclick="clearDocFile('${pid}')" style="background:none;border:none;cursor:pointer;color:var(--text3);">✕</button>
-          </div>
-          <div id="doc-upload-progress-${pid}" style="display:none;margin-top:8px;">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px;" id="doc-upload-status-${pid}">Uploading...</div>
-            <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;">
-              <div id="doc-upload-bar-${pid}" style="height:100%;background:var(--green);width:0%;transition:width .3s;"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Notes (optional)</div>
-        <input type="text" id="doc-notes-${pid}" class="np-input" style="font-size:11px;padding:5px 8px;" placeholder="Rev 4, stamped, final, etc."></div>
-      <div style="display:flex;gap:6px;">
-        <button onclick="saveDocument('${pid}')" style="font-size:11px;padding:5px 14px;border-radius:var(--radius);background:var(--green);color:#fff;border:none;cursor:pointer;font-weight:500;">Save</button>
-        <button onclick="cancelAddDoc('${pid}')" style="font-size:11px;padding:5px 14px;border-radius:var(--radius);background:var(--bg);color:var(--text2);border:0.5px solid var(--border2);cursor:pointer;">Cancel</button>
-      </div>
-    </div>`;
-
-  const docRows = DOC_TYPES.map(t => {
-    const typeDocs = byType[t.id] || [];
-    if (!typeDocs.length && !t.required) return '';
-    const rowsHtml = typeDocs.map(d => {
-      const dt = d.addedAt ? new Date(d.addedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:6px;margin-top:4px;">
-        <a href="${d.url}" target="_blank" style="flex:1;font-size:11px;color:var(--green);text-decoration:none;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.url}">${d.label}</a>
-        ${d.notes?`<span style="font-size:10px;color:var(--text3);white-space:nowrap;">${d.notes}</span>`:''}
-        <span style="font-size:10px;color:var(--text3);white-space:nowrap;">${dt}</span>
-        <span style="font-size:10px;color:var(--text3);white-space:nowrap;">${d.addedBy||''}</span>
-        <button onclick="deleteDocument('${pid}','${d.id}')" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 2px;">✕</button>
-      </div>`;
-    }).join('');
-    return `<div style="margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-          <span>${t.icon}</span>
-          <span style="font-size:11px;font-weight:600;color:var(--text2);">${t.label}</span>
-          ${t.required?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:${typeDocs.length?'#E8F5EE':'#FEE2E2'};color:${typeDocs.length?'#1B6B47':'#A32D2D'};">${typeDocs.length?'✓':'Required'}</span>`:''}
-          <button onclick="showAddDocForm('${pid}','${t.id}')" title="Add" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--green);font-size:14px;padding:0 2px;">＋</button>
-        </div>
-        ${rowsHtml||`<div style="font-size:10px;color:var(--text3);padding:4px 8px;">${t.required?'Not yet attached':'—'}</div>`}
-      </div>`;
-  }).join('');
+  }
 
   return `<div style="padding:14px 16px;">
-    ${statusBar}${folderBar}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);">Documents (${docs.length})</div>
-      <button onclick="showAddDocForm('${pid}',null)" style="font-size:11px;padding:5px 12px;border-radius:var(--radius);background:var(--green);color:#fff;border:none;cursor:pointer;font-weight:500;">+ Add Document</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:0.5px solid var(--border);">
+      <span style="font-size:15px;">📁</span>
+      <span style="font-size:12px;font-weight:600;color:var(--text);flex:1;">${escapeHtml(p.name)} — Project Files</span>
+      <a href="${folderUrl}" target="_blank" rel="noopener"
+        style="font-size:11px;color:var(--green);text-decoration:none;font-weight:500;padding:4px 10px;border:0.5px solid var(--green);border-radius:var(--radius);">
+        Open in Drive ↗
+      </a>
     </div>
-    ${addForm}${docRows}
+    <div id="drive-browser-${pid}" style="min-height:80px;">
+      <div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:10px;height:10px;border:1.5px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;"></span>
+        Loading files...
+      </div>
+    </div>
   </div>`;
+}
+
+// ── GOOGLE DRIVE BROWSER ──────────────────────────────────────────────────────
+const GDRIVE_CLIENT_ID = '628637774830-tlsfc1vrtv1529mm6cs51u33po6m8hje.apps.googleusercontent.com';
+const GDRIVE_SCOPES    = 'https://www.googleapis.com/auth/drive.readonly';
+let _gapiReady  = false;
+let _gapiLoading = false;
+let _driveToken = null;   // access token from GIS
+let _driveTokenClient = null;
+let _driveCallbackQueue = []; // callbacks waiting for token
+
+function ensureGapi(cb) {
+  if (_gapiReady) { cb(); return; }
+  if (_gapiLoading) { _driveCallbackQueue.push(cb); return; }
+  _gapiLoading = true;
+  _driveCallbackQueue.push(cb);
+
+  function initGapi() {
+    gapi.load('client', async () => {
+      await gapi.client.init({});
+      await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+      _gapiReady = true;
+      _gapiLoading = false;
+      _driveCallbackQueue.forEach(fn => fn());
+      _driveCallbackQueue = [];
+    });
+  }
+
+  if (typeof gapi !== 'undefined') { initGapi(); return; }
+  // gapi not yet loaded — poll
+  const t = setInterval(() => {
+    if (typeof gapi !== 'undefined') { clearInterval(t); initGapi(); }
+  }, 100);
+}
+
+function ensureDriveToken(cb) {
+  if (_driveToken) { cb(_driveToken); return; }
+  if (!_driveTokenClient) {
+    _driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GDRIVE_CLIENT_ID,
+      scope: GDRIVE_SCOPES,
+      callback: (resp) => {
+        if (resp.error) { console.warn('Drive token error', resp); return; }
+        _driveToken = resp.access_token;
+        // Auto-clear token when it expires (~1hr)
+        setTimeout(() => { _driveToken = null; }, (resp.expires_in - 60) * 1000);
+        _driveCallbackQueue.forEach(fn => fn(_driveToken));
+        _driveCallbackQueue = [];
+      },
+    });
+  }
+  _driveCallbackQueue.push(cb);
+  _driveTokenClient.requestAccessToken({prompt: ''});
+}
+
+function loadDriveBrowser(pid) {
+  const el = document.getElementById(`drive-browser-${pid}`);
+  if (!el) return;
+  const folder = projectFolders[pid];
+  if (!folder?.folderId) {
+    el.innerHTML = `<div style="font-size:11px;color:var(--text3);">No folder ID — <a href="${folder?.folderUrl}" target="_blank" style="color:var(--green);">open in Drive ↗</a></div>`;
+    return;
+  }
+
+  ensureGapi(() => {
+    ensureDriveToken(token => {
+      if (!token) { el.innerHTML = `<div style="font-size:11px;color:var(--text3);">Sign in to view files.</div>`; return; }
+      gapi.client.setToken({access_token: token});
+      fetchDriveFolder(folder.folderId, el, pid, 0);
+    });
+  });
+}
+
+async function fetchDriveFolder(folderId, el, pid, depth) {
+  try {
+    const resp = await gapi.client.drive.files.list({
+      q: `'${folderId}' in parents and trashed=false`,
+      fields: 'files(id,name,mimeType,thumbnailLink,webViewLink,size,modifiedTime)',
+      orderBy: 'name',
+      pageSize: 200,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+
+    const files = resp.result.files || [];
+    if (!files.length) {
+      el.innerHTML = `<div style="font-size:11px;color:var(--text3);padding:8px 0;">No files found.</div>`;
+      return;
+    }
+
+    const folders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+    const docs    = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
+
+    const IMAGE_TYPES = ['image/jpeg','image/png','image/gif','image/webp','image/heic'];
+    const FILE_ICONS  = {
+      'application/pdf': '📄',
+      'application/vnd.google-apps.document': '📝',
+      'application/vnd.google-apps.spreadsheet': '📊',
+      'application/vnd.google-apps.presentation': '📊',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📝',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '📊',
+    };
+
+    let html = '';
+
+    // Render subfolders as expandable cards
+    if (folders.length) {
+      html += folders.map(f => `
+        <div style="margin-bottom:8px;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div onclick="toggleDriveFolder('${f.id}','df-${f.id}')"
+            style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);cursor:pointer;user-select:none;">
+            <span id="df-arrow-${f.id}" style="font-size:10px;color:var(--text3);">▶</span>
+            <span style="font-size:13px;">📁</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text);flex:1;">${escapeHtml(f.name)}</span>
+            <a href="${f.webViewLink}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+              style="font-size:10px;color:var(--green);text-decoration:none;">Open ↗</a>
+          </div>
+          <div id="df-${f.id}" style="display:none;padding:10px 12px;background:var(--bg);">
+            <div style="font-size:11px;color:var(--text3);">Loading...</div>
+          </div>
+        </div>`).join('');
+    }
+
+    // Render images as thumbnail grid
+    const images = docs.filter(f => IMAGE_TYPES.includes(f.mimeType));
+    const others = docs.filter(f => !IMAGE_TYPES.includes(f.mimeType));
+
+    if (images.length) {
+      html += `<div style="margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px;">Photos (${images.length})</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;">
+          ${images.map(f => `
+            <a href="${f.webViewLink}" target="_blank" rel="noopener" title="${escapeHtml(f.name)}"
+              style="display:block;border-radius:6px;overflow:hidden;border:0.5px solid var(--border);aspect-ratio:1;background:var(--bg2);">
+              ${f.thumbnailLink
+                ? `<img src="${f.thumbnailLink.replace('=s220','=s400')}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;">🖼</div>`
+              }
+            </a>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    if (others.length) {
+      html += `<div>
+        ${depth===0 && others.length ? `<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;">Files (${others.length})</div>` : ''}
+        ${others.map(f => {
+          const icon = FILE_ICONS[f.mimeType] || '📎';
+          const size = f.size ? (Number(f.size)/1024/1024).toFixed(1)+'MB' : '';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;margin-bottom:3px;background:var(--bg2);">
+            <span style="font-size:13px;flex-shrink:0;">${icon}</span>
+            <a href="${f.webViewLink}" target="_blank" rel="noopener"
+              style="flex:1;font-size:11px;color:var(--green);text-decoration:none;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+              title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</a>
+            ${size ? `<span style="font-size:10px;color:var(--text3);flex-shrink:0;">${size}</span>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    el.innerHTML = html || `<div style="font-size:11px;color:var(--text3);">Empty folder.</div>`;
+
+  } catch(e) {
+    console.warn('Drive fetch error', e);
+    el.innerHTML = `<div style="font-size:11px;color:var(--text3);">Could not load files. <a href="${(projectFolders[pid]||{}).folderUrl||'#'}" target="_blank" style="color:var(--green);">Open in Drive ↗</a></div>`;
+  }
+}
+
+async function toggleDriveFolder(folderId, elId) {
+  const el = document.getElementById(elId);
+  const arrow = document.getElementById(`df-arrow-${folderId}`);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▶' : '▼';
+  if (!open && el.innerHTML.includes('Loading...')) {
+    await fetchDriveFolder(folderId, el, null, 1);
+  }
 }
 
 // Track selected file per pid
